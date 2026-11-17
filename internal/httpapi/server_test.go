@@ -14,10 +14,18 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/binarycat0/buildyard/internal/jdk"
 	"github.com/binarycat0/buildyard/internal/store"
+	"github.com/binarycat0/buildyard/internal/tasks"
 )
 
 func newServer(t *testing.T) (http.Handler, string) {
+	t.Helper()
+	return newServerHome(t, t.TempDir())
+}
+
+// newServerHome uses userHome as the home directory for JDK and mvn/mvnd lookup.
+func newServerHome(t *testing.T, userHome string) (http.Handler, string) {
 	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "buildyard.db")
 	st, err := store.Open(context.Background(), dbPath)
@@ -29,7 +37,9 @@ func newServer(t *testing.T) (http.Handler, string) {
 		"index.html": {Data: []byte("<html>buildyard</html>")},
 		"app.js":     {Data: []byte("console.log(1)")},
 	}
-	s := &Server{Store: st, DataDir: "/tmp/x", UI: ui}
+	bg := tasks.New(1, nil)
+	t.Cleanup(bg.Close)
+	s := &Server{Store: st, Tasks: bg, JDKs: jdk.Detector{Home: userHome, GOOS: "darwin"}, Home: userHome, DataDir: "/tmp/x", UI: ui}
 	return s.Handler(), dbPath
 }
 
@@ -111,16 +121,19 @@ func TestProjectsAPI(t *testing.T) {
 	}
 
 	id := "/api/projects/" + strconv.FormatInt(p.ID, 10)
-	w = call("PATCH", id, `{"name":"Renamed","executable":"./mvnw","env":{"MAVEN_OPTS":"-Xmx8g"}}`)
+	w = call("PATCH", id, `{"name":"Renamed","executable":"wrapper","env":{"MAVEN_OPTS":"-Xmx8g"}}`)
 	mustJSON(w, &p)
-	if w.Code != 200 || p.Name != "Renamed" || *p.Executable != "./mvnw" || p.Env["MAVEN_OPTS"] != "-Xmx8g" {
+	if w.Code != 200 || p.Name != "Renamed" || *p.Executable != "wrapper" || p.Env["MAVEN_OPTS"] != "-Xmx8g" {
 		t.Fatalf("patch: %d %s", w.Code, w.Body)
 	}
 	if w := call("PATCH", id, `{"name":"  "}`); w.Code != 400 {
 		t.Fatalf("empty name: %d", w.Code)
 	}
-	if w := call("PATCH", id, `{"javaHome":"jdk21"}`); w.Code != 400 {
-		t.Fatalf("relative javaHome: %d", w.Code)
+	if w := call("PATCH", id, `{"executable":"./mvnw"}`); w.Code != 400 {
+		t.Fatalf("relative executable: %d", w.Code)
+	}
+	if w := call("PATCH", id, `{"jdkId":999}`); w.Code != 400 {
+		t.Fatalf("unknown jdk: %d", w.Code)
 	}
 	if w := call("PATCH", id, `{"skipPresets":{"a":1}}`); w.Code != 400 {
 		t.Fatalf("object skipPresets: %d", w.Code)
@@ -139,7 +152,7 @@ func TestProjectsAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st2.Close()
-	h2 := (&Server{Store: st2, UI: fstest.MapFS{"index.html": {}}}).Handler()
+	h2 := (&Server{Store: st2, Tasks: tasks.New(1, nil), UI: fstest.MapFS{"index.html": {}}}).Handler()
 	w = do(t, h2, req{method: "GET", path: id})
 	if w.Code != 200 || !bytes.Contains(w.Body.Bytes(), []byte("Renamed")) {
 		t.Fatalf("after restart: %d %s", w.Code, w.Body)

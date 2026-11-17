@@ -8,59 +8,193 @@
   <script type="module" src="/app.js"></script>
   <script defer src="/vendor/alpine-3.14.9.min.js"></script>
 </head>
-<body x-data="projectsPage" x-init="load()">
+<body x-data="app" x-init="init()">
   <header class="top">
-    <strong>Buildyard</strong>
-    <span class="muted" x-text="health ? 'v' + health.version : ''"></span>
+    <a href="#/" class="brand">Buildyard</a>
+    <nav>
+      <a href="#/" :class="{active: view === 'projects' || view === 'project'}">Проекты</a>
+      <a href="#/settings" :class="{active: view === 'settings'}">Настройки</a>
+    </nav>
+    <span class="muted grow-right" x-text="health ? 'v' + health.version : ''"></span>
   </header>
 
   <main>
-    <section class="toolbar">
-      <h1>Проекты</h1>
-      <button class="primary" @click="openAdd()" x-show="!adding">Добавить проект</button>
+    <p class="error" x-show="error" x-text="error"></p>
+
+    <!-- ===================== Projects ===================== -->
+    <section x-show="view === 'projects'">
+      <div class="toolbar">
+        <h1>Проекты</h1>
+        <button class="primary" @click="openAdd()" x-show="!adding">Добавить проект</button>
+      </div>
+
+      <form class="card add" x-show="adding" x-cloak @submit.prevent="add()">
+        <label>Путь к корню проекта
+          <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
+        </label>
+        <label>Имя <span class="muted">(необязательно, по умолчанию имя папки)</span>
+          <input x-model="form.name">
+        </label>
+        <p class="error" x-show="formError" x-text="formError"></p>
+        <div class="row">
+          <button class="primary" type="submit" :disabled="busy">Добавить</button>
+          <button type="button" @click="adding = false">Отмена</button>
+        </div>
+      </form>
+
+      <p class="muted" x-show="loaded && projects.length === 0 && !adding">
+        Проектов пока нет. Добавьте папку с pom.xml.
+      </p>
+
+      <div class="grid">
+        <template x-for="p in projects" :key="p.id">
+          <article class="card">
+            <div class="row spread">
+              <h2><a :href="'#/projects/' + p.id" x-text="p.name"></a></h2>
+              <span class="badge" x-text="p.buildTool"></span>
+            </div>
+            <code class="path" x-text="p.rootPath"></code>
+            <p class="muted" x-text="lastJobText(p)"></p>
+            <div class="row">
+              <a class="button" :href="'#/projects/' + p.id">Настройки</a>
+              <button class="danger" @click="remove(p)">Удалить</button>
+            </div>
+          </article>
+        </template>
+      </div>
     </section>
 
-    <form class="card add" x-show="adding" x-cloak @submit.prevent="add()">
-      <label>Путь к корню проекта
-        <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
-      </label>
-      <label>Имя <span class="muted">(необязательно, по умолчанию имя папки)</span>
-        <input x-model="form.name">
-      </label>
-      <p class="error" x-show="formError" x-text="formError"></p>
-      <div class="row">
-        <button class="primary" type="submit" :disabled="busy">Добавить</button>
-        <button type="button" @click="adding = false">Отмена</button>
-      </div>
-    </form>
-
-    <p class="error" x-show="error" x-text="error"></p>
-    <p class="muted" x-show="loaded && projects.length === 0 && !adding">
-      Проектов пока нет. Добавьте папку с pom.xml.
-    </p>
-
-    <div class="grid">
-      <template x-for="p in projects" :key="p.id">
-        <article class="card">
-          <div class="row spread">
-            <template x-if="editing !== p.id">
-              <h2 x-text="p.name"></h2>
-            </template>
-            <template x-if="editing === p.id">
-              <input class="rename" x-model="editName" @keydown.enter="rename(p)" @keydown.escape="editing = null">
-            </template>
-            <span class="badge" x-text="p.buildTool"></span>
+    <!-- ===================== Project settings ===================== -->
+    <section x-show="view === 'project'" x-cloak>
+      <template x-if="proj">
+        <div class="stack">
+          <div class="toolbar">
+            <h1 x-text="proj.name"></h1>
+            <code class="path" x-text="proj.rootPath"></code>
           </div>
-          <code class="path" x-text="p.rootPath"></code>
-          <p class="muted" x-text="lastJobText(p)"></p>
-          <div class="row">
-            <button x-show="editing !== p.id" @click="editing = p.id; editName = p.name">Переименовать</button>
-            <button x-show="editing === p.id" class="primary" @click="rename(p)">Сохранить</button>
-            <button class="danger" @click="remove(p)">Удалить</button>
+
+          <div class="card">
+            <h2>Итог для запуска</h2>
+            <template x-if="runtime">
+              <dl class="kv">
+                <dt>Сборщик</dt>
+                <dd>
+                  <template x-if="runtime.executable">
+                    <span><code x-text="runtime.executable.path"></code>
+                      <span class="muted" x-text="'(' + runtime.executable.reason + (runtime.executableFrom === 'default' ? ', из глобальных настроек' : '') + ')'"></span></span>
+                  </template>
+                  <span class="error" x-show="runtime.executableError" x-text="runtime.executableError"></span>
+                </dd>
+                <dt>JDK</dt>
+                <dd>
+                  <span x-show="runtime.jdk" x-text="runtime.jdk && jdkLabel(runtime.jdk) + (runtime.jdkFrom === 'default' ? ' (из глобальных настроек)' : '')"></span>
+                  <span x-show="!runtime.jdk" class="muted" x-text="'JAVA_HOME демона' + (tools.javaHome ? ': ' + tools.javaHome : ' (не задан)')"></span>
+                </dd>
+              </dl>
+            </template>
           </div>
-        </article>
+
+          <form class="card" @submit.prevent="saveProject()">
+            <label>Имя <input x-model="pform.name" required></label>
+
+            <fieldset>
+              <legend>Сборщик</legend>
+              <label class="radio"><input type="radio" value="" x-model="pform.execChoice">
+                Как в глобальных настройках <span class="muted" x-text="'(' + execLabel(settings.defaultExecutable) + ')'"></span></label>
+              <label class="radio"><input type="radio" value="auto" x-model="pform.execChoice">
+                Авто <span class="muted">— ./mvnw, если есть, иначе mvnd, иначе mvn</span></label>
+              <label class="radio" :class="{disabled: !runtime?.wrapper}"><input type="radio" value="wrapper" x-model="pform.execChoice">
+                Враппер проекта ./mvnw
+                <span class="muted" x-text="runtime?.wrapper ? (runtime.wrapper.mavenVersion ? '— Maven ' + runtime.wrapper.mavenVersion : '') : '— в проекте нет mvnw'"></span></label>
+              <label class="radio"><input type="radio" value="mvnd" x-model="pform.execChoice">
+                mvnd <span class="muted" x-text="runtime?.tools.mvnd ? '— ' + runtime.tools.mvnd : '— не найден'"></span></label>
+              <label class="radio"><input type="radio" value="mvn" x-model="pform.execChoice">
+                mvn <span class="muted" x-text="runtime?.tools.mvn ? '— ' + runtime.tools.mvn : '— не найден'"></span></label>
+              <label class="radio"><input type="radio" value="custom" x-model="pform.execChoice"> Свой путь</label>
+              <input x-show="pform.execChoice === 'custom'" x-model="pform.customPath" placeholder="/opt/maven/bin/mvn">
+            </fieldset>
+
+            <label>JDK
+              <select x-model.number="pform.jdkId">
+                <option value="0" x-text="'Как в глобальных настройках (' + defaultJdkText() + ')'"></option>
+                <template x-for="j in jdks" :key="j.id">
+                  <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.jdkId"></option>
+                </template>
+              </select>
+            </label>
+
+            <label>Переменные окружения <span class="muted">(KEY=VALUE, по одной на строку; например MAVEN_OPTS)</span>
+              <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
+            </label>
+
+            <p class="error" x-show="pformError" x-text="pformError"></p>
+            <div class="row">
+              <button class="primary" type="submit" :disabled="busy">Сохранить</button>
+              <span class="muted" x-show="saved">Сохранено</span>
+            </div>
+          </form>
+        </div>
       </template>
-    </div>
+    </section>
+
+    <!-- ===================== Global settings ===================== -->
+    <section x-show="view === 'settings'" x-cloak class="stack">
+      <h1>Настройки</h1>
+
+      <form class="card" @submit.prevent="saveSettings()">
+        <h2>По умолчанию для проектов</h2>
+        <label>Сборщик
+          <select x-model="sform.defaultExecutable">
+            <option value="auto">Авто: ./mvnw, если есть, иначе mvnd, иначе mvn</option>
+            <option value="wrapper">Всегда враппер проекта ./mvnw</option>
+            <option value="mvnd" x-text="'mvnd' + (tools.tools?.mvnd ? ' — ' + tools.tools.mvnd : ' — не найден')"></option>
+            <option value="mvn" x-text="'mvn' + (tools.tools?.mvn ? ' — ' + tools.tools.mvn : ' — не найден')"></option>
+          </select>
+        </label>
+        <label>JDK
+          <select x-model.number="sform.defaultJdkId">
+            <option value="0" x-text="'JAVA_HOME демона' + (tools.javaHome ? ' (' + tools.javaHome + ')' : ' (не задан)')"></option>
+            <template x-for="j in jdks" :key="j.id">
+              <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === sform.defaultJdkId"></option>
+            </template>
+          </select>
+        </label>
+        <div class="row">
+          <button class="primary" type="submit" :disabled="busy">Сохранить</button>
+          <span class="muted" x-show="saved">Сохранено</span>
+        </div>
+      </form>
+
+      <div class="card">
+        <div class="row spread">
+          <h2>Доступные JDK</h2>
+          <button @click="detect()" :disabled="detectTask">
+            <span x-text="detectTask ? 'Ищу…' : 'Найти заново'"></span>
+          </button>
+        </div>
+        <p class="muted" x-show="detectResult" x-text="detectResult"></p>
+        <table class="list" x-show="jdks.length">
+          <thead><tr><th>Версия</th><th>Название</th><th>Путь</th><th>Откуда</th><th></th></tr></thead>
+          <tbody>
+            <template x-for="j in jdks" :key="j.id">
+              <tr :class="{missing: j.missing}">
+                <td><strong x-text="j.version || '?'"></strong> <span class="muted" x-text="j.arch"></span></td>
+                <td><input class="inline" :value="j.name" :placeholder="j.vendor" @change="renameJdk(j, $event.target.value)"></td>
+                <td><code class="path" x-text="j.home"></code> <span class="error" x-show="j.missing">не найден</span></td>
+                <td class="muted" x-text="j.source"></td>
+                <td><button class="danger small" @click="deleteJdk(j)">Убрать</button></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <p class="muted" x-show="!jdks.length && !detectTask">JDK не найдены. Добавьте путь вручную.</p>
+        <form class="row" @submit.prevent="addJdk()">
+          <input class="grow" x-model="jdkPath" placeholder="Путь к JDK, например /Library/Java/JavaVirtualMachines/temurin-21.jdk">
+          <button type="submit">Добавить</button>
+        </form>
+        <p class="error" x-show="jdkError" x-text="jdkError"></p>
+      </div>
+    </section>
   </main>
 </body>
 </html>

@@ -15,8 +15,8 @@ type Project struct {
 	Name        string            `json:"name"`
 	RootPath    string            `json:"rootPath"`
 	BuildTool   string            `json:"buildTool"`
-	Executable  *string           `json:"executable"` // nil = auto
-	JavaHome    *string           `json:"javaHome"`
+	Executable  *string           `json:"executable"` // nil = global default; else auto|wrapper|mvnd|mvn|/abs/path
+	JdkID       *int64            `json:"jdkId"`      // nil = global default JDK
 	Env         map[string]string `json:"env"`
 	SkipPresets json.RawMessage   `json:"skipPresets"`
 	CreatedAt   time.Time         `json:"createdAt"`
@@ -35,13 +35,13 @@ type JobSummary struct {
 // ProjectPatch holds the fields PATCH /api/projects/{id} may change. Nil means "leave as is".
 type ProjectPatch struct {
 	Name        *string            `json:"name"`
-	Executable  *string            `json:"executable"`
-	JavaHome    *string            `json:"javaHome"`
+	Executable  *string            `json:"executable"` // "" resets to the global default
+	JdkID       *int64             `json:"jdkId"`      // 0 resets to the global default
 	Env         *map[string]string `json:"env"`
 	SkipPresets *json.RawMessage   `json:"skipPresets"`
 }
 
-const projectCols = `p.id, p.name, p.root_path, p.build_tool, p.executable, p.java_home,
+const projectCols = `p.id, p.name, p.root_path, p.build_tool, p.executable, p.jdk_id,
 	p.env_json, p.skip_presets_json, p.created_at,
 	j.id, j.status, j.queued_at, j.started_at, j.finished_at`
 
@@ -58,9 +58,9 @@ func (s *Store) CreateProject(ctx context.Context, p Project) (Project, error) {
 	}
 	env, _ := json.Marshal(p.Env)
 	res, err := s.db.ExecContext(ctx, `INSERT INTO project
-		(name, root_path, build_tool, executable, java_home, env_json, skip_presets_json, created_at)
+		(name, root_path, build_tool, executable, jdk_id, env_json, skip_presets_json, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.Name, p.RootPath, p.BuildTool, p.Executable, p.JavaHome, string(env), string(p.SkipPresets), now())
+		p.Name, p.RootPath, p.BuildTool, p.Executable, p.JdkID, string(env), string(p.SkipPresets), now())
 	if err != nil {
 		return Project{}, mapErr(err)
 	}
@@ -96,7 +96,7 @@ func (s *Store) ListProjects(ctx context.Context) ([]Project, error) {
 	return out, rows.Err()
 }
 
-// UpdateProject applies a patch. An empty string for Executable or JavaHome resets it to NULL (auto).
+// UpdateProject applies a patch. An empty Executable or a zero JdkID resets it to the global default.
 func (s *Store) UpdateProject(ctx context.Context, id int64, patch ProjectPatch) (Project, error) {
 	var sets []string
 	var args []any
@@ -106,8 +106,12 @@ func (s *Store) UpdateProject(ctx context.Context, id int64, patch ProjectPatch)
 	if patch.Executable != nil {
 		sets, args = append(sets, "executable = ?"), append(args, nullIfEmpty(*patch.Executable))
 	}
-	if patch.JavaHome != nil {
-		sets, args = append(sets, "java_home = ?"), append(args, nullIfEmpty(*patch.JavaHome))
+	if patch.JdkID != nil {
+		var v any
+		if *patch.JdkID > 0 {
+			v = *patch.JdkID
+		}
+		sets, args = append(sets, "jdk_id = ?"), append(args, v)
 	}
 	if patch.Env != nil {
 		env := *patch.Env
@@ -154,7 +158,7 @@ func scanProject(r scanner) (Project, error) {
 		jobID                              sql.NullInt64
 		jobStatus, queued, started, finish sql.NullString
 	)
-	if err := r.Scan(&p.ID, &p.Name, &p.RootPath, &p.BuildTool, &p.Executable, &p.JavaHome,
+	if err := r.Scan(&p.ID, &p.Name, &p.RootPath, &p.BuildTool, &p.Executable, &p.JdkID,
 		&env, &presets, &created, &jobID, &jobStatus, &queued, &started, &finish); err != nil {
 		return Project{}, err
 	}
