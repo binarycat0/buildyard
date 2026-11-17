@@ -1,0 +1,1014 @@
+# buildyard fixture: Plain (no thread names) -T 1C build tail: Reactor Summary + BUILD FAILURE + errors
+# buildyard fixture: source: build-1 (f139f13)
+[WARNING] SystemTray is not supported, skipping notifications...
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Detecting the operating system and CPU architecture
+[INFO] ------------------------------------------------------------------------
+[INFO] os.detected.name: osx
+[INFO] os.detected.arch: aarch_64
+[INFO] os.detected.bitness: 64
+[INFO] os.detected.version: 27.0
+[INFO] os.detected.version.major: 27
+[INFO] os.detected.version.minor: 0
+[INFO] os.detected.classifier: osx-aarch_64
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Build Tools - Parent                                               [pom]
+[INFO] Build Tools - Configs                                              [jar]
+[INFO] Build Tools - Error Definition Code Generator                      [jar]
+[INFO] Build Tools - Dremio Error Prone Checks                            [jar]
+[INFO] Build Tools - Freemarker Codegen Tooling                  [maven-plugin]
+[INFO] Build Tools - Open Api Spec Code Generator                         [jar]
+[INFO] Build Tools - Dremio Opentelemetry BOM                             [pom]
+[INFO] Build Tools - Protostuff Compiler Plugin                  [maven-plugin]
+[INFO] Dremio - Parent                                                    [pom]
+[INFO] Protocol                                                           [jar]
+[INFO] Common - Parent                                                    [pom]
+[INFO] Common - AWS                                                       [jar]
+[INFO] Common - Core                                                      [jar]
+[INFO] Common - Exceptions                                                [jar]
+[INFO] Common - Telemetry API                                             [jar]
+# ... trimmed ...
+[INFO] Installing /Users/dev/dremio-global/dremio/enterprise/kubernetes/engine/operator/v26/app/target/dremio-ee-kubernetes-engine-operator-v26-app-27.0.0-SNAPSHOT-runner.jar to /Users/dev/.m2/repository/com/dremio/enterprise/engine/operator/v26/dremio-ee-kubernetes-engine-operator-v26-app/27.0.0-SNAPSHOT/dremio-ee-kubernetes-engine-operator-v26-app-27.0.0-SNAPSHOT-runner.jar
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Dremio - Root 27.0.0-SNAPSHOT:
+[INFO] 
+[INFO] Build Tools - Parent ............................... SUCCESS [  0.498 s]
+[INFO] Build Tools - Configs .............................. SUCCESS [  0.289 s]
+[INFO] Build Tools - Error Definition Code Generator ...... SUCCESS [  0.754 s]
+[INFO] Build Tools - Dremio Error Prone Checks ............ SUCCESS [  0.710 s]
+[INFO] Build Tools - Freemarker Codegen Tooling ........... SUCCESS [  0.680 s]
+[INFO] Build Tools - Open Api Spec Code Generator ......... SUCCESS [  0.840 s]
+[INFO] Build Tools - Dremio Opentelemetry BOM ............. SUCCESS [  0.488 s]
+[INFO] Build Tools - Protostuff Compiler Plugin ........... SUCCESS [  0.663 s]
+[INFO] Dremio - Parent .................................... SUCCESS [  0.659 s]
+[INFO] Protocol ........................................... SUCCESS [ 16.020 s]
+[INFO] Common - Parent .................................... SUCCESS [  0.876 s]
+[INFO] Common - AWS ....................................... SUCCESS [ 30.892 s]
+[INFO] Common - Core ...................................... SUCCESS [ 30.889 s]
+[INFO] Common - Exceptions ................................ SUCCESS [  0.642 s]
+[INFO] Common - Telemetry API ............................. SUCCESS [01:03 min]
+[INFO] Common - Legacy .................................... SUCCESS [  1.671 s]
+[INFO] Services ........................................... SUCCESS [  0.863 s]
+[INFO] Services - Options ................................. SUCCESS [ 52.583 s]
+[INFO] Services - Telemetry - Utils ....................... SUCCESS [  0.801 s]
+[INFO] Tools .............................................. SUCCESS [  0.865 s]
+[INFO] Tools - Metrics Test ............................... SUCCESS [ 30.975 s]
+[INFO] Services - Telemetry - API ......................... SUCCESS [ 41.362 s]
+[INFO] Common - ZooKeeper ................................. SUCCESS [01:03 min]
+[INFO] OSS - Tools - Zookeeper Test Runner ................ SUCCESS [  0.608 s]
+[INFO] Services - Coordinator ............................. SUCCESS [  1.750 s]
+[INFO] Services - Credentials ............................. SUCCESS [  1.617 s]
+[INFO] Services - Base RPC ................................ SUCCESS [  0.861 s]
+[INFO] Sabot .............................................. SUCCESS [  0.881 s]
+[INFO] Sabot - Vector Tools ............................... SUCCESS [ 52.386 s]
+[INFO] Client - Parent .................................... SUCCESS [  0.877 s]
+[INFO] Client - Base ...................................... SUCCESS [ 20.687 s]
+[INFO] Source Connector SPI ............................... SUCCESS [ 52.656 s]
+[INFO] Services - Fabric RPC .............................. SUCCESS [ 20.649 s]
+[INFO] Services - Datastore ............................... SUCCESS [  3.818 s]
+[INFO] Services - PubSub .................................. SUCCESS [  0.858 s]
+[INFO] Services - Configuration ........................... SUCCESS [  0.849 s]
+[INFO] Services - Authenticator ........................... SUCCESS [ 52.641 s]
+[INFO] Services - Users ................................... SUCCESS [  0.725 s]
+[INFO] Services - Namespace API ........................... SUCCESS [  2.684 s]
+[INFO] Sabot - Query Engine Storage Plugins API ........... SUCCESS [  0.808 s]
+[INFO] Services - Task Scheduler .......................... SUCCESS [  0.866 s]
+[INFO] Sabot - Catalog API Proto .......................... SUCCESS [  2.227 s]
+[INFO] Sabot - Catalog .................................... SUCCESS [  0.910 s]
+[INFO] Services - Namespace ............................... SUCCESS [  0.805 s]
+[INFO] Sabot - Query Engine Storage Plugins Impls ......... SUCCESS [  1.046 s]
+[INFO] Sabot - Catalog Impl ............................... SUCCESS [  0.969 s]
+[INFO] Common - Schema Constants .......................... SUCCESS [01:03 min]
+[INFO] Services - Impersonation Validation API ............ SUCCESS [ 40.973 s]
+[INFO] Plugins - Parent ................................... SUCCESS [  0.811 s]
+[INFO] Plugins - Fetcher Proto ............................ SUCCESS [  3.015 s]
+[INFO] Services - gRPC .................................... SUCCESS [ 20.867 s]
+[INFO] Services - Executor Service ........................ SUCCESS [ 53.002 s]
+[INFO] Services - Maestro Service ......................... SUCCESS [  0.453 s]
+[INFO] Services - Maestro common .......................... SUCCESS [  1.172 s]
+[INFO] Services - Maestro Client .......................... SUCCESS [  0.390 s]
+[INFO] dremio-services-jobresults ......................... SUCCESS [  0.479 s]
+[INFO] Services - JobResults - Common ..................... SUCCESS [  1.362 s]
+[INFO] Services - JobResults - Client ..................... SUCCESS [  0.331 s]
+[INFO] Services - TransientStore .......................... SUCCESS [  1.127 s]
+[INFO] Services - Nessie GRPC ............................. SUCCESS [  0.475 s]
+[INFO] Services - Nessie GRPC - Common .................... SUCCESS [02:16 min]
+[INFO] dremio-services-nessie-metadata-cache .............. SUCCESS [  0.891 s]
+[INFO] Services - Lineage ................................. SUCCESS [  0.476 s]
+[INFO] Services - Lineage - Common ........................ SUCCESS [  0.799 s]
+[INFO] Services - Nessie GRPC - Client .................... SUCCESS [  0.744 s]
+[INFO] Services - Embedded Metadata Pointer ............... SUCCESS [  0.762 s]
+[INFO] Services - Nessie Validation ....................... SUCCESS [  7.330 s]
+[INFO] Sabot - TDigest .................................... SUCCESS [01:03 min]
+[INFO] Sabot - Logical Plan ............................... SUCCESS [  1.787 s]
+[INFO] Sabot - Grammar .................................... SUCCESS [01:04 min]
+[INFO] Services - Spill management ........................ SUCCESS [ 20.517 s]
+[INFO] Common - File Content Validation ................... SUCCESS [01:03 min]
+[INFO] Services - Resource Scheduler ...................... SUCCESS [  0.866 s]
+[INFO] Services - Command Pool ............................ SUCCESS [  0.742 s]
+[INFO] Provisioning API - Parent .......................... SUCCESS [  0.875 s]
+[INFO] Provisioning API - common .......................... SUCCESS [  0.970 s]
+[INFO] Services - Executor Selector ....................... SUCCESS [  0.568 s]
+[INFO] dremio-services-jobtelemetry ....................... SUCCESS [  0.441 s]
+[INFO] Services - JobTelemetry - Common ................... SUCCESS [  1.504 s]
+[INFO] Services - Job Telemetry - Server .................. SUCCESS [  0.960 s]
+[INFO] Services - Job Telemetry Client .................... SUCCESS [  0.277 s]
+[INFO] Contrib - Parent ................................... SUCCESS [  0.873 s]
+[INFO] Contrib - Nessie Compatibility Common Override ..... SUCCESS [01:04 min]
+[INFO] Services - Accelerator API ......................... SUCCESS [  1.935 s]
+[INFO] Services - Orphanage ............................... SUCCESS [  1.186 s]
+[INFO] Services - Hadoop Credentials ...................... SUCCESS [  0.894 s]
+[INFO] Services - PartitionStatsCache ..................... SUCCESS [  0.859 s]
+[INFO] Services - DistributedPlanCache .................... SUCCESS [  0.504 s]
+[INFO] Services - Optimization - API ...................... SUCCESS [ 40.947 s]
+[INFO] Tools - Testcontainers ............................. SUCCESS [  0.673 s]
+[INFO] Tools - Testcontainers - Core ...................... SUCCESS [  0.606 s]
+[INFO] Tools - Testcontainers - MinIO ..................... SUCCESS [  0.690 s]
+[INFO] Extras - Parent .................................... SUCCESS [  0.864 s]
+[INFO] Extras - Tools ..................................... SUCCESS [  7.244 s]
+[INFO] Extras - Tools - Iceberg Table Generator ........... SUCCESS [01:37 min]
+[INFO] Sabot - Kernel ..................................... SUCCESS [ 16.182 s]
+[INFO] Client - JDBC Driver ............................... SKIPPED
+[INFO] Common - Rate Limiting ............................. SUCCESS [ 40.916 s]
+[INFO] Contrib - Shaded Hive 3 JAR ........................ SUCCESS [01:09 min]
+[INFO] Relocated Nessie Storage Classes ................... SUCCESS [ 31.526 s]
+[INFO] Services - Job Results - Server .................... SKIPPED
+[INFO] Services - UserSessions ............................ SKIPPED
+[INFO] Services - Arrow Flight Common ..................... SUCCESS [ 52.041 s]
+[INFO] Services - Job Counts .............................. SUCCESS [  0.473 s]
+[INFO] Services - JobCounts - Common ...................... SUCCESS [  1.686 s]
+[INFO] Services - Jobs .................................... SKIPPED
+[INFO] Plugins - Pseudo-Distributed FileSystem Plugin ..... SKIPPED
+[INFO] Services - Accelerator ............................. SKIPPED
+[INFO] Services - Functions ............................... SKIPPED
+[INFO] Services - Scripts ................................. SKIPPED
+[INFO] Services - Collaboration ........................... SKIPPED
+[INFO] Sabot - Plan Serializer ............................ SKIPPED
+[INFO] Services - Tokens .................................. SKIPPED
+[INFO] Services - Arrow Flight ............................ SKIPPED
+[INFO] Services - Node Metrics ............................ SKIPPED
+[INFO] Services - System Table - Flight ................... SKIPPED
+[INFO] Plugins - SysFlight Plugin ......................... SKIPPED
+[INFO] Analyst Center ..................................... SUCCESS [  0.863 s]
+[INFO] Analyst Center - common ............................ SUCCESS [ 41.343 s]
+[INFO] Services - Job Counts - Server ..................... SUCCESS [  1.160 s]
+[INFO] Services - Catalog Maintenance ..................... SUCCESS [  0.861 s]
+[INFO] Services - Lineage - Service ....................... SKIPPED
+[INFO] Services - Statistics .............................. SKIPPED
+[INFO] Plugins - NAS Plugin ............................... SKIPPED
+[INFO] Services - Nessie - Rest javax ..................... SUCCESS [  7.342 s]
+[INFO] Services - Nessie - Proxy .......................... SUCCESS [ 41.417 s]
+[INFO] Services - OrphanageCleaner ........................ SKIPPED
+[INFO] Services - User Preference ......................... SUCCESS [  3.743 s]
+[INFO] Community - Parent ................................. SUCCESS [  0.875 s]
+[INFO] Community - Storage Plugins - Parent ............... SUCCESS [  0.654 s]
+[INFO] Community - Storage Plugins - Common ............... SKIPPED
+[INFO] Community - Storage Plugins - JDBC Parent .......... SUCCESS [  0.798 s]
+[INFO] Community - Storage Plugins - JDBC Fetcher API ..... SKIPPED
+[INFO] Community - Storage Plugins - JDBC ................. SKIPPED
+[INFO] Services - SQLRunner ............................... SKIPPED
+[INFO] Services - System Iceberg Tables - Maintainer ...... SKIPPED
+[INFO] Plugins - AWS Auth ................................. SKIPPED
+[INFO] Plugins - Common ................................... SKIPPED
+[INFO] Plugins - S3 Plugin ................................ SKIPPED
+[INFO] Services - Cloud Identity .......................... SUCCESS [  7.329 s]
+[INFO] Plugins - Azure Storage Plugin ..................... SKIPPED
+[INFO] Plugins - Google Storage Plugin .................... SKIPPED
+[INFO] Plugins - Dataplane ................................ SKIPPED
+[INFO] Analyst Center - backend ........................... SKIPPED
+[INFO] Dremio UI Library .................................. SUCCESS [  7.318 s]
+[INFO] Dremio UI Parent ................................... SUCCESS [  0.865 s]
+[INFO] UI - Design System ................................. SUCCESS [  6.871 s]
+[INFO] UI - Dremio Parser ................................. SUCCESS [  6.853 s]
+[INFO] Dremio UI Common ................................... SUCCESS [  0.822 s]
+[INFO] UI - Browserslist Config ........................... SUCCESS [  6.856 s]
+[INFO] UI - OSS License Checker ........................... SUCCESS [  6.864 s]
+[INFO] Analyst Center - UI ................................ SUCCESS [  0.962 s]
+[INFO] Plugins - Elasticsearch Plugin ..................... SKIPPED
+[INFO] Plugins - HDFS Plugin .............................. SKIPPED
+[INFO] Plugins - Mongo Plugin ............................. SUCCESS [ 51.699 s]
+[INFO] Sample data ........................................ SUCCESS [  0.888 s]
+[INFO] Storage Plugins - Hive Plugin Proxy ................ SKIPPED
+[INFO] Plugins - Hive 3.x Parent .......................... SUCCESS [  0.458 s]
+[INFO] Storage Plugins - Hive 3.x Plugin Launcher ......... SKIPPED
+[INFO] Plugins - Hive Plugin .............................. SKIPPED
+[INFO] Storage Plugins - Hive 3.x Plugin .................. SKIPPED
+[INFO] Plugins - Hive Functions ........................... SKIPPED
+[INFO] Provisioning API - Yarn Provisioning ............... SUCCESS [  0.663 s]
+[INFO] Provisioning API - Shaded Twill JAR ................ SUCCESS [  2.792 s]
+[INFO] Analyst Center - provision-api ..................... SUCCESS [  0.916 s]
+[INFO] Provisioning API - Yarn/Twill integration .......... SUCCESS [  1.000 s]
+[INFO] Tools - Attach Tool ................................ SKIPPED
+[INFO] Plugins - Iceberg Catalog Plugin ................... SKIPPED
+[INFO] Community - Storage Plugins - Parquet Accelerator .. SKIPPED
+[INFO] Community - Sabot - Parent ......................... SUCCESS [  0.651 s]
+[INFO] Community - Sabot - Joust (parent) ................. SUCCESS [  0.773 s]
+[INFO] Community - Sabot - Joust CPP ...................... SUCCESS [  0.617 s]
+[INFO] Community - Sabot - Joust Java ..................... SKIPPED
+[INFO] Community - Sabot - Kernel ......................... SKIPPED
+[INFO] Community - Sabot - Asynchronous Thread Scheduler .. SKIPPED
+[INFO] Community - Storage Plugins - Elasticsearch ........ SKIPPED
+[INFO] Community - Contrib - Parent ....................... SUCCESS [  0.644 s]
+[INFO] Community - Contrib - Db2-shade .................... SUCCESS [  1.557 s]
+[INFO] Community - Storage Plugins - Mongo ................ SKIPPED
+[INFO] Community - Services - Parent ...................... SUCCESS [  0.663 s]
+[INFO] Community - Services - Cache Manager ............... SKIPPED
+[INFO] Analyst Center - daemon ............................ SKIPPED
+[INFO] Distribution - Parent .............................. SUCCESS [  0.867 s]
+[INFO] Distribution - Scripts and Resources ............... SUCCESS [  0.748 s]
+[INFO] Distribution - All-in-one JDBC JAR ................. SKIPPED
+[INFO] Services - Nessie Storage Upgrade .................. SKIPPED
+[INFO] Community - Storage Plugins - Hive 3.x Parent ...... SUCCESS [  0.762 s]
+[INFO] Community - Storage Plugins - Hive 3.x Plugin Launcher SKIPPED
+[INFO] Community - Storage Plugins - Hive 3.x Plugin ...... SKIPPED
+[INFO] Plugins - AWS Glue Catalog Plugin .................. SKIPPED
+[INFO] Distribution - Server Packaging .................... SKIPPED
+[INFO] Plugins - Dataplane - Tests ........................ SKIPPED
+[INFO] Sabot - Arrow Parquet Writer ....................... SUCCESS [01:03 min]
+[INFO] Sabot - Object Store API ........................... SUCCESS [ 30.745 s]
+[INFO] Sabot - Object Store Azure Implementation .......... SUCCESS [ 30.701 s]
+[INFO] Sabot - Object Store GCS Implementation ............ SUCCESS [ 23.604 s]
+[INFO] Sabot - Object Store S3 Implementation ............. SUCCESS [ 33.675 s]
+[INFO] Services - Nessie GRPC - Server .................... SUCCESS [  0.551 s]
+[INFO] Services - PubSub Instrumentation .................. SUCCESS [  0.841 s]
+[INFO] Tools - Testcontainers - NATS ...................... SUCCESS [  0.707 s]
+[INFO] Services - PubSub .................................. SUCCESS [  2.427 s]
+[INFO] Services - Reindexer ............................... SUCCESS [  1.446 s]
+[INFO] Tools - Testcontainers - K3s ....................... SUCCESS [  0.832 s]
+[INFO] Tools - Testcontainers - OpenSearch ................ SUCCESS [  0.673 s]
+[INFO] Tools - Testcontainers - Zookeeper ................. SUCCESS [  0.664 s]
+[INFO] UI - ESLint Config ................................. SUCCESS [  6.862 s]
+[INFO] UI - Semantic Search ............................... SUCCESS [  0.657 s]
+[INFO] UI - Translations .................................. SUCCESS [  0.689 s]
+[INFO] Community - Common ................................. SUCCESS [ 50.661 s]
+[INFO] Community - Storage Plugins - JDBC Remote JDBC ..... SKIPPED
+[INFO] Community - Sabot - Simple Acceleration Tests ...... SKIPPED
+[INFO] Enterprise - Parent ................................ SUCCESS [  7.212 s]
+[INFO] External Authorizer SPI ............................ SUCCESS [ 33.209 s]
+[INFO] Enterprise - Sabot ................................. SUCCESS [ 33.145 s]
+[INFO] Enterprise - Sabot - Catalog API Proto ............. SUCCESS [  1.622 s]
+[INFO] Enterprise - Services - Parent ..................... SUCCESS [ 32.987 s]
+[INFO] Enterprise - Services - Usergroup Common ........... SUCCESS [  1.284 s]
+[INFO] Enterprise - Common ................................ SUCCESS [  1.510 s]
+[INFO] Enterprise - Services - UserLoginSession ........... SUCCESS [  0.611 s]
+[INFO] Enterprise - Services - UserLoginSession - Common .. SUCCESS [  2.260 s]
+[INFO] Enterprise - Services - Roles ...................... SUCCESS [  0.630 s]
+[INFO] Enterprise - Services - Roles Common ............... SUCCESS [  5.992 s]
+[INFO] Enterprise - Services - Namespace API .............. SUCCESS [  1.778 s]
+[INFO] Enterprise - Services - Accesscontrol .............. SUCCESS [  0.657 s]
+[INFO] Enterprise - Services - AccessControl - Common ..... SUCCESS [  3.464 s]
+[INFO] Enterprise - Sabot - Catalog ....................... SUCCESS [  1.824 s]
+[INFO] Enterprise - Sabot - Catalog Impl .................. SKIPPED
+[INFO] External Authorizer PF4J Loader .................... SKIPPED
+[INFO] Enterprise - Contrib - Parent ...................... SUCCESS [  0.833 s]
+[INFO] Enterprise - Contrib - Shaded Ranger Hive Plugin ... SUCCESS [  2.922 s]
+[INFO] Enterprise - Services - AiAgent - Parent ........... SUCCESS [  0.698 s]
+[INFO] Enterprise - Services - AiAgent - Errors ........... SUCCESS [  1.158 s]
+[INFO] Enterprise - Analyst Center - Parent ............... SUCCESS [  0.799 s]
+[INFO] Enterprise - Analyst Center - AI Agent Error Handling SKIPPED
+[INFO] Enterprise - Services - AiAgent - Protos ........... SUCCESS [  5.189 s]
+[INFO] Enterprise - Services - Ownership .................. SUCCESS [  1.869 s]
+[INFO] Enterprise - Services - AiAgent - Common ........... SUCCESS [  1.362 s]
+[INFO] Enterprise - Services - Credentials ................ SKIPPED
+[INFO] Enterprise - Services - AI Agent - Model ........... SUCCESS [  0.725 s]
+[INFO] Enterprise - Services - AiAgent - Bedrock .......... SKIPPED
+[INFO] Enterprise - Services - AiAgent - SQL Common ....... SUCCESS [  0.840 s]
+[INFO] Enterprise - Services - File Upload API ............ SUCCESS [ 42.525 s]
+[INFO] Enterprise - Storage Plugins ....................... SUCCESS [  0.803 s]
+[INFO] Enterprise - Storage Plugins - File Upload ......... SKIPPED
+[INFO] Enterprise - Services - File Upload Service ........ SKIPPED
+[INFO] Enterprise - Services - AiAgent - FileUpload ....... SKIPPED
+[INFO] Enterprise - Services - Skills ..................... SUCCESS [  2.011 s]
+[INFO] Enterprise - Services - Predict API ................ SUCCESS [  1.564 s]
+[INFO] Extras - Tools - Testcontainers .................... SUCCESS [  0.706 s]
+[INFO] Extras - Tools - Test Containers - Neo4j ........... SUCCESS [  0.596 s]
+[INFO] Enterprise - Services - Graph Database ............. SUCCESS [  0.768 s]
+[INFO] Enterprise - Services - Search ..................... SUCCESS [  3.165 s]
+[INFO] Enterprise - Services - Usergroup .................. SUCCESS [  1.950 s]
+[INFO] Enterprise - Services - Secure Fabric RPC .......... SUCCESS [  0.982 s]
+[INFO] Enterprise - Services - Catalog Events ............. SUCCESS [  1.562 s]
+[INFO] Enterprise - Services - Roles Client ............... SUCCESS [  0.931 s]
+[INFO] Enterprise - Services - Roles Server ............... SKIPPED
+[INFO] Enterprise - Services - Secure Namespace ........... SKIPPED
+[INFO] Enterprise - Services - Jobs ....................... SKIPPED
+[INFO] Enterprise - Services - Viz - Parent ............... SUCCESS [  0.790 s]
+[INFO] Enterprise - Services - Viz - Common ............... SUCCESS [  0.810 s]
+[INFO] OpenAPI - Parent ................................... SUCCESS [  7.279 s]
+[INFO] OpenAPI - Enterprise ............................... SUCCESS [  0.941 s]
+[INFO] Enterprise - Services - Collaboration .............. SKIPPED
+[INFO] Extras - Tools - Mongo Test Runner ................. SUCCESS [  0.903 s]
+[INFO] Extras - Tools - Redis Test Runner ................. SUCCESS [  0.960 s]
+[INFO] Enterprise - Services - Result Cache ............... SKIPPED
+[INFO] Enterprise - Services - Rules Service .............. SKIPPED
+[INFO] Enterprise - Kubernetes - Parent ................... SUCCESS [  0.818 s]
+[INFO] Enterprise - Kubernetes - Engine ................... SUCCESS [  0.712 s]
+[INFO] Enterprise - Kubernetes - Engine - Common .......... SUCCESS [  0.593 s]
+[INFO] Enterprise - Kubernetes - Engine - Common - Validate SUCCESS [  0.850 s]
+[INFO] Enterprise - Kubernetes - Engine - Common - Model .. SUCCESS [  0.807 s]
+[INFO] Enterprise - Kubernetes - Common ................... SUCCESS [  0.621 s]
+[INFO] Enterprise - Kubernetes - Common - Fabric8 ......... SUCCESS [  1.024 s]
+[INFO] Enterprise - Kubernetes - Engine - Custom Resources  SUCCESS [  0.961 s]
+[INFO] Enterprise - Kubernetes - Engine - Client .......... SUCCESS [  0.946 s]
+[INFO] Enterprise - Kubernetes - Engine - Services ........ SUCCESS [  0.573 s]
+[INFO] Enterprise - Kubernetes - Engine - Services - Engine Options SUCCESS [  1.063 s]
+[INFO] Enterprise Provisioning API - Parent ............... SUCCESS [  0.816 s]
+[INFO] Enterprise Provisioning - Kubernetes ............... SKIPPED
+[INFO] Enterprise - Services - RCAC ....................... SKIPPED
+[INFO] Enterprise - Analyst Center - common ............... SUCCESS [ 41.666 s]
+[INFO] Enterprise - Services - Reflection Recommender ..... SKIPPED
+[INFO] Enterprise - Kubernetes - Engine - Services - Engine Waiters SUCCESS [  0.861 s]
+[INFO] Enterprise - Services - Workload Management ........ SKIPPED
+[INFO] Enterprise - Services - Rules Execution ............ SKIPPED
+[INFO] Extra Services - WLM Rules Functions ............... SKIPPED
+[INFO] Enterprise - Services - Executor Selector .......... SKIPPED
+[INFO] Enterprise - Services - Scripts .................... SKIPPED
+[INFO] Enterprise - Services - Ingestion Common ........... SKIPPED
+[INFO] Enterprise - Services - EDM Common ................. SUCCESS [  1.097 s]
+[INFO] Enterprise - Services - Ingestion .................. SKIPPED
+[INFO] Enterprise - Services - Secure Accelerator ......... SKIPPED
+[INFO] Enterprise - Services - SysFlight .................. SKIPPED
+[INFO] Enterprise - Services - Optimization Common ........ SUCCESS [  1.366 s]
+[INFO] Enterprise - Services - AuthManager API ............ SUCCESS [  0.849 s]
+[INFO] Enterprise - Services - ExternalTokenProvider API .. SUCCESS [  2.036 s]
+[INFO] Enterprise - Services - Tokens ..................... SKIPPED
+[INFO] Enterprise - Services - JWT Validator .............. SKIPPED
+[INFO] Enterprise - Services - External Users ............. SKIPPED
+[INFO] Enterprise - Services - Authenticator .............. SKIPPED
+[INFO] Enterprise - Dremio Catalog Service ................ SUCCESS [  0.866 s]
+[INFO] Enterprise - Dremio Catalog - Common ............... SUCCESS [  0.806 s]
+[INFO] Enterprise - Services - AI Agent - Model API ....... SUCCESS [  0.764 s]
+[INFO] Enterprise - Services - Service Users .............. SUCCESS [  0.887 s]
+[INFO] Enterprise - Services - Service Users Common ....... SKIPPED
+[INFO] dremio-ee-services-accesscontrol-server ............ SKIPPED
+[INFO] Enterprise - Services - AiAgent - Model Parameters . SUCCESS [  0.812 s]
+[INFO] Enterprise - Services - Core Catalog ............... SUCCESS [  0.907 s]
+[INFO] Enterprise - Services - Core Catalog - Model ....... SUCCESS [ 20.269 s]
+[INFO] dremio-ee-sabot-kernel ............................. SKIPPED
+[INFO] Enterprise - Services - Semantic Layer ............. SKIPPED
+[INFO] Enterprise - Services - Search Access .............. SKIPPED
+[INFO] Enterprise - Services - Viz ........................ SKIPPED
+[INFO] Enterprise - Services - Lineage .................... SKIPPED
+[INFO] Enterprise - Services - AiAgent - Tools ............ SKIPPED
+[INFO] Enterprise - Services - AiAgent - MCP .............. SKIPPED
+[INFO] Enterprise - Services - AiAgent - Service .......... SKIPPED
+[INFO] Enterprise - Analyst Center - AI Agent REST APIs ... SKIPPED
+[INFO] Enterprise - Services - Semantic Layer API - Parent  SUCCESS [  0.740 s]
+[INFO] Enterprise - Services - Semantic Layer API - Errors  SUCCESS [  1.033 s]
+[INFO] Enterprise - Analyst Center - Semantic Layer Error Handling SKIPPED
+[INFO] Enterprise - Services - Semantic Accuracy .......... SKIPPED
+[INFO] Enterprise - Analyst Center - Semantic Accuracy REST APIs SKIPPED
+[INFO] Enterprise - Analyst Center - Semantic Layer REST APIs SKIPPED
+[INFO] Enterprise - Services - LLM Invoker ................ SKIPPED
+[INFO] Services - Open Search ............................. SKIPPED
+[INFO] Enterprise - Services - Search Ingestion ........... SKIPPED
+[INFO] Enterprise - Kubernetes - Engine - REST API ........ SKIPPED
+[INFO] Enterprise - Kubernetes - Engine - Services - Core Engine Service SKIPPED
+[INFO] Enterprise - Services - MongoDB Client ............. SUCCESS [  7.268 s]
+[INFO] Enterprise - Services - Datastore MongoDB .......... SKIPPED
+[INFO] Enterprise - Workload Usage - Parent ............... SUCCESS [  0.925 s]
+[INFO] Enterprise - Workload Usage - Common ............... SUCCESS [  1.640 s]
+[INFO] Enterprise - Workload Usage - Publish .............. SKIPPED
+[INFO] Enterprise - Workload Usage - Export ............... SUCCESS [  0.748 s]
+[INFO] Enterprise - Workload Usage - Service .............. SUCCESS [  1.206 s]
+[INFO] Enterprise - Services - SQLRunner .................. SKIPPED
+[INFO] Enterprise - Services - Diagnostic ................. SUCCESS [  3.318 s]
+[INFO] Enterprise - Services - Statistics ................. SKIPPED
+[INFO] Enterprise - Services - UserDirectory API .......... SUCCESS [  2.198 s]
+[INFO] Enterprise - Services - UserDirectory .............. SKIPPED
+[INFO] dremio-ee-services-accesscontrol-client ............ SUCCESS [  0.898 s]
+[INFO] Enterprise - Services - Arrow Flight ............... SKIPPED
+[INFO] Enterprise - Services - User Preference ............ SKIPPED
+[INFO] Enterprise - Services - Authorization .............. SUCCESS [  0.890 s]
+[INFO] Enterprise - Services - Authorization - Common ..... SUCCESS [  3.360 s]
+[INFO] Enterprise - Services - Authorization - Server - Parent SUCCESS [  0.755 s]
+[INFO] Enterprise - Services - Authorization - Server - Application Credentials SKIPPED
+[INFO] Enterprise - Services - Authorization - Server ..... SKIPPED
+[INFO] Enterprise - Services - Authorization - Client ..... SKIPPED
+[INFO] Enterprise Provisioning API - common ............... SUCCESS [  1.544 s]
+[INFO] Enterprise - Services - Optimization Source ........ SUCCESS [  1.661 s]
+[INFO] Enterprise - Dremio Catalog - Optimization ......... SUCCESS [  0.683 s]
+[INFO] Enterprise - Dremio Catalog Optimization - Proto ... SUCCESS [  1.771 s]
+[INFO] Enterprise - Dremio Catalog Optimization - pubsub-common SUCCESS [  1.412 s]
+[INFO] Enterprise - Services - Optimization ............... SKIPPED
+[INFO] Enterprise - Dremio Catalog Optimization - API ..... SUCCESS [  0.860 s]
+[INFO] Enterprise - Dremio Catalog - Polaris - AuthZ ...... SUCCESS [  0.727 s]
+[INFO] Enterprise - Dremio Catalog - Polaris - AuthZ - Proto SUCCESS [  2.496 s]
+[INFO] Enterprise - Dremio Catalog - Catalog Manager ...... SUCCESS [  0.718 s]
+[INFO] Enterprise - Dremio Catalog - Catalog Manager - Proto SUCCESS [  1.904 s]
+[INFO] Enterprise - Dremio Catalog - Polaris - AuthZ - Common SUCCESS [  0.994 s]
+[INFO] Enterprise - Dremio Catalog - Client ............... SUCCESS [  0.843 s]
+[INFO] Extras - Tools - Testcontainers - Unity Catalog .... SUCCESS [  0.629 s]
+[INFO] Extras - Tools - Testcontainers - Polaris .......... SUCCESS [  0.524 s]
+[INFO] Enterprise - Storage Plugins - Iceberg Catalog Plugin SKIPPED
+[INFO] Enterprise - Storage Plugins - Apache Polaris Plugin SKIPPED
+[INFO] Enterprise - Storage Plugins - Dremio Catalog Plugin SKIPPED
+[INFO] Enterprise - Services - Catalog Usage .............. SKIPPED
+[INFO] Enterprise - Services - Admin Console .............. SKIPPED
+[INFO] Enterprise - Storage Plugins - Google BigQuery ..... SKIPPED
+[INFO] Enterprise - Storage Plugins - SAP HANA ............ SKIPPED
+[INFO] Enterprise - Storage Plugins - System Managed Views Plugin SKIPPED
+[INFO] Enterprise - Storage Plugins - Dataplane Plugin .... SKIPPED
+[INFO] Enterprise - Services - License .................... SUCCESS [  1.254 s]
+[INFO] Enterprise - Services - Service Users Server ....... SKIPPED
+[INFO] Enterprise - Services - Service Users Client ....... SKIPPED
+[INFO] dremio-ee-space-plugin ............................. SKIPPED
+[INFO] Enterprise - Services - Core Catalog - Proto ....... SUCCESS [  1.349 s]
+[INFO] Enterprise - Services - Core Catalog - Options ..... SUCCESS [  0.917 s]
+[INFO] Enterprise - Services - Core Catalog - Service ..... SKIPPED
+[INFO] Enterprise - Services - Core Catalog - Store ....... SKIPPED
+[INFO] Enterprise - Analyst Center - Backend .............. SKIPPED
+[INFO] Dremio EE UI Parent ................................ SUCCESS [  0.702 s]
+[INFO] UI - EE Common ..................................... SUCCESS [  0.616 s]
+[INFO] UI - EE Translations ............................... SUCCESS [  0.639 s]
+[INFO] Enterprise - Analyst Center - UI ................... SUCCESS [  1.345 s]
+[INFO] Enterprise - Storage Plugins - HDFS ................ SKIPPED
+[INFO] Enterprise - Storage Plugins - Snowflake Open Catalog Plugin SKIPPED
+[INFO] Enterprise - Analyst Center - Upgrade .............. SKIPPED
+[INFO] Enterprise - Analyst Center - tools ................ SKIPPED
+[INFO] Enterprise - Storage Plugins - Teradata ............ SKIPPED
+[INFO] Enterprise - Analyst Center - daemon ............... SKIPPED
+[INFO] Enterprise - Distribution - Parent ................. SUCCESS [  0.672 s]
+[INFO] Enterprise - Distribution - Scripts and Resources .. SUCCESS [  0.736 s]
+[INFO] Enterprise - Sabot - Tracker (parent) .............. SUCCESS [  0.672 s]
+[INFO] Enterprise - Sabot - Heap Tracker CPP .............. SUCCESS [  0.644 s]
+[INFO] Enterprise - Storage Plugins - Hive Plugin - Common  SKIPPED
+[INFO] Enterprise - Storage Plugins - Hive3 Parent ........ SUCCESS [  0.741 s]
+[INFO] Enterprise - Storage Plugins - Hive 3.x Plugin Launcher SKIPPED
+[INFO] Enterprise - Storage Plugins - Hive 3.x Plugin ..... SKIPPED
+[INFO] Enterprise - Storage Plugins - AWS Glue Catalog Plugin SKIPPED
+[INFO] Enterprise - Distribution - EE Server Packaging .... SKIPPED
+[INFO] Enterprise - Dremio Catalog - Persist .............. SKIPPED
+[INFO] Enterprise - Dremio Catalog - Polaris - AuthZ - Service SKIPPED
+[INFO] Enterprise - Dremio Catalog - Catalog Manager - API  SUCCESS [  0.925 s]
+[INFO] Enterprise - Dremio Catalog - gRPC ................. SUCCESS [  1.442 s]
+[INFO] Enterprise - Dremio Catalog - Iceberg Client ....... SUCCESS [01:42 min]
+[INFO] Enterprise - Dremio Catalog Optimization - Service . SUCCESS [  1.150 s]
+[INFO] Enterprise - Dremio Catalog Optimization - Sharable Test Code FAILURE [ 18.775 s]
+[INFO] Enterprise - Dremio Catalog - Catalog Services Server SKIPPED
+[INFO] Enterprise - Dremio Catalog - Catalog Manager - Common SUCCESS [  0.549 s]
+[INFO] Enterprise - Dremio Catalog - Catalog Manager - Service SUCCESS [  2.199 s]
+[INFO] Enterprise - Dremio Catalog - Polaris BOM .......... SUCCESS [  0.623 s]
+[INFO] Enterprise - Dremio Catalog - Polaris Events ....... SUCCESS [  0.605 s]
+[INFO] Enterprise - Dremio Catalog - Polaris Events - Proto SUCCESS [  1.904 s]
+[INFO] Enterprise - Dremio Catalog - Polaris Events - Publisher SUCCESS [  1.432 s]
+[INFO] Enterprise - Dremio Catalog - Polaris Events - Listener SUCCESS [ 21.009 s]
+[INFO] Enterprise - Dremio Catalog - Polaris Server - Common SKIPPED
+[INFO] Enterprise - Dremio Catalog - Polaris Server - Sharable Test Code FAILURE [ 43.952 s]
+[INFO] Enterprise - Dremio Catalog - Polaris Server - Common gRPC SKIPPED
+[INFO] Enterprise - Dremio Catalog - Polaris Server - Common Internal SUCCESS [01:40 min]
+[INFO] Enterprise - Dremio Catalog - Polaris Server ....... SKIPPED
+[INFO] Enterprise - Dremio Catalog - Polaris Server (External) SKIPPED
+[INFO] Enterprise - Dremio Catalog - Polaris Server - TestContainer SKIPPED
+[INFO] Enterprise - Dremio Catalog Service - Tests ........ SKIPPED
+[INFO] Enterprise - Kubernetes - Common - AssertJ ......... SUCCESS [  0.585 s]
+[INFO] Enterprise - Kubernetes - Common - AssertJ - Fabric8 SUCCESS [  0.826 s]
+[INFO] Enterprise - Kubernetes - Common - JOSDK ........... SUCCESS [  0.728 s]
+[INFO] Enterprise - Kubernetes - Common - AssertJ - JOSDK . SUCCESS [  0.721 s]
+[INFO] Enterprise - Kubernetes - Common - Fabric8 Logging . SUCCESS [  0.624 s]
+[INFO] Enterprise - Kubernetes - Common - QOSDK ........... SUCCESS [  1.126 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator ........ SUCCESS [  0.553 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Common SUCCESS [  0.892 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Config SUCCESS [  0.857 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Logging SUCCESS [  0.805 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Engine Options SUCCESS [  0.672 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Core . SUCCESS [  0.952 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Quarkus Test SUCCESS [  3.174 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Reconciler - PVC SUCCESS [  3.146 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Test . SUCCESS [  0.801 s]
+[INFO] Enterprise - Kubernetes - Engine - Test ............ SUCCESS [  0.970 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - V26 Parent SUCCESS [  0.989 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - V26 - App SUCCESS [ 43.315 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - V27 Parent SUCCESS [  0.991 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Core . SUCCESS [  3.164 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - SPI SUCCESS [  0.704 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - Custom Resource SUCCESS [  3.408 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - Condition SUCCESS [  3.425 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - Events SUCCESS [  0.924 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - Health SUCCESS [  0.936 s]
+[INFO] Enterprise - Kubernetes - Engine - Services - Engine Idle SUCCESS [  1.065 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - Idle SUCCESS [  0.890 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - Kubenertes Pods SUCCESS [  0.957 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - State SUCCESS [  0.910 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - ServiceSet SUCCESS [  1.338 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Visitor - ZooKeeper SUCCESS [  0.797 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - Status SUCCESS [  0.969 s]
+[INFO] Enterprise - Kubernetes - Engine - Operator - V27 - App SUCCESS [ 31.066 s]
+[INFO] Enterprise - Sabot - Integration Tests ............. SKIPPED
+[INFO] Enterprise - Services - Authorization - Integration Tests SKIPPED
+[INFO] Enterprise - Services - JobCounts - Parent ......... SUCCESS [  0.753 s]
+[INFO] Enterprise - Services - JobCounts - Server ......... SKIPPED
+[INFO] Enterprise - Services - OpenTelemetry Proto ........ SUCCESS [  3.634 s]
+[INFO] Enterprise - Services - PlanMode ................... SUCCESS [  0.705 s]
+[INFO] Enterprise - Services - PlanMode - Common .......... SUCCESS [  6.195 s]
+[INFO] Enterprise - Services - PlanMode - Server .......... SKIPPED
+[INFO] Enterprise - services - Reindexer .................. SUCCESS [  0.684 s]
+[INFO] Enterprise - services - Reindexer - Common ......... SUCCESS [  1.361 s]
+[INFO] Enterprise - services - Reindexer - Server ......... SKIPPED
+[INFO] UI - EE Mocks ...................................... SUCCESS [  0.618 s]
+[INFO] UI - EE Mocks Server ............................... SUCCESS [  0.585 s]
+[INFO] OpenAPI - Cloud .................................... SUCCESS [  0.852 s]
+[INFO] DaaS Executor Scripts .............................. SUCCESS [  7.316 s]
+[INFO] Extras - Plugins ................................... SUCCESS [  6.902 s]
+[INFO] Extras - Storage Plugins - Jaunt ................... SKIPPED
+[INFO] Extras - Tests - Parent ............................ SUCCESS [  6.761 s]
+[INFO] Extras - Tests - Acceleration ...................... SKIPPED
+[INFO] Extras - Tests - Search - Parent ................... SUCCESS [ 33.575 s]
+[INFO] Extras - Tests - Search - Common ................... SKIPPED
+[INFO] Extras - Tests - AI Agent .......................... SKIPPED
+[INFO] Extras - Tests - Compatibility ..................... SKIPPED
+[INFO] Extras - Tests - Mongo ............................. SKIPPED
+[INFO] Extras - Tests - Join tests ........................ SKIPPED
+[INFO] Extras - Tests - Lineage ........................... SKIPPED
+[INFO] Extras - Tests - Microbenchmarks ................... SKIPPED
+[INFO] Extras - Tests - Planner ........................... SKIPPED
+[INFO] Extras - Tests - Reflection ........................ SKIPPED
+[INFO] Extras - Tests - Search - Tests .................... SKIPPED
+[INFO] Extras - Tests - Semantic Layer .................... SKIPPED
+[INFO] Extras - Tests - Simple Statistics Tests ........... SKIPPED
+[INFO] Extras - Tests - TableAuthorizers .................. SUCCESS [ 33.578 s]
+[INFO] Extras - Tests - TableAuthorizers - Example Plugin . SKIPPED
+[INFO] Extras - Tests - Viz ............................... SKIPPED
+[INFO] Extras - Tools - ARP Generator ..................... SKIPPED
+[INFO] Extras - Tools - ARP Pushdown ...................... SKIPPED
+[INFO] Extras - Tools - ARP Validator ..................... SUCCESS [  1.027 s]
+[INFO] AuthManager AWS KMS Signing Key CronJob ............ SUCCESS [  2.299 s]
+[INFO] Extras - Tools - Data Fixers ....................... SUCCESS [  0.887 s]
+[INFO] Extras - Tools - Backup Analyzer ................... SKIPPED
+[INFO] Extras - Tools - Nessie Query Load Tool ............ SUCCESS [  1.558 s]
+[INFO] Extras - Tools - Testcontainers - GCS .............. SUCCESS [  0.873 s]
+[INFO] Extras - Tools - Testcontainers - AWS .............. SUCCESS [  0.866 s]
+[INFO] Extras - Tools - Offline Billing Events Processor .. SUCCESS [  3.569 s]
+[INFO] Dremio - Extras - OptionScanner .................... SUCCESS [  5.983 s]
+[INFO] Extras - Tools - Dremio Plan Dump Reader ........... SKIPPED
+[INFO] Extras - Tools - Prepare Offline Build ............. SUCCESS [  0.872 s]
+[INFO] Extras - Tools - Profile Field Extractor Tool ...... SKIPPED
+[INFO] Extras - Tools - Query Fuzzer ...................... SKIPPED
+[INFO] Extras - Tools - Reproduction Tool ................. SKIPPED
+[INFO] Extras - Tools - Semantic Layer CLI ................ SUCCESS [  1.255 s]
+[INFO] Extras - Tools - Testcontainers - Mongo ............ SUCCESS [  0.819 s]
+[INFO] Extras - Tools - Testcontainers - Pulsar ........... SUCCESS [  0.967 s]
+[INFO] Extras - Tools - Testcontainers - Redis ............ SUCCESS [  0.803 s]
+[INFO] DaaS - UserOptions ................................. SKIPPED
+[INFO] DaaS - Parent ...................................... SUCCESS [  0.794 s]
+[INFO] DaaS - Common - Parent ............................. SUCCESS [  0.550 s]
+[INFO] DaaS - Common - SPIRE .............................. SUCCESS [  0.768 s]
+[INFO] DaaS - Common ...................................... SUCCESS [  2.166 s]
+[INFO] DaaS - Consistency Fixer ........................... SUCCESS [  0.537 s]
+[INFO] DaaS - Consistency Fixer - Common .................. SUCCESS [  2.310 s]
+[INFO] DaaS - Application - Billing Service ............... SUCCESS [  0.529 s]
+[INFO] DaaS - Application - BillingService - Common ....... SUCCESS [  5.852 s]
+[INFO] DaaS - StorageManager Service ...................... SUCCESS [  0.542 s]
+[INFO] DaaS - StorageManager - Common ..................... SUCCESS [  2.602 s]
+[INFO] DaaS - Application - Secrets Service ............... SUCCESS [  0.511 s]
+[INFO] DaaS - Application - Secrets Service - Common ...... SUCCESS [  1.966 s]
+[INFO] DaaS - Application - Secrets Service - Client ...... SUCCESS [  0.905 s]
+[INFO] DaaS - Common - Service Discovery .................. SUCCESS [  0.705 s]
+[INFO] DaaS - ProjectsManager ............................. SUCCESS [01:39 min]
+[INFO] DaaS - ProjectsManager - Common .................... SUCCESS [ 13.158 s]
+[INFO] DaaS - Common - Prometheus ......................... SUCCESS [  1.100 s]
+[INFO] DaaS - Editions .................................... SUCCESS [01:39 min]
+[INFO] DaaS - Editions Service - Common ................... SUCCESS [  1.984 s]
+[INFO] Daas - Services - Parent ........................... SUCCESS [01:39 min]
+[INFO] dremio-daas-services-grpc .......................... SUCCESS [  0.804 s]
+[INFO] DaaS - Executor Token Service ...................... SUCCESS [01:39 min]
+[INFO] DaaS - Executor Token Service - Utils .............. SUCCESS [  0.773 s]
+[INFO] DaaS - Application ................................. SUCCESS [  1.215 s]
+[INFO] DaaS - Options Service ............................. SKIPPED
+[INFO] DaaS - Services - Task Store ....................... SUCCESS [  1.151 s]
+[INFO] DaaS - Dremio Catalog Service ...................... SUCCESS [01:39 min]
+[INFO] DaaS - Dremio Catalog Service - Options ............ SKIPPED
+[INFO] DaaS - ProjectsManager - Tenant Capabilities Client  SKIPPED
+[INFO] DaaS - SysFlightService ............................ SUCCESS [01:39 min]
+[INFO] DaaS - SysFlightService - Common ................... SUCCESS [  0.606 s]
+[INFO] DaaS - Application - User Session Service .......... SUCCESS [01:39 min]
+[INFO] DaaS - Application - UserSessionService - Common ... SKIPPED
+[INFO] DaaS - Application - UserSessionService - client ... SKIPPED
+[INFO] DaaS - Comics ...................................... SUCCESS [01:39 min]
+[INFO] DaaS - Comics - Extensions ......................... SUCCESS [  0.586 s]
+[INFO] DaaS - Comics - Extensions - Common ................ SUCCESS [  0.647 s]
+[INFO] DaaS - Comics - Extensions - Common - Utils ........ SUCCESS [  0.675 s]
+[INFO] DaaS - Aws - Common ................................ SKIPPED
+[INFO] DaaS - Azure - Common .............................. SKIPPED
+[INFO] DaaS - Common - ZooKeeper .......................... SUCCESS [  1.000 s]
+[INFO] DaaS - EngineManagementService ..................... SUCCESS [01:39 min]
+[INFO] DaaS - EMS - Common ................................ SKIPPED
+[INFO] DaaS - AuthenticationManager ....................... SUCCESS [01:39 min]
+[INFO] DaaS - AuthenticationManager - Common .............. SKIPPED
+[INFO] DaaS - Arctic Catalog Authorization Service ........ SUCCESS [01:38 min]
+[INFO] DaaS - Arctic Catalog Authorization Service - Common SKIPPED
+[INFO] DaaS - Arctic Catalog Authorization Service - Client SKIPPED
+[INFO] DaaS - Arctic Catalog Authorization Service - Server SKIPPED
+[INFO] DaaS - Services - Tenant Datastore ................. SKIPPED
+[INFO] DaaS - Services - KVStore .......................... SKIPPED
+[INFO] DaaS - Services - PubSub - Pulsar .................. SUCCESS [ 21.014 s]
+[INFO] DaaS - Services - PubSub ........................... SUCCESS [  1.698 s]
+[INFO] Daas - Patterns - Parent ........................... SUCCESS [01:38 min]
+[INFO] DaaS - Patterns - Saga ............................. SUCCESS [  1.962 s]
+[INFO] DaaS - services - Reindexer ........................ SUCCESS [  0.608 s]
+[INFO] DaaS - services - Reindexer - Server ............... SKIPPED
+[INFO] DaaS - Services - Intercom ......................... SUCCESS [  0.612 s]
+[INFO] dremio-daas-services-intercom-common ............... SUCCESS [  1.447 s]
+[INFO] dremio-daas-services-intercom-client ............... SUCCESS [  0.593 s]
+[INFO] DaaS - Services - TransientStore - Redis ........... SUCCESS [  1.116 s]
+[INFO] DaaS - Services - LoadingCache - Redis ............. SUCCESS [  0.654 s]
+[INFO] DaaS - Services - Token Signing .................... SKIPPED
+[INFO] DaaS - AuthenticationManager - Signing Key Common .. SKIPPED
+[INFO] dremio-daas-authenticationmanager-server ........... SKIPPED
+[INFO] dremio-daas-authenticationmanager-client ........... SKIPPED
+[INFO] DaaS - Application - Flight Proxy Service .......... SUCCESS [01:38 min]
+[INFO] DaaS - Flight Proxy Service - Common ............... SUCCESS [  0.741 s]
+[INFO] DaaS - Common - Application ........................ SKIPPED
+[INFO] DaaS - GlobalProjectsManager - Parent .............. SUCCESS [  0.748 s]
+[INFO] DaaS - GlobalProjectsManager - Common .............. SKIPPED
+[INFO] DaaS - Services - Routing .......................... SUCCESS [  0.733 s]
+[INFO] DaaS - Application - UserSessionService - Server ... SKIPPED
+[INFO] DaaS - Flight Proxy Service - Server ............... SKIPPED
+[INFO] DaaS - Services - Arrow Flight ..................... SKIPPED
+[INFO] Daas - Services - Coordinator Parent ............... SUCCESS [  0.628 s]
+[INFO] DaaS - Coordinator - Options ....................... SKIPPED
+[INFO] DaaS - Project - Config ............................ SUCCESS [  0.848 s]
+[INFO] DaaS - Project - Config - Common ................... SKIPPED
+[INFO] DCS Plugins - Parent ............................... SUCCESS [  0.473 s]
+[INFO] DCS Plugins - Plugin Common Parent ................. SUCCESS [  0.560 s]
+[INFO] DCS Plugins - Common ............................... SKIPPED
+[INFO] DaaS - Application - Events Service ................ SUCCESS [  0.711 s]
+[INFO] DaaS - Events - Processing - Tables Common ......... SUCCESS [  0.953 s]
+[INFO] DCS Services - Nessie Metadata Cache ............... SUCCESS [  3.229 s]
+[INFO] DaaS - Optimization Service ........................ SUCCESS [  0.695 s]
+[INFO] DaaS - Optimization Service - Common ............... SKIPPED
+[INFO] DaaS - EMS - Logging ............................... SUCCESS [  1.488 s]
+[INFO] dremio-daas-services-zk ............................ SUCCESS [  0.686 s]
+[INFO] DaaS - EMS - SlotsAndWaiters ....................... SKIPPED
+[INFO] ruleservice ........................................ SUCCESS [  0.617 s]
+[INFO] DaaS - RuleService - Common ........................ SKIPPED
+[INFO] DaaS - Ruleservice - Server ........................ SKIPPED
+[INFO] DaaS - Services - Resource Scheduler ............... SKIPPED
+[INFO] DaaS - Sabot ....................................... SUCCESS [  0.726 s]
+[INFO] dremio-daas-sabot-kernel ........................... SKIPPED
+[INFO] DCS Plugins - History Tables Plugin ................ SKIPPED
+[INFO] dremio-daas-sampledb-plugin ........................ SKIPPED
+[INFO] DCS Plugins - SysFlight Plugin ..................... SKIPPED
+[INFO] Arctic Proxy Service ............................... SUCCESS [  1.109 s]
+[INFO] DCS Plugins - Dataplane Plugin ..................... SKIPPED
+[INFO] DCS Plugins - System Iceberg Tables Plugin ......... SKIPPED
+[INFO] DCS - Storage Plugin - Dremio Catalog Plugin ....... SKIPPED
+[INFO] DaaS - Project - Config - Server ................... SKIPPED
+[INFO] DaaS - Services - Catalog Maintenance .............. SKIPPED
+[INFO] DaaS - Services - Search Ingestion ................. SKIPPED
+[INFO] DaaS - Services - Viz .............................. SKIPPED
+[INFO] DaaS - RendezvousService ........................... SUCCESS [  0.721 s]
+[INFO] DaaS - RendezvousService - Common .................. SUCCESS [  1.268 s]
+[INFO] DaaS - RendezvousService - Client .................. SUCCESS [  0.828 s]
+[INFO] DaaS - Executor Service ............................ SUCCESS [  0.751 s]
+[INFO] DaaS - Executor Service Common ..................... SUCCESS [  0.836 s]
+[INFO] DaaS - RendezvousService - Server .................. SKIPPED
+[INFO] DaaS - Rendezvous Poll Registry .................... SUCCESS [  0.767 s]
+[INFO] DaaS - Rendezvous Poller ........................... SUCCESS [  0.761 s]
+[INFO] Daas Services - QueryResults - Parent .............. SUCCESS [  0.536 s]
+[INFO] Daas Services - QueryResults - Common .............. SKIPPED
+[INFO] Daas Services - Downloads - Parent ................. SUCCESS [  0.547 s]
+[INFO] dremio-daas-services-downloads-common .............. SUCCESS [  1.522 s]
+[INFO] dremio-daas-services-downloads-server .............. SKIPPED
+[INFO] DaaS - Executor Service Rendezvous Registrar ....... SKIPPED
+[INFO] DaaS - Executor Service Client ..................... SKIPPED
+[INFO] DaaS - Ingestion Service ........................... SUCCESS [  0.699 s]
+[INFO] DaaS - Ingestion Service - Common .................. SKIPPED
+[INFO] DaaS - Dremio Catalog Service - Proto .............. SUCCESS [  1.214 s]
+[INFO] DaaS - Dremio Catalog Service - Client ............. SUCCESS [  0.580 s]
+[INFO] DaaS - Common - Temporal ........................... SUCCESS [  0.673 s]
+[INFO] DaaS - ProjectsManager - Utils ..................... SKIPPED
+[INFO] DaaS - Application - Atlantis Service .............. SUCCESS [  0.720 s]
+[INFO] DaaS - Atlantis Service - Scope Annotation Checker . SUCCESS [  0.922 s]
+[INFO] DaaS - Application - Outbound Token Service ........ SUCCESS [  0.731 s]
+[INFO] DaaS - Application - Outbound Token Service - Client SKIPPED
+[INFO] DaaS - Generative AI Service ....................... SUCCESS [  0.741 s]
+[INFO] DaaS - Gen AI Service - Common ..................... SUCCESS [  2.431 s]
+[INFO] DaaS - Application - ModelProviderService .......... SUCCESS [  0.715 s]
+[INFO] DaaS - Application - ModelProviderService - Common . SUCCESS [  4.576 s]
+[INFO] DaaS - Nessie Service .............................. SUCCESS [  0.736 s]
+[INFO] DaaS - Nessie Service - Common ..................... SUCCESS [  1.244 s]
+[INFO] DaaS - Nessie Service - Client ..................... SUCCESS [  0.819 s]
+[INFO] DaaS - Table Maintenance Service ................... SUCCESS [  0.609 s]
+[INFO] DaaS - Table Maintenance Service - Proto ........... SUCCESS [  1.624 s]
+[INFO] DaaS - Services - Accelerator ...................... SUCCESS [  0.716 s]
+[INFO] DaaS - Services - Accelerator - Proto .............. SUCCESS [  1.764 s]
+[INFO] DaaS - Nessie Integration Tests .................... SUCCESS [  1.469 s]
+[INFO] DaaS - Nessie Service - Server ..................... SKIPPED
+[INFO] DaaS - Dremio Catalog Service - Common ............. SUCCESS [  0.605 s]
+[INFO] DaaS - Comics - Extensions - Common - Runtime ...... SUCCESS [  0.689 s]
+[INFO] DaaS - Comics - Test ............................... SUCCESS [  0.815 s]
+[INFO] DaaS - Comics - Extensions - Logging ............... SUCCESS [  0.681 s]
+[INFO] DaaS - Comics - Extensions - Logging - Runtime ..... SUCCESS [  1.227 s]
+[INFO] DaaS - Comics - Core ............................... SUCCESS [  0.803 s]
+[INFO] DaaS - Comics - Extensions - gRPC .................. SUCCESS [  0.613 s]
+[INFO] DaaS - Comics - Extensions - gRPC - Runtime ........ SUCCESS [  1.855 s]
+[INFO] DaaS - Comics - Extensions - Options ............... SUCCESS [  0.580 s]
+[INFO] DaaS - Comics - Extensions - Options - Runtime ..... SKIPPED
+[INFO] DaaS - Coordinator - Source - Verification - Parent  SUCCESS [  0.944 s]
+[INFO] DaaS - Coordinator - Source - Verification - Common  SUCCESS [  1.420 s]
+[INFO] DaaS - Comics - Extensions - Pub/Sub ............... SUCCESS [  0.659 s]
+[INFO] DaaS - Comics - Extensions - Pub/Sub - Runtime ..... SUCCESS [  1.519 s]
+[INFO] DaaS - Comics - Extensions - Common - Deployment ... SUCCESS [  0.990 s]
+[INFO] DaaS - Comics - Extensions - Common - Dev Services . SUCCESS [  1.277 s]
+[INFO] DaaS - Comics - Extensions - Curator ............... SUCCESS [  0.648 s]
+[INFO] DaaS - Comics - Extensions - Curator - Runtime ..... SUCCESS [ 19.725 s]
+[INFO] DaaS - Comics - Extensions - Curator - Deployment .. SUCCESS [  2.832 s]
+[INFO] DaaS - Comics - Extensions - gRPC - Deployment ..... SUCCESS [  3.715 s]
+[INFO] DaaS - Comics - Extensions - Guice ................. SUCCESS [  0.637 s]
+[INFO] DaaS - Comics - Extensions - Guice - Runtime ....... SUCCESS [  1.126 s]
+[INFO] DaaS - Comics - Extensions - Guice - Deployment .... SUCCESS [  2.463 s]
+[INFO] DaaS - Comics - Extensions - KV Store .............. SUCCESS [  0.622 s]
+[INFO] DaaS - Comics - Extensions - KV Store - Runtime .... SKIPPED
+[INFO] DaaS - Comics - Extensions - KV Store - Deployment . SKIPPED
+[INFO] DaaS - Comics - Extensions - Logging - Deployment .. SUCCESS [  0.730 s]
+[INFO] DaaS - Comics - Extensions - Options - Deployment .. SKIPPED
+[INFO] DaaS - Comics - Extensions - Pub/Sub - Deployment .. SUCCESS [  1.060 s]
+[INFO] DaaS - Comics - Extensions - Saga .................. SUCCESS [  0.613 s]
+[INFO] DaaS - Comics - Extensions - Saga - Runtime ........ SUCCESS [  1.425 s]
+[INFO] DaaS - Comics - Extensions - Saga - Deployment ..... SKIPPED
+[INFO] DaaS - Comics - Extensions - TransientStore ........ SUCCESS [  0.874 s]
+[INFO] DaaS - Comics - Extensions - TransientStore - Runtime SUCCESS [  0.674 s]
+[INFO] DaaS - Comics - Extensions - TransientStore - Deployment SUCCESS [  0.528 s]
+[INFO] DaaS - Comics - App Parent ......................... SKIPPED
+[INFO] DaaS - Dremio Catalog Service - Server ............. SKIPPED
+[INFO] DaaS - Dremio Catalog Service - TestContainer ...... SKIPPED
+[INFO] DaaS - TenantManager - Parent ...................... SUCCESS [  0.553 s]
+[INFO] DaaS - TenantManager - Workflows ................... SKIPPED
+[INFO] DaaS - Application - Atlantis - Server ............. SKIPPED
+[INFO] DaaS - Search Common ............................... SUCCESS [  0.535 s]
+[INFO] DaaS - Services - Search ........................... SKIPPED
+[INFO] DaaS - Services - Core Catalog ..................... SUCCESS [  0.638 s]
+[INFO] DaaS - Services - Core Catalog - Proto ............. SUCCESS [  1.564 s]
+[INFO] DaaS - Services - Core Catalog - Store ............. SKIPPED
+[INFO] DaaS - Services - Source-Propagation ............... SUCCESS [  0.710 s]
+[INFO] DaaS - Services - Source-Propagation - Common ...... SUCCESS [  1.389 s]
+[INFO] DaaS - ContainerizedSources - Parent ............... SUCCESS [  0.663 s]
+[INFO] DaaS - ContainerizedSources - Common ............... SUCCESS [  0.976 s]
+[INFO] DaaS - ContainerizedSources - Workflows ............ SUCCESS [ 41.654 s]
+[INFO] DaaS - Analyst Center - Parent ..................... SKIPPED
+[INFO] DaaS - Analyst Center - backend .................... SKIPPED
+[INFO] DCS Plugins - S3 Plugin ............................ SKIPPED
+[INFO] DaaS - Ingestion Service - Coordinator Implementation SKIPPED
+[INFO] DaaS - Services - Executor Selector ................ SKIPPED
+[INFO] Daas Services - QueryResults - Client .............. SKIPPED
+[INFO] dremio-daas-services-jobs .......................... SKIPPED
+[INFO] dremio-daas-services-accesscontrolservice .......... SUCCESS [  0.757 s]
+[INFO] DaaS - services - AccessControlService - Server .... SKIPPED
+[INFO] DaaS - Services - ElectionManager .................. SUCCESS [  0.759 s]
+[INFO] DaaS - Services - Core Catalog - Service ........... SKIPPED
+[INFO] DaaS - Services - Accelerator - Server ............. SKIPPED
+[INFO] DaaS - Services - Source-Propagation - Server ...... SKIPPED
+[INFO] DaaS - Optimization Service - Coordinator Tools .... SKIPPED
+[INFO] DaaS - Services - Collaboration .................... SKIPPED
+[INFO] DaaS - Services - Namespace ........................ SKIPPED
+[INFO] DaaS - SysFlightService - Server ................... SKIPPED
+[INFO] DaaS - Services - Results-Cache .................... SKIPPED
+[INFO] DaaS - Services - AiAgent - Parent ................. SUCCESS [  0.711 s]
+[INFO] DaaS - Services - AiAgent - Protos ................. SUCCESS [ 41.981 s]
+[INFO] DaaS - Usage Events Service ........................ SUCCESS [  0.674 s]
+[INFO] DaaS - Application - UsageEventsService - Common ... SUCCESS [  1.738 s]
+[INFO] DaaS - Application - AiAgentService ................ SUCCESS [  0.705 s]
+[INFO] DaaS - Application - AiAgentService - Common ....... SKIPPED
+[INFO] Daas - Services - AiAgent - Service ................ SKIPPED
+[INFO] Daas - CoordinatorManagementService - Parent ....... SUCCESS [  0.711 s]
+[INFO] Daas - CoordinatorManagementService - Common ....... SUCCESS [  1.920 s]
+[INFO] DaaS - Services - Edition Context Service Parent ... SUCCESS [  0.935 s]
+[INFO] DaaS - Edition - Context - Common .................. SUCCESS [  3.851 s]
+[INFO] DaaS - Edition - Context - Server .................. SKIPPED
+[INFO] DaaS - Coordinator - Source - Verification - Server  SKIPPED
+[INFO] DaaS - Services - File Upload ...................... SKIPPED
+[INFO] DaaS - Access Service .............................. SKIPPED
+[INFO] DaaS - Integration Tests for Access Service ........ SKIPPED
+[INFO] DaaS - Application - AiAgentService - Server ....... SKIPPED
+[INFO] DaaS - Comics - Extensions - gRPC - Test ........... SUCCESS [  0.816 s]
+[INFO] DaaS - Application - AiAgentService - Tests ........ SKIPPED
+[INFO] DaaS - ARP Containerized Source Service ............ SUCCESS [  0.688 s]
+[INFO] DaaS - ARP Containerized Source Service - Base ..... SKIPPED
+[INFO] DaaS - ARP Containerized Source Service - MSSQL .... SKIPPED
+[INFO] DaaS - ARP Containerized Source Service - MySQL .... SKIPPED
+[INFO] DaaS - ARP Containerized Source Service - Oracle ... SKIPPED
+[INFO] DaaS - ARP Containerized Source Service - Postgres . SKIPPED
+[INFO] DaaS - Application - Outbound Token Service - Server SKIPPED
+[INFO] DaaS - Application - Atlantis - Integration Tests .. SKIPPED
+[INFO] DaaS - AuthenticationManager - Signing Key Bootstrapper SKIPPED
+[INFO] DaaS - Application - BillingService - Client ....... SUCCESS [  1.148 s]
+[INFO] DaaS - Application - BillingService - Server ....... SKIPPED
+[INFO] DaaS - Application - BillingService - Spanner DDL Tool SUCCESS [  0.618 s]
+[INFO] DaaS - Billing - Webhook ........................... SKIPPED
+[INFO] DaaS - CoordinatorManagementService - Client ....... SUCCESS [  1.057 s]
+[INFO] DaaS - Coordinator Operator ........................ SUCCESS [  0.781 s]
+[INFO] DaaS - Coordinator Operator - Argo Rollout ......... SUCCESS [  0.537 s]
+[INFO] DaaS - Coordinator Operator - Argo Rollout - Model . SUCCESS [ 44.748 s]
+[INFO] DaaS - Coordinator Operator - Common - Resource .... SUCCESS [ 18.470 s]
+[INFO] DaaS - Coordinator Operator - Common ............... SUCCESS [  2.727 s]
+[INFO] Daas - CoordinatorManagementService - Server ....... SKIPPED
+[INFO] DaaS - Comics - CLI ................................ SUCCESS [  0.930 s]
+[INFO] DaaS - Comics - Docs ............................... SUCCESS [  0.648 s]
+[INFO] DaaS - Comics - Extensions - TransientStore - Redis  SUCCESS [  0.715 s]
+[INFO] DaaS - Comics - Integration Tests .................. SKIPPED
+[INFO] DaaS - Comics - Integration Tests - Curator ........ SKIPPED
+[INFO] DaaS - Comics - Integration Tests - Curator Health Disabled SKIPPED
+[INFO] DaaS - Comics - Integration Tests - gRPC Contextual Interceptor SKIPPED
+[INFO] DaaS - Comics - Integration Tests - gRPC Contextual Interceptor Disabled SKIPPED
+[INFO] DaaS - Comics - Integration Tests - KVStore ........ SKIPPED
+[INFO] DaaS - Comics - Integration Tests - Logging ........ SKIPPED
+[INFO] DaaS - Comics - Integration Tests - Options ........ SKIPPED
+[INFO] DaaS - Comics - Integration Tests - Transient Store  SKIPPED
+[INFO] DaaS - Common - Comics - Parent .................... SUCCESS [  0.708 s]
+[INFO] DaaS - Common - Comics - Config .................... SUCCESS [  0.942 s]
+[INFO] DaaS - Common - Kubernetes Client .................. SKIPPED
+[INFO] DaaS - Consistency Fixer - Server .................. SKIPPED
+[INFO] DaaS - ContainerizedSources - Server ............... SKIPPED
+[INFO] DaaS - Coordinator Operator - Argo Rollout - Client  SUCCESS [ 18.436 s]
+[INFO] DaaS - Coordinator Operator - Operator ............. SUCCESS [  1.536 s]
+[INFO] DaaS - DAC - CRS Daemon ............................ SKIPPED
+[INFO] DaaS - UI .......................................... SUCCESS [  1.705 s]
+[INFO] DaaS - Analyst Center - daemon ..................... SKIPPED
+[INFO] DCS Plugins - JDBC Plugin Parent ................... SUCCESS [  0.539 s]
+[INFO] DCS Plugins - JDBC Plugin - Containerized JDBC ..... SKIPPED
+[INFO] DCS Plugins - Schema Fetcher Common ................ SKIPPED
+[INFO] DCS Plugins - JDBC Plugin - Fetcher Proxy .......... SKIPPED
+[INFO] DCS Plugins - Mongo Plugin Parent .................. SUCCESS [  0.593 s]
+[INFO] DCS Plugins - Mongo Plugin - Fetcher Proxy ......... SKIPPED
+[INFO] DaaS - Serverless - Parent ......................... SUCCESS [  0.725 s]
+[INFO] DaaS - Serverless - Plugins - Parent ............... SUCCESS [  0.543 s]
+[INFO] DaaS - Serverless - Plugins - Common ............... SKIPPED
+[INFO] DaaS - Executor Service Aws ........................ SKIPPED
+[INFO] DaaS - Serverless - Plugins - S3 ................... SKIPPED
+[INFO] DaaS - Serverless - Plugins - AWS Glue ............. SKIPPED
+[INFO] DaaS - Serverless - Plugins - Iceberg Catalog ...... SKIPPED
+[INFO] DaaS - Serverless - Plugins - Azure Storage ........ SKIPPED
+[INFO] DCS Plugins - AWS Glue Catalog Plugin .............. SKIPPED
+[INFO] DCS Plugins - Azure Storage Plugin ................. SKIPPED
+[INFO] DaaS - Distribution - Parent ....................... SUCCESS [  0.723 s]
+[INFO] DaaS - Distribution - Base Parent (Server & CRS) ... SKIPPED
+[INFO] DaaS - Distribution - CRS .......................... SKIPPED
+[INFO] DaaS - Distribution - Server ....................... SKIPPED
+[INFO] DaaS - Executor Service SourcePropagation .......... SKIPPED
+[INFO] DaaS - Executor Service Health ..................... SKIPPED
+[INFO] DaaS - Executor Token Service - Common ............. SUCCESS [  1.819 s]
+[INFO] DaaS - Executor Service Auth ....................... SUCCESS [  1.285 s]
+[INFO] DaaS - Executor Service Azure ...................... SUCCESS [  0.691 s]
+[INFO] dremio-daas-services-maestro ....................... SUCCESS [  0.729 s]
+[INFO] dremio-daas-services-maestro-client ................ SUCCESS [  0.800 s]
+[INFO] dremio-daas-jobtelemetryservice .................... SUCCESS [  0.768 s]
+[INFO] DaaS - JobTelemetryService - Client ................ SUCCESS [  1.111 s]
+[INFO] dremio-daas-services-jobresults .................... SUCCESS [  0.646 s]
+[INFO] dremio-daas-services-jobresults-client ............. SUCCESS [  1.168 s]
+[INFO] Daas Services - QueryResults - Server .............. SKIPPED
+[INFO] DaaS - Services - AccessControlService - Client .... SKIPPED
+[INFO] DaaS - Executor Service Dac ........................ SUCCESS [  0.759 s]
+[INFO] DaaS - Executor Service Dac Backend ................ SKIPPED
+[INFO] DaaS - Executor Service Dac Daemon ................. SKIPPED
+[INFO] DaaS - Distribution - DaaS Executor Packaging ...... SKIPPED
+[INFO] DaaS - Integration Tests for DaaS Dremio Catalog ... SKIPPED
+[INFO] DaaS - Edition Service - Server .................... SKIPPED
+[INFO] DaaS - EMS - AzureVMOpHandler ...................... SKIPPED
+[INFO] DaaS - EMS - Client ................................ SKIPPED
+[INFO] DaaS - EMS - Compute Instance ...................... SKIPPED
+[INFO] DaaS - EMS - EC2OpHandler .......................... SKIPPED
+[INFO] DaaS - EMS - Redis - Client ........................ SKIPPED
+[INFO] Daas Patterns Podcast .............................. SUCCESS [  1.708 s]
+[INFO] Daas - Patterns - ProlognedTaskLeader .............. SUCCESS [ 20.317 s]
+[INFO] DaaS - Services - Supervisor ....................... SUCCESS [  0.963 s]
+[INFO] DaaS - Workflow Service ............................ SUCCESS [  0.739 s]
+[INFO] DaaS - Workflow Service - Common ................... SKIPPED
+[INFO] DaaS - Serverless - Project - Parent ............... SUCCESS [  0.636 s]
+[INFO] DaaS - Serverless - Project - Common ............... SUCCESS [  0.761 s]
+[INFO] DaaS - Serverless - Engine - Parent ................ SUCCESS [  0.625 s]
+[INFO] DaaS - Serverless - Engine - Custom Resource Definition SUCCESS [  1.318 s]
+[INFO] DaaS - Serverless - Project - Custom Resource ...... SUCCESS [  0.905 s]
+[INFO] DaaS - Serverless - Engine - Common ................ SUCCESS [  0.856 s]
+[INFO] DaaS - EMS - EngineManager ......................... SKIPPED
+[INFO] DaaS - EMS - Java Client ........................... SKIPPED
+[INFO] DaaS - Events - Processing - Jobs Common ........... SKIPPED
+[INFO] DaaS - Events - Customer Audit Export Job .......... SKIPPED
+[INFO] DaaS - Application - Events Service - Common ....... SUCCESS [  1.557 s]
+[INFO] DaaS - Application - Events Service - Client ....... SUCCESS [  1.116 s]
+[INFO] DaaS - Events - Iceberg Compaction Job ............. SKIPPED
+[INFO] DaaS - Events - Customer Datalake Processing Job ... SKIPPED
+[INFO] DaaS - Events - Internal Datalake Processing Job ... SKIPPED
+[INFO] DaaS - Application - Events Service - Admin UI ..... SUCCESS [  0.762 s]
+[INFO] DaaS - Application - Events Service - Server ....... SKIPPED
+[INFO] DaaS - Events - Tenant Accumulator Job ............. SKIPPED
+[INFO] DaaS - Dremio Flink Container ...................... SKIPPED
+[INFO] DaaS - ExampleService .............................. SUCCESS [  0.752 s]
+[INFO] DaaS - ExampleService - Common ..................... SUCCESS [ 53.395 s]
+[INFO] DaaS - ExampleService - Client ..................... SUCCESS [  0.792 s]
+[INFO] DaaS - ExampleService - Test ....................... SUCCESS [  0.806 s]
+[INFO] DaaS - ExampleService - Server ..................... SKIPPED
+[INFO] DaaS - Executor Agent Service ...................... SUCCESS [  0.742 s]
+[INFO] DaaS - ExecutorAgentService - Common ............... SUCCESS [ 54.877 s]
+[INFO] DaaS - ExecutorAgentService - Client ............... SKIPPED
+[INFO] DaaS - Executor Agent .............................. SUCCESS [  5.978 s]
+[INFO] DaaS - ExecutorAgentService - Server ............... SKIPPED
+[INFO] DaaS - Executor Token Service - Server ............. SKIPPED
+[INFO] DaaS - Gen AI Service - Client ..................... SUCCESS [  0.753 s]
+[INFO] DaaS - Gen AI Service - Server ..................... SKIPPED
+[INFO] DaaS - GlobalProjectsManager - Workflows ........... SKIPPED
+[INFO] DaaS - RegionalProjectProvisioner - Parent ......... SUCCESS [  0.707 s]
+[INFO] DaaS - RegionalProjectProvisioner - Common ......... SUCCESS [  2.277 s]
+[INFO] dremio-daas-services-intercom-server ............... SUCCESS [  0.720 s]
+[INFO] DaaS - ProjectsManager - Server .................... SKIPPED
+[INFO] DaaS - RegionalProjectProvisioner - Workflows ...... SKIPPED
+[INFO] DaaS - GlobalProjectsManager - Server .............. SKIPPED
+[INFO] DaaS - Billing Events Service - Server ............. SKIPPED
+[INFO] DaaS - License Generator - Server .................. SKIPPED
+[INFO] DaaS - Ingestion Service - AWS Lambda .............. SUCCESS [01:39 min]
+[INFO] DaaS - Ingestion Service - Client .................. SUCCESS [  0.687 s]
+[INFO] DaaS - Optimization Service - Mongo ................ SKIPPED
+[INFO] DaaS - Workflow Service - Airflow Client ........... SUCCESS [01:06 min]
+[INFO] DaaS - Workflow Service - Common Internal .......... SKIPPED
+[INFO] DaaS - Ingestion Service - Server .................. SKIPPED
+[INFO] DaaS - Jobs Service ................................ SKIPPED
+[INFO] DaaS - Jobs Service - Common ....................... SKIPPED
+[INFO] DaaS - Jobs Service - Server ....................... SKIPPED
+[INFO] DaaS - Services - Blob Datastore ................... SUCCESS [  0.934 s]
+[INFO] DaaS - Job Telemetry Service - Server .............. SKIPPED
+[INFO] DCS - Onboarding UI ................................ SUCCESS [  0.685 s]
+[INFO] DCS - Login UI ..................................... SUCCESS [  0.883 s]
+[INFO] DaaS - Application - ModelProviderService - Server . SKIPPED
+[INFO] DaaS - Application - ModelProviderService - Tests .. SKIPPED
+[INFO] DaaS - Nessie Service - Content Generator .......... SKIPPED
+[INFO] DaaS - Nessie Service - REST proxy ................. SUCCESS [  1.145 s]
+[INFO] DaaS - Optimization Service - Client ............... SKIPPED
+[INFO] DaaS - Optimization Service - Server ............... SKIPPED
+[INFO] DaaS - Application - Outbound Token Service - Common SKIPPED
+[INFO] DaaS - Application - Outbound Token Service - Signing Key Bootstrapper SKIPPED
+[INFO] Daas Patterns Podcast Tests ........................ SUCCESS [  1.340 s]
+[INFO] DaaS - Patterns - Saga Tests ....................... SUCCESS [  1.920 s]
+[INFO] DCS - Plugins - Dataplane - Tests .................. SKIPPED
+[INFO] DCS Plugins - Redshift Plugin ...................... SKIPPED
+[INFO] DaaS - Private Sources PrivateLink Operator ........ SUCCESS [ 53.080 s]
+[INFO] DaaS - Project Operator - Java Client .............. SUCCESS [  2.748 s]
+[INFO] DaaS - Project Operator ............................ SUCCESS [01:01 min]
+[INFO] DaaS - ProjectsManager - Client .................... SKIPPED
+[INFO] DaaS - RegionalProjectProvisioner - Server ......... SKIPPED
+[INFO] DaaS - RuleService - Client ........................ SKIPPED
+[INFO] DaaS - Sabot - Catalog Impl ........................ SKIPPED
+[INFO] DaaS - Application - Secrets Service - Server ...... SKIPPED
+[INFO] DaaS - Serverless - Engine - Operator - Parent ..... SUCCESS [  0.863 s]
+[INFO] DaaS - Serverless - Engine - Operator - State ...... SUCCESS [  0.761 s]
+[INFO] DaaS - Serverless - Engine - Operator - Credentials  SUCCESS [  1.006 s]
+[INFO] DaaS - Serverless - Engine - Operator - Visit - AWS  SUCCESS [  0.899 s]
+[INFO] DaaS - Serverless - Engine - Operator - Status ..... SUCCESS [  0.847 s]
+[INFO] DaaS - Serverless - Engine - Operator - Engine Options SKIPPED
+[INFO] DaaS - Serverless - Engine - Operator - Monitor .... SUCCESS [  0.910 s]
+[INFO] DaaS - Serverless - Engine - Operator - App ........ SKIPPED
+[INFO] DaaS - Serverless - Project - Operator - Parent .... SUCCESS [  0.839 s]
+[INFO] DaaS - Serverless - Project - Operator - Istio Test  SUCCESS [  1.432 s]
+[INFO] DaaS - Serverless - Project - Operator - App ....... SUCCESS [ 12.322 s]
+[INFO] DaaS - Services - AiAgent - Sandbox ................ SUCCESS [  1.237 s]
+[INFO] Daas - Services - AiAgent - Tests .................. SKIPPED
+[INFO] DaaS - Project - Config - Client ................... SKIPPED
+[INFO] DaaS - Coordinator - Source - Verification - Client  SUCCESS [  0.710 s]
+[INFO] dremio-daas-services-otel-javaagent-extension ...... SUCCESS [  0.635 s]
+[INFO] DaaS - Services - PubSub - Pulsar - Namespace Resolver SUCCESS [  0.930 s]
+[INFO] DaaS - services - Reindexer - Client ............... SUCCESS [  1.473 s]
+[INFO] DaaS - Sources Operator ............................ SUCCESS [01:43 min]
+[INFO] DaaS - Application - SQL Proxy ..................... SKIPPED
+[INFO] DaaS - StorageManager - Client ..................... SKIPPED
+[INFO] DaaS - StorageManager - Inventory Aggregation Job .. SKIPPED
+[INFO] DaaS - StorageManager - Server ..................... SKIPPED
+[INFO] DCS - Support Console UI ........................... SUCCESS [ 40.836 s]
+[INFO] DaaS - Table Maintenance Service - Options ......... SKIPPED
+[INFO] DaaS - Table Maintenance Service - Server .......... SKIPPED
+[INFO] DaaS - Telemetry Aggregation Service ............... SUCCESS [  0.599 s]
+[INFO] DaaS - Dremio Fluentbit HttpOut Go Plugin .......... SUCCESS [ 33.166 s]
+[INFO] DaaS - Telemetry Aggregation Service - Server ...... SUCCESS [  0.791 s]
+[INFO] DaaS - TenantManager - Server ...................... SKIPPED
+[INFO] DaaS - Usage Events Service - Server ............... SKIPPED
+[INFO] DaaS - Workflow Service - Azure Blob Storage Sync .. SUCCESS [  0.647 s]
+[INFO] DaaS - Workflow Service - Google Cloud Storage Sync  SUCCESS [  0.651 s]
+[INFO] DaaS - Workflow Service - Python Scripts ........... SUCCESS [  0.627 s]
+[INFO] DaaS - Workflow Service - AWS Cloud Storage Sync ... SUCCESS [  0.588 s]
+[INFO] DaaS - Workflow Service - Server ................... SKIPPED
+[INFO] Dremio - Root ...................................... SUCCESS [  0.488 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  06:11 min (Wall Clock)
+[INFO] Finished at: 2026-11-17T19:38:24Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal io.quarkus:quarkus-maven-plugin:3.27.4.1:generate-code (default-quarkus-build) on project dremio-ee-dremiocatalog-optimization-test-common: Quarkus code generation phase has failed: InvocationTargetException: Failed to generate Java classes from proto files: [/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/b9ef574fbab6f253e677e6e067ac954bfeb23ee9/dremio_catalog_optimization_common.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/b9ef574fbab6f253e677e6e067ac954bfeb23ee9/dremio_catalog_optimization_store.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/b9ef574fbab6f253e677e6e067ac954bfeb23ee9/dremio_catalog_optimization_service.proto] to /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc with command /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/com.google.protobuf-protoc-osx-aarch_64-exe -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/b9ef574fbab6f253e677e6e067ac954bfeb23ee9 -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-dependencies/0ce801cf0df7143c1c55012021c43242915fec04 --plugin=protoc-gen-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe --plugin=protoc-gen-q-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/quarkus-grpc10767778759445479933.sh --q-grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc --grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc --java_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/b9ef574fbab6f253e677e6e067ac954bfeb23ee9/dremio_catalog_optimization_common.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/b9ef574fbab6f253e677e6e067ac954bfeb23ee9/dremio_catalog_optimization_store.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/b9ef574fbab6f253e677e6e067ac954bfeb23ee9/dremio_catalog_optimization_service.proto: Process exited abnormally (pid 69675) with exit code 1 with error output:
+[ERROR]  > /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe: program not found or is not executable
+[ERROR]  > Please specify a program using absolute path or make sure the program is available in your PATH system variable
+[ERROR]  > --grpc_out: protoc-gen-grpc: Plugin failed with status code 1.
+[ERROR] -> [Help 1]
+[ERROR] Failed to execute goal io.quarkus:quarkus-maven-plugin:3.27.4.1:generate-code (default-quarkus-build) on project dremio-ee-dremiocatalog-polaris-server-test: Quarkus code generation phase has failed: InvocationTargetException: Failed to generate Java classes from proto files: [/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/e07cda607e1ba7dac07de544b3b7743dacb5daff/ppc_catalog.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/e07cda607e1ba7dac07de544b3b7743dacb5daff/catalogmanager_service.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/e07cda607e1ba7dac07de544b3b7743dacb5daff/table_cleanup_service.proto] to /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc with command /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/com.google.protobuf-protoc-osx-aarch_64-exe -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/e07cda607e1ba7dac07de544b3b7743dacb5daff -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-dependencies/0ce801cf0df7143c1c55012021c43242915fec04 --plugin=protoc-gen-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe --plugin=protoc-gen-q-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/quarkus-grpc4816071034994410566.sh --q-grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc --grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc --java_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/e07cda607e1ba7dac07de544b3b7743dacb5daff/ppc_catalog.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/e07cda607e1ba7dac07de544b3b7743dacb5daff/catalogmanager_service.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/e07cda607e1ba7dac07de544b3b7743dacb5daff/table_cleanup_service.proto: Process exited abnormally (pid 69678) with exit code 1 with error output:
+[ERROR]  > /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe: program not found or is not executable
+[ERROR]  > Please specify a program using absolute path or make sure the program is available in your PATH system variable
+[ERROR]  > --grpc_out: protoc-gen-grpc: Plugin failed with status code 1.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :dremio-ee-dremiocatalog-optimization-test-common

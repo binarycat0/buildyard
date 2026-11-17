@@ -1,0 +1,127 @@
+# buildyard fixture: Plugin failure: quarkus-maven-plugin:generate-code, protoc-gen-grpc-java x86_64 binary on arm64
+# buildyard fixture: source: build-v3, module dremio-ee-dremiocatalog-optimization-test-common
+[main] [INFO] Scanning for projects...
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] Detecting the operating system and CPU architecture
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] os.detected.name: osx
+[main] [INFO] os.detected.arch: aarch_64
+[main] [INFO] os.detected.bitness: 64
+[main] [INFO] os.detected.version: 27.0
+[main] [INFO] os.detected.version.major: 27
+[main] [INFO] os.detected.version.minor: 0
+[main] [INFO] os.detected.classifier: osx-aarch_64
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] Reactor Build Order:
+[main] [INFO] 
+[main] [INFO] Build Tools - Parent                                               [pom]
+[main] [INFO] Build Tools - Configs                                              [jar]
+[main] [INFO] Build Tools - Error Definition Code Generator                      [jar]
+[main] [INFO] Build Tools - Dremio Error Prone Checks                            [jar]
+[main] [INFO] Build Tools - Freemarker Codegen Tooling                  [maven-plugin]
+[main] [INFO] Build Tools - Open Api Spec Code Generator                         [jar]
+[main] [INFO] Build Tools - Dremio Opentelemetry BOM                             [pom]
+[main] [INFO] Build Tools - Protostuff Compiler Plugin                  [maven-plugin]
+[main] [INFO] Build Tools - Test Logging                                         [jar]
+[main] [INFO] Dremio - Parent                                                    [pom]
+[main] [INFO] Protocol                                                           [jar]
+[main] [INFO] Common - Parent                                                    [pom]
+[main] [INFO] Common - AWS                                                       [jar]
+[main] [INFO] Common - Core                                                      [jar]
+[main] [INFO] Common - Exceptions                                                [jar]
+[main] [INFO] Common - Telemetry API                                             [jar]
+[main] [INFO] Common - Legacy                                                    [jar]
+[main] [INFO] Services                                                           [pom]
+[main] [INFO] Services - Options                                                 [jar]
+[main] [INFO] Services - Telemetry - Utils                                       [jar]
+[main] [INFO] Tools                                                              [pom]
+[main] [INFO] Tools - Metrics Test                                               [jar]
+[main] [INFO] Services - Telemetry - API                                         [jar]
+[main] [INFO] Common - ZooKeeper                                                 [jar]
+[main] [INFO] OSS - Tools - Zookeeper Test Runner                                [jar]
+[main] [INFO] Services - Coordinator                                             [jar]
+# ... trimmed reactor build order ...
+[main] [INFO] DaaS - Telemetry Aggregation Service - Server                      [jar]
+[main] [INFO] DaaS - TenantManager - Server                                      [jar]
+[main] [INFO] DaaS - Usage Events Service - Server                               [jar]
+[main] [INFO] DaaS - Application - UserSessionService - Server                   [jar]
+[main] [INFO] DaaS - Workflow Service - Azure Blob Storage Sync                  [jar]
+[main] [INFO] DaaS - Workflow Service - Google Cloud Storage Sync                [jar]
+[main] [INFO] DaaS - Workflow Service - Python Scripts                           [jar]
+[main] [INFO] DaaS - Workflow Service - AWS Cloud Storage Sync                   [jar]
+[main] [INFO] DaaS - Workflow Service - Server                                   [jar]
+[main] [INFO] Dremio - Root                                                      [pom]
+[main] [INFO] 
+[main] [INFO] Using the MultiThreadedBuilder implementation with a thread count of 24
+# ... other modules' lines omitted ...
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] 
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] --< com.dremio.enterprise.dremiocatalog.optimization:dremio-ee-dremiocatalog-optimization-test-common >--
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Building Enterprise - Dremio Catalog Optimization - Sharable Test Code 28.0.0-SNAPSHOT [433/959]
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO]   from enterprise/dremiocatalog/optimization/test-common/pom.xml
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] --------------------------------[ jar ]---------------------------------
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] 
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] --- enforcer:3.6.2:enforce (enforce-dependencies-exclusions) @ dremio-ee-dremiocatalog-optimization-test-common ---
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Skipping Rule Enforcement.
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] 
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] --- enforcer:3.6.2:enforce (enforce-bouncycastle-dependencies-exclusions) @ dremio-ee-dremiocatalog-optimization-test-common ---
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Skipping Rule Enforcement.
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] 
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] --- git-commit-id:4.0.0:revision (for-jars) @ dremio-ee-dremiocatalog-optimization-test-common ---
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] dotGitDirectory /Users/dev/dremio-global/dremio/.git
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Collected git.build.user.email with value REDACTED
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Collected git.commit.id with value 2b42a562e1ff94eb5b4b2bd0d7491dbffd90dc84
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Collected git.commit.time with value 2026-11-17T19:56:34+0000
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Collected git.build.time with value 2026-11-17T20:25:28+0000
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Collected git.build.number with value 
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] including property git.build.user.email in results
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] including property git.commit.id in results
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] including property git.commit.time in results
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] including property git.build.time in results
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Reading existing properties file [/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/classes/git.properties] (for module Enterprise - Dremio Catalog Optimization - Sharable Test Code)...
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Writing properties file to [/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/classes/git.properties] (for module Enterprise - Dremio Catalog Optimization - Sharable Test Code)...
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] 
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] --- resources:3.3.1:resources (default-resources) @ dremio-ee-dremiocatalog-optimization-test-common ---
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Copying 1 resource from src/main/resources to target/classes
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] 
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] --- quarkus:3.27.6.1:generate-code (default-quarkus-build) @ dremio-ee-dremiocatalog-optimization-test-common ---
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/io/quarkus/platform/quarkus-bom-quarkus-platform-properties/3.27.6.1/quarkus-bom-quarkus-platform-properties-3.27.6.1.properties
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/platform/quarkus-bom-quarkus-platform-properties/3.27.6.1/quarkus-bom-quarkus-platform-properties-3.27.6.1.properties
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/platform/quarkus-bom-quarkus-platform-properties/3.27.6.1/quarkus-bom-quarkus-platform-properties-3.27.6.1.properties (951 B at 2.9 kB/s)
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/io/quarkus/quarkus-grpc-deployment/3.27.6.1/quarkus-grpc-deployment-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-deployment/3.27.6.1/quarkus-grpc-deployment-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-deployment/3.27.6.1/quarkus-grpc-deployment-3.27.6.1.pom (6.6 kB at 20 kB/s)
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/io/quarkus/quarkus-grpc-dev/3.27.6.1/quarkus-grpc-dev-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-dev/3.27.6.1/quarkus-grpc-dev-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-dev/3.27.6.1/quarkus-grpc-dev-3.27.6.1.pom (819 B at 2.5 kB/s)
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/io/quarkus/quarkus-grpc-common-deployment/3.27.6.1/quarkus-grpc-common-deployment-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-common-deployment/3.27.6.1/quarkus-grpc-common-deployment-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-common-deployment/3.27.6.1/quarkus-grpc-common-deployment-3.27.6.1.pom (1.9 kB at 5.4 kB/s)
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/io/quarkus/quarkus-smallrye-stork-deployment/3.27.6.1/quarkus-smallrye-stork-deployment-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-smallrye-stork-deployment/3.27.6.1/quarkus-smallrye-stork-deployment-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-smallrye-stork-deployment/3.27.6.1/quarkus-smallrye-stork-deployment-3.27.6.1.pom (2.1 kB at 6.3 kB/s)
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/io/quarkus/quarkus-grpc-codegen/3.27.6.1/quarkus-grpc-codegen-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-codegen/3.27.6.1/quarkus-grpc-codegen-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-codegen/3.27.6.1/quarkus-grpc-codegen-3.27.6.1.pom (6.0 kB at 15 kB/s)
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/io/quarkus/quarkus-grpc-protoc-plugin/3.27.6.1/quarkus-grpc-protoc-plugin-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-protoc-plugin/3.27.6.1/quarkus-grpc-protoc-plugin-3.27.6.1.pom
+[mvn-builder-dremio-ee-dremiocatalog-optimization-test-common] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/io/quarkus/quarkus-grpc-protoc-plugin/3.27.6.1/quarkus-grpc-protoc-plugin-3.27.6.1.pom (3.3 kB at 9.0 kB/s)
+# ... trimmed ...
+[main] [ERROR] Failed to execute goal io.quarkus:quarkus-maven-plugin:3.27.6.1:generate-code (default-quarkus-build) on project dremio-ee-dremiocatalog-optimization-test-common: Quarkus code generation phase has failed: InvocationTargetException: Failed to generate Java classes from proto files: [/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/607d0964e296c8eefe7f8beedc6efed2d59c1ad7/dremio_catalog_optimization_common.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/607d0964e296c8eefe7f8beedc6efed2d59c1ad7/dremio_catalog_optimization_store.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/607d0964e296c8eefe7f8beedc6efed2d59c1ad7/dremio_catalog_optimization_service.proto] to /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc with command /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/com.google.protobuf-protoc-osx-aarch_64-exe -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/607d0964e296c8eefe7f8beedc6efed2d59c1ad7 -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-dependencies/0ce801cf0df7143c1c55012021c43242915fec04 --plugin=protoc-gen-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe --plugin=protoc-gen-q-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/quarkus-grpc14926592852279735372.sh --q-grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc --grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc --java_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/generated-sources/grpc /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/607d0964e296c8eefe7f8beedc6efed2d59c1ad7/dremio_catalog_optimization_common.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/607d0964e296c8eefe7f8beedc6efed2d59c1ad7/dremio_catalog_optimization_store.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/protoc-protos-from-dependencies/607d0964e296c8eefe7f8beedc6efed2d59c1ad7/dremio_catalog_optimization_service.proto: Process exited abnormally (pid 1074) with exit code 1 with error output:
+[main] [ERROR]  > /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/optimization/test-common/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe: program not found or is not executable
+[main] [ERROR]  > Please specify a program using absolute path or make sure the program is available in your PATH system variable
+[main] [ERROR]  > --grpc_out: protoc-gen-grpc: Plugin failed with status code 1.
+[main] [ERROR] -> [Help 1]
+[main] [ERROR] Failed to execute goal io.quarkus:quarkus-maven-plugin:3.27.6.1:generate-code (default-quarkus-build) on project dremio-ee-dremiocatalog-polaris-server-test: Quarkus code generation phase has failed: InvocationTargetException: Failed to generate Java classes from proto files: [/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/cd61ef0a03796f9dfcdc437fbd261c3a3a10bf2f/ppc_catalog.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/cd61ef0a03796f9dfcdc437fbd261c3a3a10bf2f/catalogmanager_service.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/cd61ef0a03796f9dfcdc437fbd261c3a3a10bf2f/table_cleanup_service.proto] to /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc with command /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/com.google.protobuf-protoc-osx-aarch_64-exe -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/cd61ef0a03796f9dfcdc437fbd261c3a3a10bf2f -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-dependencies/0ce801cf0df7143c1c55012021c43242915fec04 --plugin=protoc-gen-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe --plugin=protoc-gen-q-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/quarkus-grpc12958614185399789144.sh --q-grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc --grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc --java_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/generated-sources/grpc /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/cd61ef0a03796f9dfcdc437fbd261c3a3a10bf2f/ppc_catalog.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/cd61ef0a03796f9dfcdc437fbd261c3a3a10bf2f/catalogmanager_service.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/protoc-protos-from-dependencies/cd61ef0a03796f9dfcdc437fbd261c3a3a10bf2f/table_cleanup_service.proto: Process exited abnormally (pid 1076) with exit code 1 with error output:
+[main] [ERROR]  > /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-test/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe: program not found or is not executable
+[main] [ERROR]  > Please specify a program using absolute path or make sure the program is available in your PATH system variable
+[main] [ERROR]  > --grpc_out: protoc-gen-grpc: Plugin failed with status code 1.
+[main] [ERROR] -> [Help 1]
+[main] [ERROR] 
+[main] [ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[main] [ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[main] [ERROR] 
+[main] [ERROR] For more information about the errors and possible solutions, please read the following articles:
+[main] [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+[main] [ERROR] 
+[main] [ERROR] After correcting the problems, you can resume the build with the command
+[main] [ERROR]   mvn <args> -rf :dremio-ee-dremiocatalog-optimization-test-common
