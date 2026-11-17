@@ -1,0 +1,123 @@
+// Package httpapi serves the JSON API and the embedded UI, behind the localhost security checks.
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"runtime"
+	"time"
+
+	"github.com/binarycat0/buildyard/internal/store"
+)
+
+// Version is set by main from build flags.
+var Version = "dev"
+
+// Server holds what the handlers need.
+type Server struct {
+	Store   *store.Store
+	Token   string
+	Port    int
+	DataDir string
+	UI      fs.FS // static files; index.html at the root
+	Log     *slog.Logger
+	started time.Time
+}
+
+// Handler returns the full HTTP handler: security middleware around the API and UI routes.
+func (s *Server) Handler() http.Handler {
+	s.started = time.Now()
+	if s.Log == nil {
+		s.Log = slog.Default()
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/health", s.health)
+	mux.HandleFunc("GET /api/projects", s.listProjects)
+	mux.HandleFunc("POST /api/projects", s.createProject)
+	mux.HandleFunc("GET /api/projects/{id}", s.getProject)
+	mux.HandleFunc("PATCH /api/projects/{id}", s.patchProject)
+	mux.HandleFunc("DELETE /api/projects/{id}", s.deleteProject)
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
+	})
+	mux.Handle("/", s.ui())
+	return s.secure(mux)
+}
+
+func (s *Server) health(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":    "ok",
+		"version":   Version,
+		"goVersion": runtime.Version(),
+		"dataDir":   s.DataDir,
+		"uptimeSec": int(time.Since(s.started).Seconds()),
+	})
+}
+
+// ui serves the embedded static files; unknown paths fall back to index.html.
+func (s *Server) ui() http.Handler {
+	files := http.FileServerFS(s.UI)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		if r.URL.Path != "/" {
+			if _, err := fs.Stat(s.UI, r.URL.Path[1:]); err == nil {
+				files.ServeHTTP(w, r)
+				return
+			}
+		}
+		http.ServeFileFS(w, r, s.UI, "index.html")
+	})
+}
+
+type apiError struct {
+	Error   string `json:"error"`
+	Message string `json:"message"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, apiError{Error: code, Message: msg})
+}
+
+// decode reads a JSON body (max 1 MiB) into v, rejecting unknown fields.
+func decode(r *http.Request, v any) error {
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
+
+// ListenAndServe serves h on 127.0.0.1:port until ctx is done. Binding elsewhere is not supported.
+func ListenAndServe(ctx context.Context, port int, h http.Handler) error {
+	srv := &http.Server{
+		Addr:              "127.0.0.1:" + itoa(port),
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	errc := make(chan error, 1)
+	go func() { errc <- srv.ListenAndServe() }()
+	select {
+	case err := <-errc:
+		return err
+	case <-ctx.Done():
+		shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := srv.Shutdown(shut)
+		if e := <-errc; !errors.Is(e, http.ErrServerClosed) && err == nil {
+			err = e
+		}
+		return err
+	}
+}
