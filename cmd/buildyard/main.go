@@ -16,8 +16,10 @@ import (
 
 	"github.com/binarycat0/buildyard/internal/config"
 	"github.com/binarycat0/buildyard/internal/httpapi"
+	"github.com/binarycat0/buildyard/internal/jdk"
 	"github.com/binarycat0/buildyard/internal/lock"
 	"github.com/binarycat0/buildyard/internal/store"
+	"github.com/binarycat0/buildyard/internal/tasks"
 	"github.com/binarycat0/buildyard/web"
 )
 
@@ -122,8 +124,15 @@ func serve(args []string) error {
 	}
 	defer st.Close()
 
+	bg := tasks.New(2, log)
+	defer bg.Close()
+
+	home, _ := os.UserHomeDir()
 	httpapi.Version = version
-	srv := &httpapi.Server{Store: st, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	srv := &httpapi.Server{Store: st, Tasks: bg, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	if _, err := srv.SubmitJDKDetect(); err != nil {
+		log.Warn("JDK detection not started", "err", err)
+	}
 	log.Info("buildyard started", "version", version, "addr", fmt.Sprintf("127.0.0.1:%d", e.cfg.Port), "dataDir", e.paths.Dir)
 	fmt.Fprintf(os.Stderr, "\nOpen Buildyard: %s\n\n", link(e))
 

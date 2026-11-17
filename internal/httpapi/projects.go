@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/binarycat0/buildyard/internal/buildtool/maven"
 	"github.com/binarycat0/buildyard/internal/project"
 	"github.com/binarycat0/buildyard/internal/store"
 )
@@ -90,9 +91,15 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if patch.JavaHome != nil && *patch.JavaHome != "" && !filepath.IsAbs(*patch.JavaHome) {
-		writeError(w, http.StatusBadRequest, "bad_request", "javaHome must be an absolute path")
+	if patch.Executable != nil && *patch.Executable != "" && !maven.ValidMode(*patch.Executable) {
+		writeError(w, http.StatusBadRequest, "bad_request", "executable must be auto, wrapper, mvnd, mvn or an absolute path")
 		return
+	}
+	if patch.JdkID != nil && *patch.JdkID > 0 {
+		if _, err := s.Store.GetJDK(r.Context(), *patch.JdkID); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "unknown jdkId")
+			return
+		}
 	}
 	p, err := s.Store.UpdateProject(r.Context(), id, patch)
 	s.respondProject(w, p, err)

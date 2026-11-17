@@ -12,7 +12,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/binarycat0/buildyard/internal/jdk"
 	"github.com/binarycat0/buildyard/internal/store"
+	"github.com/binarycat0/buildyard/internal/tasks"
 )
 
 // Version is set by main from build flags.
@@ -21,6 +23,9 @@ var Version = "dev"
 // Server holds what the handlers need.
 type Server struct {
 	Store   *store.Store
+	Tasks   *tasks.Manager
+	JDKs    jdk.Detector // where to look for JDKs
+	Home    string       // user home, for finding mvn/mvnd outside PATH
 	DataDir string
 	UI      fs.FS // static files; index.html at the root
 	Log     *slog.Logger
@@ -40,6 +45,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}", s.getProject)
 	mux.HandleFunc("PATCH /api/projects/{id}", s.patchProject)
 	mux.HandleFunc("DELETE /api/projects/{id}", s.deleteProject)
+	mux.HandleFunc("GET /api/projects/{id}/runtime", s.projectRuntime)
+	mux.HandleFunc("GET /api/settings", s.getSettings)
+	mux.HandleFunc("PUT /api/settings", s.putSettings)
+	mux.HandleFunc("GET /api/tools", s.getTools)
+	mux.HandleFunc("GET /api/jdks", s.listJDKs)
+	mux.HandleFunc("POST /api/jdks", s.addJDK)
+	mux.HandleFunc("POST /api/jdks/detect", s.detectJDKs)
+	mux.HandleFunc("PATCH /api/jdks/{id}", s.renameJDK)
+	mux.HandleFunc("DELETE /api/jdks/{id}", s.deleteJDK)
+	mux.HandleFunc("GET /api/tasks", s.listTasks)
+	mux.HandleFunc("GET /api/tasks/{id}", s.getTask)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
 	})

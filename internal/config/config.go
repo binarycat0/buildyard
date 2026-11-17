@@ -28,8 +28,7 @@ type Retention struct {
 }
 
 type Defaults struct {
-	Executable string   `toml:"executable"` // auto | mvn | mvnd | mvnw
-	Flags      []string `toml:"flags"`
+	Flags []string `toml:"flags"`
 }
 
 // Default returns the configuration used when config.toml is missing or leaves fields unset.
@@ -38,7 +37,7 @@ func Default() Config {
 		Port:              DefaultPort,
 		MaxConcurrentJobs: 1,
 		Retention:         Retention{JobsPerProject: 200, MaxLogBytes: "2GB"},
-		Defaults:          Defaults{Executable: "auto", Flags: []string{"-ntp"}},
+		Defaults:          Defaults{Flags: []string{"-ntp"}},
 	}
 }
 
@@ -119,9 +118,6 @@ func Load(path string) (Config, error) {
 	if md.IsDefined("retention", "maxLogBytes") {
 		cfg.Retention.MaxLogBytes = file.Retention.MaxLogBytes
 	}
-	if md.IsDefined("defaults", "executable") {
-		cfg.Defaults.Executable = file.Defaults.Executable
-	}
 	if md.IsDefined("defaults", "flags") {
 		cfg.Defaults.Flags = file.Defaults.Flags
 	}
@@ -138,11 +134,6 @@ func (c Config) Validate() error {
 	}
 	if c.MaxConcurrentJobs < 1 {
 		return fmt.Errorf("maxConcurrentJobs must be >= 1")
-	}
-	switch c.Defaults.Executable {
-	case "auto", "mvn", "mvnd", "mvnw":
-	default:
-		return fmt.Errorf("defaults.executable must be auto, mvn, mvnd or mvnw")
 	}
 	return nil
 }

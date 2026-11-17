@@ -70,7 +70,9 @@ MVP — это фазы 1–4: проекты, запуск с выбором м
 | UI | Статические HTML + Alpine.js + ES-модули, вшиты через `go:embed`; JSON API + `EventSource` | Нет node-сборки; тот же API потом использует CLI |
 | Чтение pom.xml | `encoding/xml` для `<modules>`, `<profiles>`, `<parent>`, координат | Полная модель Maven не нужна: точную картину даёт расширение |
 | События сборки | Своё Maven-расширение на Java (EventSpy), подключается флагом `-Dmaven.ext.class.path`, пишет JSON Lines. Jar вшит в бинарник и распаковывается в `~/.buildyard/ext/` при старте | Точные начало и конец модулей и плагинов без зависимости от формата лога; проект не меняется. Парсинг лога остаётся запасным каналом |
-| Исполняемый файл сборки | Автоопределение: mvnd в PATH → `./mvnw` → mvn; можно переопределить для проекта и запуска | mvnd даёт тёплую JVM бесплатно |
+| Исполняемый файл сборки | Режим `auto | wrapper | mvnd | mvn | /абсолютный/путь`. Глобальный режим по умолчанию в настройках, проект может переопределить. `auto`: `./mvnw`, если он есть в проекте, иначе mvnd, иначе mvn. mvn/mvnd ищутся в PATH и в Homebrew/sdkman | Враппер фиксирует версию Maven проекта; mvnd даёт тёплую JVM |
+| JDK | Список JDK в глобальных настройках: автопоиск (macOS JavaVirtualMachines, Homebrew, sdkman, jenv, asdf, mise, Gradle jdks, /usr/lib/jvm, JAVA_HOME) плюс ручное добавление. JDK по умолчанию в настройках, проект может выбрать свой | Разные проекты требуют разные JDK |
+| Фоновые задачи | Поиск JDK, сканы модулей и пакетов ставятся в очередь `internal/tasks`: API сразу отдаёт задачу (`202`), UI опрашивает `GET /api/tasks/{id}`. Одна активная задача на ключ | Долгие операции не держат HTTP-запрос |
 | Остановка процессов | `os/exec` + `SysProcAttr{Setpgid: true}`; отмена = SIGTERM (для клиента mvnd — SIGINT) на всю группу, через 10 с SIGKILL | Работает на macOS и Linux, убивает surefire, node и прочие дочерние процессы |
 | Команда | Всегда `[]string` argv, без shell | Нет проблем с экранированием и инъекциями |
 | CLI и конфиг | Подкоманды на stdlib `flag` (`buildyard serve`, позже `buildyard run`); конфиг `~/.buildyard/config.toml` (`BurntSushi/toml`) | Минимум зависимостей |
@@ -119,11 +121,29 @@ CREATE TABLE project (
   name              TEXT NOT NULL,
   root_path         TEXT NOT NULL UNIQUE,
   build_tool        TEXT NOT NULL DEFAULT 'maven', -- maven | gradle (позже)
-  executable        TEXT,                          -- NULL = авто: mvnd -> ./mvnw -> mvn
-  java_home         TEXT,
+  executable        TEXT,                          -- NULL = из настроек; auto | wrapper | mvnd | mvn | /abs/path
+  jdk_id            INTEGER REFERENCES jdk(id) ON DELETE SET NULL, -- NULL = JDK из настроек
   env_json          TEXT NOT NULL DEFAULT '{}',
   skip_presets_json TEXT NOT NULL DEFAULT '[]',    -- свои пресеты пропусков
   created_at        TEXT NOT NULL
+);
+
+CREATE TABLE jdk (
+  id          INTEGER PRIMARY KEY,
+  home        TEXT NOT NULL UNIQUE,
+  name        TEXT NOT NULL DEFAULT '',     -- метка пользователя
+  version     TEXT NOT NULL DEFAULT '',     -- из файла release
+  major       INTEGER NOT NULL DEFAULT 0,
+  vendor      TEXT NOT NULL DEFAULT '',
+  arch        TEXT NOT NULL DEFAULT '',
+  source      TEXT NOT NULL,                -- manual | macos | homebrew | sdkman | jenv | ...
+  missing     INTEGER NOT NULL DEFAULT 0,   -- не найден при последнем поиске
+  detected_at TEXT NOT NULL
+);
+
+CREATE TABLE setting (                      -- глобальные настройки из UI
+  key   TEXT PRIMARY KEY,                   -- defaultExecutable, defaultJdkId
+  value TEXT NOT NULL                       -- JSON
 );
 
 CREATE TABLE module (
@@ -397,6 +417,13 @@ Maven всегда пишет полный лог в файл, а «уровен
 | GET | `/api/jobs/{id}/stream` | SSE: лог, модули, статус |
 | GET | `/api/events` | SSE: статусы всех задач для глобальной строки задач |
 | GET | `/api/health` | Версия и состояние демона |
+| GET | `/api/projects/{id}/runtime` | Какой сборщик и JDK будут использованы и почему, наличие `./mvnw` |
+| GET / PUT | `/api/settings` | Глобальные настройки: сборщик и JDK по умолчанию |
+| GET | `/api/tools` | Найденные mvn и mvnd, `JAVA_HOME` демона |
+| GET / POST | `/api/jdks` | Список JDK; добавить вручную `{home, name}` |
+| POST | `/api/jdks/detect` | Поиск JDK фоновой задачей → `202 {task}` |
+| PATCH / DELETE | `/api/jdks/{id}` | Переименовать или убрать JDK |
+| GET | `/api/tasks`, `/api/tasks/{id}` | Фоновые задачи и их статус |
 
 События в `/api/jobs/{id}/stream` (`event:` → `data:`):
 
@@ -452,7 +479,6 @@ jobsPerProject = 200
 maxLogBytes = "2GB"
 
 [defaults]
-executable = "auto"   # auto | mvn | mvnd | mvnw
 flags = ["-ntp"]
 ```
 
