@@ -1,0 +1,287 @@
+# buildyard fixture: Compilation failure (maven-compiler-plugin) under -T, -fae
+# buildyard fixture: source: build-v4, module dremio-ee-sabot-kernel
+[main] [INFO] Scanning for projects...
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] Detecting the operating system and CPU architecture
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] os.detected.name: osx
+[main] [INFO] os.detected.arch: aarch_64
+[main] [INFO] os.detected.bitness: 64
+[main] [INFO] os.detected.version: 27.0
+[main] [INFO] os.detected.version.major: 27
+[main] [INFO] os.detected.version.minor: 0
+[main] [INFO] os.detected.classifier: osx-aarch_64
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] Reactor Build Order:
+[main] [INFO] 
+[main] [INFO] Build Tools - Parent                                               [pom]
+[main] [INFO] Build Tools - Configs                                              [jar]
+[main] [INFO] Build Tools - Error Definition Code Generator                      [jar]
+[main] [INFO] Build Tools - Dremio Error Prone Checks                            [jar]
+[main] [INFO] Build Tools - Freemarker Codegen Tooling                  [maven-plugin]
+[main] [INFO] Build Tools - Open Api Spec Code Generator                         [jar]
+[main] [INFO] Build Tools - Dremio Opentelemetry BOM                             [pom]
+[main] [INFO] Build Tools - Protostuff Compiler Plugin                  [maven-plugin]
+[main] [INFO] Build Tools - Test Logging                                         [jar]
+[main] [INFO] Dremio - Parent                                                    [pom]
+[main] [INFO] Protocol                                                           [jar]
+[main] [INFO] Common - Parent                                                    [pom]
+[main] [INFO] Common - AWS                                                       [jar]
+[main] [INFO] Common - Core                                                      [jar]
+[main] [INFO] Common - Exceptions                                                [jar]
+[main] [INFO] Common - Telemetry API                                             [jar]
+[main] [INFO] Common - Legacy                                                    [jar]
+[main] [INFO] Services                                                           [pom]
+[main] [INFO] Services - Options                                                 [jar]
+[main] [INFO] Services - Telemetry - Utils                                       [jar]
+[main] [INFO] Tools                                                              [pom]
+[main] [INFO] Tools - Metrics Test                                               [jar]
+[main] [INFO] Services - Telemetry - API                                         [jar]
+[main] [INFO] Common - ZooKeeper                                                 [jar]
+[main] [INFO] OSS - Tools - Zookeeper Test Runner                                [jar]
+[main] [INFO] Services - Coordinator                                             [jar]
+# ... trimmed reactor build order ...
+[main] [INFO] DaaS - Telemetry Aggregation Service - Server                      [jar]
+[main] [INFO] DaaS - TenantManager - Server                                      [jar]
+[main] [INFO] DaaS - Usage Events Service - Server                               [jar]
+[main] [INFO] DaaS - Application - UserSessionService - Server                   [jar]
+[main] [INFO] DaaS - Workflow Service - Azure Blob Storage Sync                  [jar]
+[main] [INFO] DaaS - Workflow Service - Google Cloud Storage Sync                [jar]
+[main] [INFO] DaaS - Workflow Service - Python Scripts                           [jar]
+[main] [INFO] DaaS - Workflow Service - AWS Cloud Storage Sync                   [jar]
+[main] [INFO] DaaS - Workflow Service - Server                                   [jar]
+[main] [INFO] Dremio - Root                                                      [pom]
+[main] [INFO] 
+[main] [INFO] Using the MultiThreadedBuilder implementation with a thread count of 24
+# ... other modules' lines omitted ...
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] ------------< com.dremio.enterprise:dremio-ee-sabot-kernel >------------
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Building dremio-ee-sabot-kernel 28.0.0-SNAPSHOT                [815/957]
+[mvn-builder-dremio-ee-sabot-kernel] [INFO]   from enterprise/sabot/kernel/pom.xml
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --------------------------------[ jar ]---------------------------------
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/org/bouncycastle/bcjmail-jdk18on/1.87/bcjmail-jdk18on-1.87.pom
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/org/bouncycastle/bcjmail-jdk18on/1.87/bcjmail-jdk18on-1.87.pom
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/org/bouncycastle/bcjmail-jdk18on/1.87/bcjmail-jdk18on-1.87.pom (1.4 kB at 4.2 kB/s)
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/org/bouncycastle/bcmail-jdk18on/1.87/bcmail-jdk18on-1.87.pom
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/org/bouncycastle/bcmail-jdk18on/1.87/bcmail-jdk18on-1.87.pom
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/org/bouncycastle/bcmail-jdk18on/1.87/bcmail-jdk18on-1.87.pom (1.4 kB at 2.0 kB/s)
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloading from dremio-free: https://maven.dremio.com/free/org/bouncycastle/bcjmail-jdk18on/1.87/bcjmail-jdk18on-1.87.jar
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloading from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/org/bouncycastle/bcjmail-jdk18on/1.87/bcjmail-jdk18on-1.87.jar
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Downloaded from dremio-public-mirror: https://repo.drem.io/content/groups/java-mirror/org/bouncycastle/bcjmail-jdk18on/1.87/bcjmail-jdk18on-1.87.jar (96 kB at 61 kB/s)
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- enforcer:3.6.2:enforce (enforce-dependencies-exclusions) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Skipping Rule Enforcement.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- enforcer:3.6.2:enforce (enforce-bouncycastle-dependencies-exclusions) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Skipping Rule Enforcement.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- enforcer:3.6.2:enforce (ban-dependencies) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Skipping Rule Enforcement.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- git-commit-id:4.0.0:revision (for-jars) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] dotGitDirectory /Users/dev/dremio-global/dremio/.git
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Collected git.build.user.email with value REDACTED
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Collected git.commit.id with value 2b42a562e1ff94eb5b4b2bd0d7491dbffd90dc84
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Collected git.commit.time with value 2026-11-17T19:56:34+0000
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Collected git.build.time with value 2026-11-17T20:52:29+0000
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Collected git.build.number with value 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] including property git.build.user.email in results
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] including property git.commit.id in results
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] including property git.commit.time in results
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] including property git.build.time in results
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Reading existing properties file [/Users/dev/dremio-global/dremio/enterprise/sabot/kernel/target/classes/git.properties] (for module dremio-ee-sabot-kernel)...
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Writing properties file to [/Users/dev/dremio-global/dremio/enterprise/sabot/kernel/target/classes/git.properties] (for module dremio-ee-sabot-kernel)...
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- protobuf:0.6.1:compile (generate-protobuf) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Compiling 2 proto file(s) to /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/target/generated-sources/protobuf/java
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- protobuf:0.6.1:compile-custom (generate-protobuf) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Compiling 2 proto file(s) to /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/target/generated-sources/protobuf/grpc-java
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- resources:3.3.1:copy-resources (copy-sources-as-resources) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Copying 1 resource from src/main/java to target/classes
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- resources:3.3.1:resources (default-resources) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Copying 3 resources from src/main/resources to target/classes
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Copying 2 resources from src/main/protobuf to target/classes
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Copying 2 resources from src/main/protobuf to target/classes
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- flatten:1.9.0:flatten (flatten) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Generating flattened POM of project com.dremio.enterprise:dremio-ee-sabot-kernel:jar:28.0.0-SNAPSHOT...
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] --- compiler:3.14.1:compile (default-compile) @ dremio-ee-sabot-kernel ---
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Compiling 150 source files with javac [debug release 21] to target/classes
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/store/autoclustering/ClusteringUtils.java: Some input files use or override a deprecated API.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/store/autoclustering/ClusteringUtils.java: Recompile with -Xlint:deprecation for details.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/FineGrainedAccessQueryUtility.java: Some input files use or override a deprecated API that is marked for removal.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/FineGrainedAccessQueryUtility.java: Recompile with -Xlint:removal for details.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/store/autoclustering/EnterpriseClusteringOptions.java: Some input files use unchecked or unsafe operations.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/store/autoclustering/EnterpriseClusteringOptions.java: Recompile with -Xlint:unchecked for details.
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] Some messages have been simplified; recompile with -Xdiags:verbose to get full output
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] -------------------------------------------------------------
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] COMPILATION ERROR : 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] -------------------------------------------------------------
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogEntityOwnershipImpl.java:[141,29] method getOwnerIds in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogEntityOwnershipImpl.java:[255,50] no suitable method found for getOwnerId(com.dremio.connector.metadata.EntityPath,java.lang.String,java.lang.String)
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[152,8] com.dremio.exec.catalog.EnterpriseCatalogImpl is not abstract and does not override abstract method grantOwnershipOnEntity(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.access.CatalogEntityOwner.OwnerType,java.lang.String) in com.dremio.catalog.access.QueryEngineCatalogAccessController
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[956,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[969,33] cannot find symbol
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[972,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[986,33] cannot find symbol
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1007,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1027,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1044,23] method grantEntityOwnership in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1119,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[2130,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[2224,30] method filterVisibleCatalogEntities in class com.dremio.catalog.utils.PrivilegeServiceUtils cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[99,8] com.dremio.exec.catalog.UserContextualizedCatalogImpl is not abstract and does not override abstract method grantOwnershipOnEntity(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.access.CatalogEntityOwner.OwnerType,java.lang.String) in com.dremio.catalog.access.QueryEngineCatalogAccessController
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[892,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[899,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[919,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[928,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[935,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[1081,3] method does not override or implement a method from a supertype
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/udf/EnterpriseUserDefinedFunctionCatalogImpl.java:[116,15] no suitable method found for getOwner(com.dremio.connector.metadata.EntityPath,java.lang.String,java.lang.String)
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/CatalogGrantHandler.java:[170,27] method grant in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/CatalogRevokeHandler.java:[141,27] method revoke in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantCatalogOwnershipHandler.java:[60,53] incompatible types: bad type in conditional expression
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOnAllPrivilegeServiceProvidedDatasetsHandler.java:[44,21] method addToAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOnAllPrivilegeServiceProvidedFoldersHandler.java:[44,21] method addToAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOnAllPrivilegeServiceProvidedSpacesHandler.java:[43,21] method addToAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[285,25] cannot find symbol
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[290,25] method grantEntityOwnership in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[335,53] incompatible types: bad type in conditional expression
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[490,26] cannot find symbol
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[492,26] cannot find symbol
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/ReferenceGrantHandler.java:[64,28] cannot find symbol
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/ReferenceRevokeHandler.java:[64,28] cannot find symbol
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/RevokeOnAllPrivilegeServiceProvidedDatasetsHandler.java:[44,21] method deleteFromAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/RevokeOnAllPrivilegeServiceProvidedFoldersHandler.java:[44,21] method deleteFromAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/RevokeOnAllPrivilegeServiceProvidedSpacesHandler.java:[44,21] method deleteFromAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] 37 errors 
+[mvn-builder-dremio-ee-sabot-kernel] [INFO] -------------------------------------------------------------
+# ... trimmed: Reactor Summary see 04 ...
+[main] [ERROR] Failed to execute goal io.quarkus:quarkus-maven-plugin:3.27.6.1:generate-code-tests (default) on project dremio-daas-comics-saga-deployment: Quarkus code generation phase has failed: InvocationTargetException: Failed to generate Java classes from proto files: [/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/src/test/proto/saga.proto] to /Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/generated-test-sources/grpc with command /Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/com.google.protobuf-protoc-osx-aarch_64-exe -I=/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/src/test/proto -I=/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/protoc-dependencies/0ce801cf0df7143c1c55012021c43242915fec04 --plugin=protoc-gen-grpc=/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe --plugin=protoc-gen-q-grpc=/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/quarkus-grpc15784579132005057074.sh --q-grpc_out=/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/generated-test-sources/grpc --grpc_out=/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/generated-test-sources/grpc --java_out=/Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/generated-test-sources/grpc /Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/src/test/proto/saga.proto: Process exited abnormally (pid 5870) with exit code 1 with error output:
+[main] [ERROR]  > /Users/dev/dremio-global/dremio/daas/comics/extensions/saga/deployment/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe: program not found or is not executable
+[main] [ERROR]  > Please specify a program using absolute path or make sure the program is available in your PATH system variable
+[main] [ERROR]  > --grpc_out: protoc-gen-grpc: Plugin failed with status code 1.
+[main] [ERROR] -> [Help 1]
+[main] [ERROR] Failed to execute goal on project dremio-ee-dremiocatalog-catalog-services-server: Could not resolve dependencies for project com.dremio.enterprise.dremiocatalog:dremio-ee-dremiocatalog-catalog-services-server:jar:28.0.0-SNAPSHOT
+[main] [ERROR] dependency: com.dremio.enterprise.dremiocatalog.optimization:dremio-ee-dremiocatalog-optimization-test-common:jar:28.0.0-SNAPSHOT (test)
+[main] [ERROR] 	Could not find artifact com.dremio.enterprise.dremiocatalog.optimization:dremio-ee-dremiocatalog-optimization-test-common:jar:28.0.0-SNAPSHOT
+[main] [ERROR] -> [Help 2]
+[main] [ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project dremio-ee-sabot-kernel: Compilation failure: Compilation failure: 
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogEntityOwnershipImpl.java:[141,29] method getOwnerIds in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: java.util.List<com.dremio.connector.metadata.EntityPath>
+[main] [ERROR]   found:    java.util.List<com.dremio.connector.metadata.EntityPath>,java.lang.String,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogEntityOwnershipImpl.java:[255,50] no suitable method found for getOwnerId(com.dremio.connector.metadata.EntityPath,java.lang.String,java.lang.String)
+[main] [ERROR]     method com.dremio.catalog.PrivilegeService.getOwnerId(com.dremio.connector.metadata.EntityPath) is not applicable
+[main] [ERROR]       (actual and formal argument lists differ in length)
+[main] [ERROR]     method com.dremio.catalog.PrivilegeService.getOwnerId(com.dremio.catalog.model.CatalogEntityId,com.dremio.catalog.PrivilegeService.EntityType) is not applicable
+[main] [ERROR]       (actual and formal argument lists differ in length)
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[152,8] com.dremio.exec.catalog.EnterpriseCatalogImpl is not abstract and does not override abstract method grantOwnershipOnEntity(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.access.CatalogEntityOwner.OwnerType,java.lang.String) in com.dremio.catalog.access.QueryEngineCatalogAccessController
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[956,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[969,33] cannot find symbol
+[main] [ERROR]   symbol:   method grantOnReference(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.model.CatalogGrantList)
+[main] [ERROR]   location: variable privilegeService of type com.dremio.catalog.PrivilegeService
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[972,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[986,33] cannot find symbol
+[main] [ERROR]   symbol:   method revokeFromReference(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.model.CatalogGrantList)
+[main] [ERROR]   location: variable privilegeService of type com.dremio.catalog.PrivilegeService
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1007,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1027,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1044,23] method grantEntityOwnership in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: com.dremio.connector.metadata.EntityPath,java.lang.String
+[main] [ERROR]   found:    com.dremio.connector.metadata.EntityPath,java.lang.String,java.lang.String,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[1119,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[2130,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/EnterpriseCatalogImpl.java:[2224,30] method filterVisibleCatalogEntities in class com.dremio.catalog.utils.PrivilegeServiceUtils cannot be applied to given types;
+[main] [ERROR]   required: com.dremio.catalog.PrivilegeService,java.util.Set<com.dremio.catalog.model.CatalogEntityKey>
+[main] [ERROR]   found:    com.dremio.catalog.PrivilegeService,java.util.Set<com.dremio.catalog.model.CatalogEntityKey>,com.dremio.options.OptionManager
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[99,8] com.dremio.exec.catalog.UserContextualizedCatalogImpl is not abstract and does not override abstract method grantOwnershipOnEntity(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.access.CatalogEntityOwner.OwnerType,java.lang.String) in com.dremio.catalog.access.QueryEngineCatalogAccessController
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[892,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[899,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[919,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[928,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[935,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/UserContextualizedCatalogImpl.java:[1081,3] method does not override or implement a method from a supertype
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/catalog/udf/EnterpriseUserDefinedFunctionCatalogImpl.java:[116,15] no suitable method found for getOwner(com.dremio.connector.metadata.EntityPath,java.lang.String,java.lang.String)
+[main] [ERROR]     method com.dremio.catalog.PrivilegeService.getOwner(com.dremio.connector.metadata.EntityPath) is not applicable
+[main] [ERROR]       (actual and formal argument lists differ in length)
+[main] [ERROR]     method com.dremio.catalog.PrivilegeService.getOwner(com.dremio.catalog.model.CatalogEntityId,com.dremio.catalog.PrivilegeService.EntityType) is not applicable
+[main] [ERROR]       (actual and formal argument lists differ in length)
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/CatalogGrantHandler.java:[170,27] method grant in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: com.dremio.connector.metadata.EntityPath,com.dremio.catalog.PrivilegeService.EntityType,java.lang.String,java.util.List<java.lang.String>
+[main] [ERROR]   found:    com.dremio.connector.metadata.EntityPath,com.dremio.catalog.PrivilegeService.EntityType,java.lang.String,java.lang.String,java.lang.String,java.util.List<java.lang.String>
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/CatalogRevokeHandler.java:[141,27] method revoke in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: com.dremio.connector.metadata.EntityPath,com.dremio.catalog.PrivilegeService.EntityType,java.lang.String,java.util.List<java.lang.String>
+[main] [ERROR]   found:    com.dremio.connector.metadata.EntityPath,com.dremio.catalog.PrivilegeService.EntityType,java.lang.String,java.lang.String,java.lang.String,java.util.List<java.lang.String>
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantCatalogOwnershipHandler.java:[60,53] incompatible types: bad type in conditional expression
+[main] [ERROR]     com.dremio.catalog.access.EnterpriseCatalogEntityOwner.OwnerType cannot be converted to com.dremio.catalog.access.CatalogEntityOwner.OwnerType
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOnAllPrivilegeServiceProvidedDatasetsHandler.java:[44,21] method addToAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   found:    java.lang.String,java.lang.String,java.lang.String,java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOnAllPrivilegeServiceProvidedFoldersHandler.java:[44,21] method addToAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   found:    java.lang.String,java.lang.String,java.lang.String,java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOnAllPrivilegeServiceProvidedSpacesHandler.java:[43,21] method addToAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   found:    java.lang.String,java.lang.String,java.lang.String,java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[285,25] cannot find symbol
+[main] [ERROR]   symbol:   method grantReferenceOwnership(java.lang.String,java.lang.String,java.lang.String)
+[main] [ERROR]   location: variable privilegeService of type com.dremio.catalog.PrivilegeService
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[290,25] method grantEntityOwnership in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: com.dremio.connector.metadata.EntityPath,java.lang.String
+[main] [ERROR]   found:    com.dremio.connector.metadata.EntityPath,java.lang.String,java.lang.String,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[335,53] incompatible types: bad type in conditional expression
+[main] [ERROR]     com.dremio.catalog.access.EnterpriseCatalogEntityOwner.OwnerType cannot be converted to com.dremio.catalog.access.CatalogEntityOwner.OwnerType
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[490,26] cannot find symbol
+[main] [ERROR]   symbol:   variable BRANCH
+[main] [ERROR]   location: class com.dremio.catalog.PrivilegeService.EntityType
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/GrantOwnershipHandler.java:[492,26] cannot find symbol
+[main] [ERROR]   symbol:   variable TAG
+[main] [ERROR]   location: class com.dremio.catalog.PrivilegeService.EntityType
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/ReferenceGrantHandler.java:[64,28] cannot find symbol
+[main] [ERROR]   symbol:   method grantOnReference(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.model.CatalogGrantList)
+[main] [ERROR]   location: variable catalogAccessController of type com.dremio.catalog.access.QueryEngineCatalogAccessController
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/ReferenceRevokeHandler.java:[64,28] cannot find symbol
+[main] [ERROR]   symbol:   method revokeFromReference(com.dremio.catalog.model.CatalogEntityKey,com.dremio.catalog.model.CatalogGrantList)
+[main] [ERROR]   location: variable catalogAccessController of type com.dremio.catalog.access.QueryEngineCatalogAccessController
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/RevokeOnAllPrivilegeServiceProvidedDatasetsHandler.java:[44,21] method deleteFromAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   found:    java.lang.String,java.lang.String,java.lang.String,java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/RevokeOnAllPrivilegeServiceProvidedFoldersHandler.java:[44,21] method deleteFromAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   found:    java.lang.String,java.lang.String,java.lang.String,java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] /Users/dev/dremio-global/dremio/enterprise/sabot/kernel/src/main/java/com/dremio/exec/planner/sql/handlers/RevokeOnAllPrivilegeServiceProvidedSpacesHandler.java:[44,21] method deleteFromAllChildrenAccessControlList in interface com.dremio.catalog.PrivilegeService cannot be applied to given types;
+[main] [ERROR]   required: java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   found:    java.lang.String,java.lang.String,java.lang.String,java.util.Set<java.lang.String>,java.lang.String,java.lang.String,java.util.List<java.lang.String>,java.lang.String
+[main] [ERROR]   reason: actual and formal argument lists differ in length
+[main] [ERROR] -> [Help 3]
+[main] [ERROR] Failed to execute goal io.quarkus:quarkus-maven-plugin:3.27.6.1:generate-code (default-quarkus-build) on project dremio-ee-dremiocatalog-polaris-server-common-grpc: Quarkus code generation phase has failed: InvocationTargetException: Failed to generate Java classes from proto files: [/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogprivileges.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogprivilegestore.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/opencatalogvisibilitystore.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/opencatalogvisibility.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogaccessmanagementservice.proto, /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogaccesscheckservice.proto] to /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/generated-sources/grpc with command /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/com.google.protobuf-protoc-osx-aarch_64-exe -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97 -I=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-dependencies/0ce801cf0df7143c1c55012021c43242915fec04 --plugin=protoc-gen-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe --plugin=protoc-gen-q-grpc=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/quarkus-grpc15826352832655282700.sh --q-grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/generated-sources/grpc --grpc_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/generated-sources/grpc --java_out=/Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/generated-sources/grpc /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogprivileges.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogprivilegestore.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/opencatalogvisibilitystore.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/opencatalogvisibility.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogaccessmanagementservice.proto /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/protoc-protos-from-dependencies/bdb6e2fe69508ac89eb2e1ce697eeab479737a97/dremiocatalogaccesscheckservice.proto: Process exited abnormally (pid 13767) with exit code 1 with error output:
+[main] [ERROR]  > /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/server-polaris-common-grpc/target/io.grpc-protoc-gen-grpc-java-osx-aarch_64-exe: program not found or is not executable
+[main] [ERROR]  > Please specify a program using absolute path or make sure the program is available in your PATH system variable
+[main] [ERROR]  > --grpc_out: protoc-gen-grpc: Plugin failed with status code 1.
+[main] [ERROR] -> [Help 1]
+[main] [ERROR] 
+[main] [ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[main] [ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[main] [ERROR] 
+[main] [ERROR] For more information about the errors and possible solutions, please read the following articles:
+[main] [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+[main] [ERROR] [Help 2] http://cwiki.apache.org/confluence/display/MAVEN/DependencyResolutionException
+[main] [ERROR] [Help 3] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[main] [ERROR] 
+[main] [ERROR] After correcting the problems, you can resume the build with the command
+[main] [ERROR]   mvn <args> -rf :dremio-daas-comics-saga-deployment

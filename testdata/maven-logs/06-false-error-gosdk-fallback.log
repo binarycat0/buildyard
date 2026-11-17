@@ -1,0 +1,102 @@
+# buildyard fixture: [ERROR] line that is NOT a failure: gosdk-wrapper 403 then fallback to go.dev succeeds
+# buildyard fixture: source: build-1, interleaved -T output
+[INFO] including property git.commit.time in results
+[INFO] including property git.build.time in results
+[INFO] Reading existing properties file [/Users/dev/dremio-global/dremio/daas/sources-operator/target/classes/git.properties] (for module DaaS - Sources Operator)...
+[INFO] Collected git.commit.time with value 2026-10-19T12:30:07+0100
+[INFO] Collected git.build.time with value 2026-11-17T19:35:16+0000
+[INFO] Collected git.build.number with value 
+[INFO] Writing properties file to [/Users/dev/dremio-global/dremio/daas/sources-operator/target/classes/git.properties] (for module DaaS - Sources Operator)...
+[INFO] including property git.build.user.email in results
+[INFO] including property git.commit.id in results
+[INFO] including property git.commit.time in results
+[INFO] including property git.build.time in results
+[INFO] Reading existing properties file [/Users/dev/dremio-global/dremio/daas/telemetryservice/target/classes/git.properties] (for module DaaS - Telemetry Aggregation Service)...
+[INFO] Collected git.commit.id with value f139f13fe847674f86d9a925374172c220871490
+[INFO] 
+[INFO] --- gosdk-wrapper:1.1.2:cache-sdk (provision-go-sdk) @ dremio-daas-sources-operator ---
+[INFO] Writing properties file to [/Users/dev/dremio-global/dremio/daas/telemetryservice/target/classes/git.properties] (for module DaaS - Telemetry Aggregation Service)...
+[INFO] 
+[INFO] --- flatten:1.7.3:flatten (flatten) @ dremio-daas-telemetryaggregationservice ---
+[INFO] Generating flattened POM of project com.dremio.daas:dremio-daas-telemetryaggregationservice:pom:27.0.0-SNAPSHOT...
+[INFO] Collected git.build.user.email with value REDACTED
+[INFO] Collected git.commit.id with value f139f13fe847674f86d9a925374172c220871490
+[INFO] 
+[INFO] --- jar:3.5.0:test-jar (default) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] Building jar: /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/iceberg-client/target/dremio-ee-dremiocatalog-icebergclient-27.0.0-SNAPSHOT-tests.jar
+[INFO] 
+[INFO] --- failsafe:3.5.4:integration-test (default-integration-test) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- forbiddenapis:3.6:check (default) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] Skipping forbidden-apis checks.
+[INFO] 
+[INFO] --- forbiddenapis:3.6:testCheck (default) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] Skipping forbidden-apis checks.
+[INFO] 
+[INFO] --- spotless:3.0.0:check (spotless-check) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] Spotless check skipped
+[INFO] 
+[INFO] --- checkstyle:3.6.0:check (checkstyle-verification) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] 
+[INFO] --- license:4.3:check (verify-license-headers) @ dremio-ee-dremiocatalog-icebergclient ---
+[ERROR] Can't load GoSDK from https://storage.googleapis.com/golang/ : HTTP response status is 403 (Forbidden)
+[INFO] Loading GoSDK link with URI: https://go.dev/dl/?prefix=go1.26.9.darwin-arm64
+[INFO] Collected git.build.user.email with value REDACTED
+[INFO] 
+[INFO] --- failsafe:3.5.4:verify (default-integration-test) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- install:3.2.0:install (default-install) @ dremio-ee-dremiocatalog-icebergclient ---
+[INFO] Installing /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/iceberg-client/.flattened-pom.xml to /Users/dev/.m2/repository/com/dremio/enterprise/dremiocatalog/dremio-ee-dremiocatalog-icebergclient/27.0.0-SNAPSHOT/dremio-ee-dremiocatalog-icebergclient-27.0.0-SNAPSHOT.pom
+[INFO] Installing /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/iceberg-client/target/dremio-ee-dremiocatalog-icebergclient-27.0.0-SNAPSHOT.jar to /Users/dev/.m2/repository/com/dremio/enterprise/dremiocatalog/dremio-ee-dremiocatalog-icebergclient/27.0.0-SNAPSHOT/dremio-ee-dremiocatalog-icebergclient-27.0.0-SNAPSHOT.jar
+[INFO] Collected git.commit.time with value 2026-10-19T12:30:07+0100
+[INFO] Collected git.build.time with value 2026-11-17T19:35:16+0000
+[INFO] Collected git.build.number with value 
+[INFO] including property git.build.user.email in results
+[INFO] including property git.commit.id in results
+[INFO] including property git.commit.time in results
+[INFO] including property git.build.time in results
+[INFO] Reading existing properties file [/Users/dev/dremio-global/dremio/oss/dac/ui/target/classes/git.properties] (for module Analyst Center - UI)...
+[INFO] Installing /Users/dev/dremio-global/dremio/enterprise/dremiocatalog/iceberg-client/target/dremio-ee-dremiocatalog-icebergclient-27.0.0-SNAPSHOT-tests.jar to /Users/dev/.m2/repository/com/dremio/enterprise/dremiocatalog/dremio-ee-dremiocatalog-icebergclient/27.0.0-SNAPSHOT/dremio-ee-dremiocatalog-icebergclient-27.0.0-SNAPSHOT-tests.jar
+[INFO] Writing properties file to [/Users/dev/dremio-global/dremio/oss/dac/ui/target/classes/git.properties] (for module Analyst Center - UI)...
+[INFO] 
+[INFO] --- frontend:1.15.0:install-node-and-pnpm (npm install) @ dremio-dac-ui ---
+[INFO] Collected git.build.user.email with value REDACTED
+[INFO] Skipping execution.
+[INFO] Collected git.build.user.email with value REDACTED
+[INFO] 
+[INFO] --- frontend:1.15.0:pnpm (npm install) @ dremio-dac-ui ---
+[INFO] Skipping execution.
+[INFO] 
+[INFO] --- frontend:1.15.0:pnpm (make sure there is no outdated/GPL OSS) @ dremio-dac-ui ---
+[INFO] Skipping execution.
+[INFO] 
+[INFO] --- frontend:1.15.0:pnpm (build minimized webpack bundle) @ dremio-dac-ui ---
+[INFO] Skipping execution.
+[INFO] 
+[INFO] --- frontend:1.15.0:pnpm (overwrite sourcemaps) @ dremio-dac-ui ---
+[INFO] Skipping execution.
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ dremio-dac-ui ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- flatten:1.7.3:flatten (flatten) @ dremio-dac-ui ---
+[INFO] Generating flattened POM of project com.dremio:dremio-dac-ui:jar:27.0.0-SNAPSHOT...
+[INFO] 
+[INFO] -----< com.dremio.extras.tools:dremio-testcontainers-unitycatalog >-----
+[INFO] Building Extras - Tools - Testcontainers - Unity Catalog 27.0.0-SNAPSHOT [208/952]
+[INFO]   from extras/tools/testcontainers/unitycatalog/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] Collected git.commit.id with value f139f13fe847674f86d9a925374172c220871490
+[INFO] Collected git.commit.id with value f139f13fe847674f86d9a925374172c220871490
+[INFO] 
+[INFO] --- enforcer:3.6.2:enforce (enforce-dependencies-exclusions) @ dremio-testcontainers-unitycatalog ---
+[INFO] Skipping Rule Enforcement.
+[INFO] 
+[INFO] --- enforcer:3.6.2:enforce (enforce-bouncycastle-dependencies-exclusions) @ dremio-testcontainers-unitycatalog ---
+[INFO] Skipping Rule Enforcement.
+[INFO] 
+[INFO] --- git-commit-id:4.0.0:revision (for-jars) @ dremio-testcontainers-unitycatalog ---
+[INFO] dotGitDirectory /Users/dev/dremio-global/dremio/.git
+[INFO] Collected git.commit.id with value f139f13fe847674f86d9a925374172c220871490

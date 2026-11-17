@@ -1,0 +1,150 @@
+# buildyard fixture: Dremio maven build (-T 1.5C, showThreadName=true), single successful module extracted
+# buildyard fixture: source: build-v4, module dremio-common-core; middle of reactor trimmed
+[main] [INFO] Scanning for projects...
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] Detecting the operating system and CPU architecture
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] os.detected.name: osx
+[main] [INFO] os.detected.arch: aarch_64
+[main] [INFO] os.detected.bitness: 64
+[main] [INFO] os.detected.version: 27.0
+[main] [INFO] os.detected.version.major: 27
+[main] [INFO] os.detected.version.minor: 0
+[main] [INFO] os.detected.classifier: osx-aarch_64
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] Reactor Build Order:
+[main] [INFO] 
+[main] [INFO] Build Tools - Parent                                               [pom]
+[main] [INFO] Build Tools - Configs                                              [jar]
+[main] [INFO] Build Tools - Error Definition Code Generator                      [jar]
+[main] [INFO] Build Tools - Dremio Error Prone Checks                            [jar]
+[main] [INFO] Build Tools - Freemarker Codegen Tooling                  [maven-plugin]
+[main] [INFO] Build Tools - Open Api Spec Code Generator                         [jar]
+[main] [INFO] Build Tools - Dremio Opentelemetry BOM                             [pom]
+[main] [INFO] Build Tools - Protostuff Compiler Plugin                  [maven-plugin]
+[main] [INFO] Build Tools - Test Logging                                         [jar]
+[main] [INFO] Dremio - Parent                                                    [pom]
+[main] [INFO] Protocol                                                           [jar]
+[main] [INFO] Common - Parent                                                    [pom]
+[main] [INFO] Common - AWS                                                       [jar]
+[main] [INFO] Common - Core                                                      [jar]
+[main] [INFO] Common - Exceptions                                                [jar]
+[main] [INFO] Common - Telemetry API                                             [jar]
+[main] [INFO] Common - Legacy                                                    [jar]
+[main] [INFO] Services                                                           [pom]
+[main] [INFO] Services - Options                                                 [jar]
+[main] [INFO] Services - Telemetry - Utils                                       [jar]
+[main] [INFO] Tools                                                              [pom]
+[main] [INFO] Tools - Metrics Test                                               [jar]
+[main] [INFO] Services - Telemetry - API                                         [jar]
+[main] [INFO] Common - ZooKeeper                                                 [jar]
+[main] [INFO] OSS - Tools - Zookeeper Test Runner                                [jar]
+[main] [INFO] Services - Coordinator                                             [jar]
+# ... trimmed reactor build order ...
+[main] [INFO] DaaS - Telemetry Aggregation Service - Server                      [jar]
+[main] [INFO] DaaS - TenantManager - Server                                      [jar]
+[main] [INFO] DaaS - Usage Events Service - Server                               [jar]
+[main] [INFO] DaaS - Application - UserSessionService - Server                   [jar]
+[main] [INFO] DaaS - Workflow Service - Azure Blob Storage Sync                  [jar]
+[main] [INFO] DaaS - Workflow Service - Google Cloud Storage Sync                [jar]
+[main] [INFO] DaaS - Workflow Service - Python Scripts                           [jar]
+[main] [INFO] DaaS - Workflow Service - AWS Cloud Storage Sync                   [jar]
+[main] [INFO] DaaS - Workflow Service - Server                                   [jar]
+[main] [INFO] Dremio - Root                                                      [pom]
+[main] [INFO] 
+[main] [INFO] Using the MultiThreadedBuilder implementation with a thread count of 24
+# ... other modules' lines omitted ...
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] ----------------< com.dremio.common:dremio-common-core >----------------
+[mvn-builder-dremio-common-core] [INFO] Building Common - Core 28.0.0-SNAPSHOT                          [41/957]
+[mvn-builder-dremio-common-core] [INFO]   from oss/common/core/pom.xml
+[mvn-builder-dremio-common-core] [INFO] --------------------------------[ jar ]---------------------------------
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- enforcer:3.6.2:enforce (enforce-dependencies-exclusions) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Skipping Rule Enforcement.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- enforcer:3.6.2:enforce (enforce-bouncycastle-dependencies-exclusions) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Skipping Rule Enforcement.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- git-commit-id:4.0.0:revision (for-jars) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] dotGitDirectory /Users/dev/dremio-global/dremio/.git
+[mvn-builder-dremio-common-core] [INFO] Collected git.build.user.email with value REDACTED
+[mvn-builder-dremio-common-core] [INFO] Collected git.commit.id with value 2b42a562e1ff94eb5b4b2bd0d7491dbffd90dc84
+[mvn-builder-dremio-common-core] [INFO] Collected git.commit.time with value 2026-11-17T19:56:34+0000
+[mvn-builder-dremio-common-core] [INFO] Collected git.build.time with value 2026-11-17T20:39:16+0000
+[mvn-builder-dremio-common-core] [INFO] Collected git.build.number with value 
+[mvn-builder-dremio-common-core] [INFO] including property git.build.user.email in results
+[mvn-builder-dremio-common-core] [INFO] including property git.commit.id in results
+[mvn-builder-dremio-common-core] [INFO] including property git.commit.time in results
+[mvn-builder-dremio-common-core] [INFO] including property git.build.time in results
+[mvn-builder-dremio-common-core] [INFO] Reading existing properties file [/Users/dev/dremio-global/dremio/oss/common/core/target/classes/git.properties] (for module Common - Core)...
+[mvn-builder-dremio-common-core] [INFO] Properties file [/Users/dev/dremio-global/dremio/oss/common/core/target/classes/git.properties] is up-to-date (for module Common - Core)...
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- resources:3.3.1:resources (default-resources) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] skip non existing resourceDirectory /Users/dev/dremio-global/dremio/oss/common/core/src/main/resources
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- flatten:1.9.0:flatten (flatten) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Generating flattened POM of project com.dremio.common:dremio-common-core:jar:28.0.0-SNAPSHOT...
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- compiler:3.14.1:compile (default-compile) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Nothing to compile - all classes are up to date.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- resources:3.3.1:testResources (default-testResources) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] skip non existing resourceDirectory /Users/dev/dremio-global/dremio/oss/common/core/src/test/resources
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Nothing to compile - all classes are up to date.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- surefire:3.5.4:test (default-test) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Tests are skipped.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- jar:3.5.0:jar (default-jar) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- jar:3.5.0:test-jar (default) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- failsafe:3.5.4:integration-test (default-integration-test) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Tests are skipped.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- forbiddenapis:3.6:check (default) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Skipping forbidden-apis checks.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- forbiddenapis:3.6:testCheck (default) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Skipping forbidden-apis checks.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- spotless:3.0.0:check (spotless-check) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Spotless check skipped
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- checkstyle:3.6.0:check (checkstyle-verification) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- license:4.3:check (verify-license-headers) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- failsafe:3.5.4:verify (default-integration-test) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Tests are skipped.
+[mvn-builder-dremio-common-core] [INFO] 
+[mvn-builder-dremio-common-core] [INFO] --- install:3.2.0:install (default-install) @ dremio-common-core ---
+[mvn-builder-dremio-common-core] [INFO] Installing /Users/dev/dremio-global/dremio/oss/common/core/.flattened-pom.xml to /Users/dev/dremio-global/.m2repo/com/dremio/common/dremio-common-core/28.0.0-SNAPSHOT/dremio-common-core-28.0.0-SNAPSHOT.pom
+[mvn-builder-dremio-common-core] [INFO] Installing /Users/dev/dremio-global/dremio/oss/common/core/target/dremio-common-core-28.0.0-SNAPSHOT.jar to /Users/dev/dremio-global/.m2repo/com/dremio/common/dremio-common-core/28.0.0-SNAPSHOT/dremio-common-core-28.0.0-SNAPSHOT.jar
+[mvn-builder-dremio-common-core] [INFO] Installing /Users/dev/dremio-global/dremio/oss/common/core/target/dremio-common-core-28.0.0-SNAPSHOT-tests.jar to /Users/dev/dremio-global/.m2repo/com/dremio/common/dremio-common-core/28.0.0-SNAPSHOT/dremio-common-core-28.0.0-SNAPSHOT-tests.jar
+# ... trimmed ...
+[main] [INFO] ------------------------------------------------------------------------
+[main] [INFO] Reactor Summary for Dremio - Root 28.0.0-SNAPSHOT:
+[main] [INFO] 
+[main] [INFO] Build Tools - Parent ............................... SUCCESS [  0.184 s]
+[main] [INFO] Build Tools - Configs .............................. SUCCESS [  0.415 s]
+[main] [INFO] Build Tools - Error Definition Code Generator ...... SUCCESS [  0.417 s]
+[main] [INFO] Build Tools - Dremio Error Prone Checks ............ SUCCESS [  0.415 s]
+[main] [INFO] Build Tools - Freemarker Codegen Tooling ........... SUCCESS [  0.581 s]
+[main] [INFO] Build Tools - Open Api Spec Code Generator ......... SUCCESS [  0.524 s]
+# ... trimmed ...
+[main] [ERROR] -> [Help 1]
+[main] [ERROR] 
+[main] [ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[main] [ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[main] [ERROR] 
+[main] [ERROR] For more information about the errors and possible solutions, please read the following articles:
+[main] [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
+[main] [ERROR] [Help 2] http://cwiki.apache.org/confluence/display/MAVEN/DependencyResolutionException
+[main] [ERROR] [Help 3] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[main] [ERROR] 
+[main] [ERROR] After correcting the problems, you can resume the build with the command
+[main] [ERROR]   mvn <args> -rf :dremio-daas-comics-saga-deployment
