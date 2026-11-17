@@ -23,7 +23,7 @@ document.addEventListener('alpine:init', () => {
         [this.projects, this.health] = await Promise.all([api('GET', '/projects'), api('GET', '/health')]);
         this.error = '';
       } catch (e) {
-        this.error = e.status === 401 ? 'Нет доступа: откройте ссылку из `buildyard open`.' : e.message;
+        this.error = e.message;
       } finally {
         this.loaded = true;
       }

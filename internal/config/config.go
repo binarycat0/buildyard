@@ -2,14 +2,11 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -49,7 +46,6 @@ func Default() Config {
 type Paths struct {
 	Dir    string
 	Config string
-	Token  string
 	Lock   string
 	Log    string
 	DB     string
@@ -76,7 +72,6 @@ func PathsIn(dir string) Paths {
 	return Paths{
 		Dir:    dir,
 		Config: filepath.Join(dir, "config.toml"),
-		Token:  filepath.Join(dir, "token"),
 		Lock:   filepath.Join(dir, "daemon.lock"),
 		Log:    filepath.Join(dir, "daemon.log"),
 		DB:     filepath.Join(dir, "buildyard.db"),
@@ -150,27 +145,4 @@ func (c Config) Validate() error {
 		return fmt.Errorf("defaults.executable must be auto, mvn, mvnd or mvnw")
 	}
 	return nil
-}
-
-// LoadOrCreateToken returns the API token, generating 32 random bytes on first use.
-// The file is written with mode 0600.
-func LoadOrCreateToken(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err == nil {
-		tok := strings.TrimSpace(string(data))
-		if len(tok) >= 32 {
-			return tok, nil
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return "", err
-	}
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	tok := hex.EncodeToString(buf)
-	if err := os.WriteFile(path, []byte(tok+"\n"), 0o600); err != nil {
-		return "", err
-	}
-	return tok, os.Chmod(path, 0o600)
 }

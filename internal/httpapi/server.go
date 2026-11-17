@@ -1,4 +1,4 @@
-// Package httpapi serves the JSON API and the embedded UI, behind the localhost security checks.
+// Package httpapi serves the JSON API and the embedded UI on 127.0.0.1.
 package httpapi
 
 import (
@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/binarycat0/buildyard/internal/store"
@@ -20,15 +21,13 @@ var Version = "dev"
 // Server holds what the handlers need.
 type Server struct {
 	Store   *store.Store
-	Token   string
-	Port    int
 	DataDir string
 	UI      fs.FS // static files; index.html at the root
 	Log     *slog.Logger
 	started time.Time
 }
 
-// Handler returns the full HTTP handler: security middleware around the API and UI routes.
+// Handler returns the HTTP handler with the API and UI routes.
 func (s *Server) Handler() http.Handler {
 	s.started = time.Now()
 	if s.Log == nil {
@@ -45,7 +44,7 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
 	})
 	mux.Handle("/", s.ui())
-	return s.secure(mux)
+	return mux
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +101,7 @@ func decode(r *http.Request, v any) error {
 // ListenAndServe serves h on 127.0.0.1:port until ctx is done. Binding elsewhere is not supported.
 func ListenAndServe(ctx context.Context, port int, h http.Handler) error {
 	srv := &http.Server{
-		Addr:              "127.0.0.1:" + itoa(port),
+		Addr:              "127.0.0.1:" + strconv.Itoa(port),
 		Handler:           h,
 		ReadHeaderTimeout: 10 * time.Second,
 	}

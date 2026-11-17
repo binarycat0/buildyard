@@ -26,8 +26,8 @@ var version = "dev"
 const usage = `Usage: buildyard <command> [flags]
 
 Commands:
-  serve     start the daemon on 127.0.0.1 and print the UI link
-  open      print the UI link and open it in the browser
+  serve     start the daemon on 127.0.0.1 and print the UI address
+  open      print the UI address and open it in the browser
   version   print the version
 
 Data lives in ~/.buildyard (override with BUILDYARD_HOME).
@@ -61,7 +61,6 @@ func main() {
 type env struct {
 	paths config.Paths
 	cfg   config.Config
-	token string
 }
 
 func setup() (env, error) {
@@ -77,15 +76,11 @@ func setup() (env, error) {
 	if err != nil {
 		return env{}, err
 	}
-	token, err := config.LoadOrCreateToken(paths.Token)
-	if err != nil {
-		return env{}, fmt.Errorf("token: %w", err)
-	}
-	return env{paths: paths, cfg: cfg, token: token}, nil
+	return env{paths: paths, cfg: cfg}, nil
 }
 
 func link(e env) string {
-	return fmt.Sprintf("http://127.0.0.1:%d/?token=%s", e.cfg.Port, e.token)
+	return fmt.Sprintf("http://127.0.0.1:%d/", e.cfg.Port)
 }
 
 func serve(args []string) error {
@@ -128,7 +123,7 @@ func serve(args []string) error {
 	defer st.Close()
 
 	httpapi.Version = version
-	srv := &httpapi.Server{Store: st, Token: e.token, Port: e.cfg.Port, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	srv := &httpapi.Server{Store: st, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
 	log.Info("buildyard started", "version", version, "addr", fmt.Sprintf("127.0.0.1:%d", e.cfg.Port), "dataDir", e.paths.Dir)
 	fmt.Fprintf(os.Stderr, "\nOpen Buildyard: %s\n\n", link(e))
 
@@ -142,7 +137,7 @@ func serve(args []string) error {
 
 func open(args []string) error {
 	fs := flag.NewFlagSet("open", flag.ExitOnError)
-	printOnly := fs.Bool("print", false, "only print the link")
+	printOnly := fs.Bool("print", false, "only print the address")
 	fs.Parse(args)
 
 	e, err := setup()
