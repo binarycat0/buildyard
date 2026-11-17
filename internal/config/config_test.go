@@ -48,22 +48,3 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		})
 	}
 }
-
-func TestTokenCreatedOnceWithMode0600(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "token")
-	a, err := LoadOrCreateToken(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(a) != 64 {
-		t.Fatalf("token length %d", len(a))
-	}
-	b, err := LoadOrCreateToken(p)
-	if err != nil || a != b {
-		t.Fatalf("token changed on second load: %v", err)
-	}
-	st, _ := os.Stat(p)
-	if st.Mode().Perm() != 0o600 {
-		t.Fatalf("mode %v", st.Mode().Perm())
-	}
-}

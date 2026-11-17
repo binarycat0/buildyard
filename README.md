@@ -9,12 +9,12 @@
 ```sh
 make build          # bin/buildyard (CGO не нужен)
 make test
-./bin/buildyard serve   # 127.0.0.1:7777, печатает ссылку с токеном
+./bin/buildyard serve   # слушает 127.0.0.1:7777, открыть http://127.0.0.1:7777/
 ./bin/buildyard open    # открыть UI в браузере
 ```
 
-Данные лежат в `~/.buildyard` (`BUILDYARD_HOME` переопределяет): `config.toml`, `token`, `buildyard.db`, `daemon.log`.
+Данные лежат в `~/.buildyard` (`BUILDYARD_HOME` переопределяет): `config.toml`, `buildyard.db`, `daemon.log`.
 
 ## Статус
 
-Фаза 1 (каркас): конфиг, lock-файл, SQLite с миграциями, токен и проверки Host/Origin, CRUD проектов и экран проектов.
+Фаза 1 (каркас): конфиг, lock-файл, SQLite с миграциями, CRUD проектов и экран проектов.
