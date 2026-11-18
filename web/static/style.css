@@ -164,6 +164,10 @@ a.modname:hover { text-decoration: underline; }
 .modtable { max-height: 360px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
 .modtable table { width: 100%; border-collapse: collapse; font-size: .9em; }
 .modtable td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--border); }
+.modtree { height: 360px; font-size: .9em; }
+.modtree .trow { height: 26px; display: flex; align-items: center; gap: 8px; padding-right: 8px; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.modtree .trow .modname { overflow: hidden; text-overflow: ellipsis; }
+.modtree .num { font-variant-numeric: tabular-nums; }
 .modtable td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .status.skipped, .status.pending { background: var(--border); color: var(--muted); }
 .modprog .seg { align-self: flex-start; }
