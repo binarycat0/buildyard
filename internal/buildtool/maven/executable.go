@@ -50,17 +50,20 @@ type Resolved struct {
 	Reason string `json:"reason"` // human-readable explanation
 }
 
+// systemBinDirs are searched when a tool is not on PATH (the daemon may run without the
+// login shell's PATH). A variable so tests can leave the machine's own tools out.
+var systemBinDirs = []string{"/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin"}
+
 // LookPath finds a program in PATH and in the usual install dirs that a launchd/systemd
 // service PATH tends to miss (Homebrew, sdkman).
 func LookPath(name, home string) string {
 	if p, err := exec.LookPath(name); err == nil {
 		return p
 	}
-	dirs := []string{
-		"/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin",
+	dirs := append(append([]string(nil), systemBinDirs...),
 		filepath.Join(home, ".sdkman/candidates/maven/current/bin"),
 		filepath.Join(home, ".sdkman/candidates/mvnd/current/bin"),
-	}
+	)
 	for _, d := range dirs {
 		if p := filepath.Join(d, name); isExecutable(p) {
 			return p
