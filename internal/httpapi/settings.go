@@ -300,16 +300,24 @@ func (s *Server) projectRuntime(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := r.Context()
-	p, err := s.Store.GetProject(ctx, id)
+	p, err := s.Store.GetProject(r.Context(), id)
 	if err != nil {
 		s.respondProject(w, p, err)
 		return
 	}
-	settings, err := s.Store.GetSettings(ctx)
+	info, err := s.runtimeFor(r.Context(), p)
 	if err != nil {
 		s.internal(w, err)
 		return
+	}
+	writeJSON(w, http.StatusOK, info)
+}
+
+// runtimeFor resolves the executable and JDK a run of p will use.
+func (s *Server) runtimeFor(ctx context.Context, p store.Project) (runtimeInfo, error) {
+	settings, err := s.Store.GetSettings(ctx)
+	if err != nil {
+		return runtimeInfo{}, err
 	}
 	info := runtimeInfo{Tools: maven.FindTools(s.Home), Wrapper: maven.FindWrapper(p.RootPath)}
 
@@ -342,5 +350,5 @@ func (s *Server) projectRuntime(w http.ResponseWriter, r *http.Request) {
 	} else if j, err := s.Store.GetJDK(ctx, *jdkID); err == nil {
 		info.JDK = &j
 	}
-	writeJSON(w, http.StatusOK, info)
+	return info, nil
 }

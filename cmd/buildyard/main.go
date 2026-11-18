@@ -13,11 +13,13 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/binarycat0/buildyard/internal/config"
 	"github.com/binarycat0/buildyard/internal/httpapi"
 	"github.com/binarycat0/buildyard/internal/jdk"
 	"github.com/binarycat0/buildyard/internal/lock"
+	"github.com/binarycat0/buildyard/internal/runner"
 	"github.com/binarycat0/buildyard/internal/store"
 	"github.com/binarycat0/buildyard/internal/tasks"
 	"github.com/binarycat0/buildyard/web"
@@ -127,9 +129,16 @@ func serve(args []string) error {
 	bg := tasks.New(2, log)
 	defer bg.Close()
 
+	if n, err := st.InterruptUnfinished(ctx); err != nil {
+		return err
+	} else if n > 0 {
+		log.Info("jobs left by the previous run marked interrupted", "count", n)
+	}
+	jobs := runner.New(st, e.paths.Logs, e.cfg.MaxConcurrentJobs, e.cfg.Retention.JobsPerProject, log)
+
 	home, _ := os.UserHomeDir()
 	httpapi.Version = version
-	srv := &httpapi.Server{Store: st, Tasks: bg, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
 	if _, err := srv.SubmitJDKDetect(); err != nil {
 		log.Warn("JDK detection not started", "err", err)
 	}
@@ -140,6 +149,9 @@ func serve(args []string) error {
 	fmt.Fprintf(os.Stderr, "\nOpen Buildyard: %s\n\n", link(e))
 
 	err = httpapi.ListenAndServe(ctx, e.cfg.Port, srv.Handler())
+	shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	jobs.Shutdown(shut) // running builds are stopped and marked interrupted
+	cancel()
 	log.Info("buildyard stopped")
 	if errors.Is(err, context.Canceled) {
 		return nil

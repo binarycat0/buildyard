@@ -7,12 +7,14 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime"
 	"strconv"
 	"time"
 
 	"github.com/binarycat0/buildyard/internal/jdk"
+	"github.com/binarycat0/buildyard/internal/runner"
 	"github.com/binarycat0/buildyard/internal/store"
 	"github.com/binarycat0/buildyard/internal/tasks"
 )
@@ -24,6 +26,7 @@ var Version = "dev"
 type Server struct {
 	Store   *store.Store
 	Tasks   *tasks.Manager
+	Runner  *runner.Runner
 	JDKs    jdk.Detector // where to look for JDKs
 	Home    string       // user home, for finding mvn/mvnd outside PATH
 	DataDir string
@@ -46,6 +49,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/projects/{id}", s.patchProject)
 	mux.HandleFunc("DELETE /api/projects/{id}", s.deleteProject)
 	mux.HandleFunc("GET /api/projects/{id}/runtime", s.projectRuntime)
+	mux.HandleFunc("POST /api/projects/{id}/preview", s.previewJob)
+	mux.HandleFunc("GET /api/projects/{id}/jobs", s.listJobs)
+	mux.HandleFunc("POST /api/projects/{id}/jobs", s.createJob)
+	mux.HandleFunc("GET /api/jobs/{id}", s.getJob)
+	mux.HandleFunc("POST /api/jobs/{id}/cancel", s.cancelJob)
+	mux.HandleFunc("POST /api/jobs/{id}/rerun", s.rerunJob)
+	mux.HandleFunc("GET /api/jobs/{id}/log", s.jobLog)
+	mux.HandleFunc("GET /api/jobs/{id}/stream", s.jobStream)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/tools", s.getTools)
@@ -122,6 +133,8 @@ func ListenAndServe(ctx context.Context, port int, h http.Handler) error {
 		Addr:              "127.0.0.1:" + strconv.Itoa(port),
 		Handler:           h,
 		ReadHeaderTimeout: 10 * time.Second,
+		// Handlers see ctx end, so live log streams close on shutdown.
+		BaseContext: func(net.Listener) context.Context { return ctx },
 	}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()

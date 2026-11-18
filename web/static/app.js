@@ -1,9 +1,5 @@
 import { api } from './api.js';
 
-const statusText = {
-  queued: 'queued', running: 'running', succeeded: 'succeeded', failed: 'failed',
-  cancelled: 'cancelled', interrupted: 'interrupted',
-};
 const execNames = { auto: 'auto', wrapper: './mvnw', mvnd: 'mvnd', mvn: 'mvn' };
 
 // Polls a background task until it finishes.
@@ -15,6 +11,87 @@ async function waitTask(id, { interval = 300, timeout = 120000 } = {}) {
     if (Date.now() > until) throw new Error('the task did not finish in time');
     await new Promise((r) => setTimeout(r, interval));
   }
+}
+
+// Splits an argument string like a shell would: whitespace separates, quotes group.
+function splitArgs(text) {
+  const out = [];
+  let cur = '';
+  let quote = null;
+  let any = false;
+  for (const ch of text) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else cur += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      any = true;
+    } else if (/\s/.test(ch)) {
+      if (cur || any) out.push(cur);
+      cur = '';
+      any = false;
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur || any) out.push(cur);
+  return out;
+}
+
+function shellQuote(a) {
+  return /^[\w@%+=:,./-]+$/.test(a) ? a : "'" + a.replace(/'/g, "'\\''") + "'";
+}
+
+// Live log rendering lives outside Alpine: thousands of lines must not become reactive.
+const logView = {
+  el: null,
+  pending: [],
+  frame: 0,
+  follow: true,
+  reset(el) {
+    this.el = el;
+    this.pending = [];
+    this.follow = true;
+    if (el) el.textContent = '';
+  },
+  lineNode(text) {
+    const d = document.createElement('div');
+    const head = text.slice(0, 80);
+    if (/\[ERROR\]|BUILD FAILURE/.test(head)) d.className = 'l-error';
+    else if (/\[WARNING\]|\[WARN\]/.test(head)) d.className = 'l-warn';
+    else if (/BUILD SUCCESS/.test(head)) d.className = 'l-ok';
+    d.textContent = text;
+    return d;
+  },
+  push(text) {
+    this.pending.push(text);
+    if (!this.frame) this.frame = requestAnimationFrame(() => this.flush());
+  },
+  flush() {
+    this.frame = 0;
+    if (!this.el) return;
+    const frag = document.createDocumentFragment();
+    for (const t of this.pending) frag.appendChild(this.lineNode(t));
+    this.pending = [];
+    this.el.appendChild(frag);
+    if (this.follow) this.el.scrollTop = this.el.scrollHeight;
+  },
+  prepend(lines) {
+    if (!this.el) return;
+    const frag = document.createDocumentFragment();
+    for (const t of lines) frag.appendChild(this.lineNode(t));
+    const before = this.el.scrollHeight;
+    this.el.insertBefore(frag, this.el.firstChild);
+    this.el.scrollTop += this.el.scrollHeight - before;
+  },
+};
+
+let stream = null;
+let ticker = 0;
+
+function closeStream() {
+  if (stream) stream.close();
+  stream = null;
 }
 
 function envToText(env) {
@@ -53,6 +130,18 @@ document.addEventListener('alpine:init', () => {
     pformError: '',
 
     ptab: 'general',
+    pview: 'run',
+    pjobs: [],
+    commonGoals: ['clean', 'compile', 'test', 'package', 'verify', 'install'],
+    rform: { goals: 'clean install', args: '' },
+    rpreview: null,
+    runError: '',
+
+    job: null,
+    jobProject: null,
+    firstLine: 0,
+    logCount: 0,
+    now: Date.now(),
     settings: { tools: { maven: { executable: 'auto', jdkId: null } } },
     sform: { maven: { executable: 'auto', jdkId: 0 } },
     tools: {},
@@ -84,9 +173,20 @@ document.addEventListener('alpine:init', () => {
       this.saved = false;
       let m;
       try {
-        if ((m = h.match(/^\/projects\/(\d+)$/))) {
+        if (!h.startsWith('/jobs/')) closeStream();
+        if ((m = h.match(/^\/projects\/(\d+)(?:\/(history|settings))?$/))) {
+          const id = Number(m[1]);
+          const same = this.view === 'project' && this.proj?.id === id;
+          this.pview = m[2] || 'run';
           this.view = 'project';
-          await this.loadProject(Number(m[1]));
+          if (same) {
+            if (this.pview === 'history') this.pjobs = await api('GET', `/projects/${id}/jobs`);
+          } else {
+            await this.loadProject(id);
+          }
+        } else if ((m = h.match(/^\/jobs\/(\d+)$/))) {
+          this.view = 'job';
+          await this.openJob(Number(m[1]));
         } else if (h === '/settings') {
           this.view = 'settings';
           await this.loadSettings();
@@ -139,21 +239,24 @@ document.addEventListener('alpine:init', () => {
     lastJobText(p) {
       if (!p.lastJob) return 'No runs yet';
       const j = p.lastJob;
-      let s = 'Last run: ' + (statusText[j.status] ?? j.status);
-      if (j.startedAt && j.finishedAt) {
-        const sec = Math.round((new Date(j.finishedAt) - new Date(j.startedAt)) / 1000);
-        s += `, ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-      }
-      return s;
+      const d = this.duration(j);
+      return this.when(j.finishedAt || j.startedAt || j.queuedAt) + (d && j.finishedAt ? ' · ' + d : '');
     },
 
     // ---------- project settings ----------
     async loadProject(id) {
-      const [p, runtime, jdks, settings, tools] = await Promise.all([
+      const [p, runtime, jdks, settings, tools, pjobs] = await Promise.all([
         api('GET', `/projects/${id}`), api('GET', `/projects/${id}/runtime`),
-        api('GET', '/jdks'), api('GET', '/settings'), api('GET', '/tools'),
+        api('GET', '/jdks'), api('GET', '/settings'), api('GET', '/tools'), api('GET', `/projects/${id}/jobs`),
       ]);
-      Object.assign(this, { proj: p, runtime, jdks, settings, tools });
+      Object.assign(this, { proj: p, runtime, jdks, settings, tools, pjobs });
+      // Start from the last run's spec.
+      const last = pjobs.find((j) => j.spec?.goals?.length);
+      this.rform = last
+        ? { goals: last.spec.goals.join(' '), args: (last.spec.extraArgs || []).map(shellQuote).join(' ') }
+        : { goals: 'clean install', args: '' };
+      this.runError = '';
+      this.refreshPreview();
       const exe = p.executable ?? '';
       const known = ['', 'auto', 'wrapper', 'mvnd', 'mvn'].includes(exe);
       this.pform = {
@@ -182,11 +285,144 @@ document.addEventListener('alpine:init', () => {
         this.proj = p;
         this.runtime = await api('GET', `/projects/${p.id}/runtime`);
         this.saved = true;
+        this.refreshPreview();
       } catch (e) {
         this.pformError = e.message;
       } finally {
         this.busy = false;
       }
+    },
+
+    // ---------- runs ----------
+    spec() {
+      return { kind: 'maven', goals: splitArgs(this.rform.goals), extraArgs: splitArgs(this.rform.args) };
+    },
+
+    hasGoal(g) {
+      return splitArgs(this.rform.goals).includes(g);
+    },
+
+    toggleGoal(g) {
+      const goals = splitArgs(this.rform.goals);
+      const order = this.commonGoals;
+      let next = goals.includes(g) ? goals.filter((x) => x !== g) : [...goals, g];
+      // Keep the lifecycle order for common goals; custom goals stay at the end.
+      next = [...order.filter((x) => next.includes(x)), ...next.filter((x) => !order.includes(x))];
+      this.rform.goals = next.join(' ');
+      this.refreshPreview();
+    },
+
+    async refreshPreview() {
+      if (!this.proj) return;
+      this.runError = '';
+      try {
+        this.rpreview = await api('POST', `/projects/${this.proj.id}/preview`, { spec: this.spec() });
+      } catch (e) {
+        this.runError = e.message;
+      }
+    },
+
+    async runJob() {
+      this.busy = true;
+      this.runError = '';
+      try {
+        const j = await api('POST', `/projects/${this.proj.id}/jobs`, { spec: this.spec() });
+        location.hash = `#/jobs/${j.id}`;
+      } catch (e) {
+        this.runError = e.message;
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    async rerun(j) {
+      try {
+        const n = await api('POST', `/jobs/${j.id}/rerun`);
+        location.hash = `#/jobs/${n.id}`;
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+
+    async cancelJob() {
+      try {
+        await api('POST', `/jobs/${this.job.id}/cancel`);
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+
+    async openJob(id) {
+      closeStream();
+      const job = await api('GET', `/jobs/${id}`);
+      this.job = job;
+      this.firstLine = 0;
+      this.logCount = job.liveLines;
+      if (this.jobProject?.id !== job.projectId) this.jobProject = await api('GET', `/projects/${job.projectId}`);
+      await this.$nextTick();
+      logView.reset(this.$refs.log);
+      clearInterval(ticker);
+      ticker = setInterval(() => { this.now = Date.now(); }, 1000);
+
+      const es = new EventSource(`/api/jobs/${id}/stream`);
+      stream = es;
+      es.addEventListener('log', (e) => {
+        const ev = JSON.parse(e.data);
+        if (!this.firstLine) this.firstLine = ev.n;
+        this.logCount = Math.max(this.logCount, ev.n);
+        logView.push(ev.text);
+      });
+      es.addEventListener('status', async (e) => {
+        const st = JSON.parse(e.data).status;
+        if (st !== this.job.status) this.job = await api('GET', `/jobs/${id}`);
+      });
+      es.addEventListener('end', (e) => {
+        this.job = JSON.parse(e.data);
+        this.logCount = this.job.logLines;
+        if (!this.firstLine && this.job.logLines) this.firstLine = this.job.logLines + 1;
+        es.close();
+        if (stream === es) stream = null;
+        clearInterval(ticker);
+      });
+    },
+
+    async loadEarlier() {
+      const to = this.firstLine - 1;
+      const from = Math.max(1, to - 4999);
+      const page = await api('GET', `/jobs/${this.job.id}/log?from=${from}&limit=${to - from + 1}`);
+      logView.prepend(page.lines);
+      this.firstLine = from;
+    },
+
+    onLogScroll(e) {
+      const el = e.target;
+      logView.follow = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    },
+
+    shellJoin(argv) {
+      return (argv || []).map(shellQuote).join(' ');
+    },
+
+    specText(j) {
+      const s = j.spec || {};
+      return [...(s.goals || []), ...(s.extraArgs || []).map(shellQuote)].join(' ') || this.shellJoin(j.argv);
+    },
+
+    when(t) {
+      if (!t) return '';
+      const d = new Date(t);
+      const today = new Date().toDateString() === d.toDateString();
+      return today ? d.toLocaleTimeString() : d.toLocaleString();
+    },
+
+    duration(j) {
+      if (!j?.startedAt) return '';
+      const end = j.finishedAt ? new Date(j.finishedAt) : new Date(this.now);
+      const sec = Math.max(0, Math.round((end - new Date(j.startedAt)) / 1000));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const ss = String(sec % 60).padStart(2, '0');
+      return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
     },
 
     execLabel(mode) {
