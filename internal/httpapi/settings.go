@@ -72,21 +72,30 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON: "+err.Error())
 		return
 	}
-	if st.DefaultExecutable == "" {
-		st.DefaultExecutable = maven.ModeAuto
-	}
-	if !maven.ValidMode(st.DefaultExecutable) {
-		writeError(w, http.StatusBadRequest, "bad_request", "defaultExecutable must be auto, wrapper, mvnd, mvn or an absolute path")
-		return
-	}
-	if st.DefaultJdkID != nil && *st.DefaultJdkID <= 0 {
-		st.DefaultJdkID = nil
-	}
-	if st.DefaultJdkID != nil {
-		if _, err := s.Store.GetJDK(r.Context(), *st.DefaultJdkID); err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "unknown defaultJdkId")
+	known := store.KnownTools()
+	for id, t := range st.Tools {
+		def, ok := known[id]
+		if !ok {
+			writeError(w, http.StatusBadRequest, "bad_request", "unknown build tool "+id)
 			return
 		}
+		if t.Executable == "" {
+			t.Executable = def.Executable
+		}
+		if id == "maven" && !maven.ValidMode(t.Executable) {
+			writeError(w, http.StatusBadRequest, "bad_request", "maven executable must be auto, wrapper, mvnd, mvn or an absolute path")
+			return
+		}
+		if t.JdkID != nil && *t.JdkID <= 0 {
+			t.JdkID = nil
+		}
+		if t.JdkID != nil {
+			if _, err := s.Store.GetJDK(r.Context(), *t.JdkID); err != nil {
+				writeError(w, http.StatusBadRequest, "bad_request", "unknown jdkId for "+id)
+				return
+			}
+		}
+		st.Tools[id] = t
 	}
 	if err := s.Store.SaveSettings(r.Context(), st); err != nil {
 		s.internal(w, err)
@@ -280,7 +289,8 @@ type runtimeInfo struct {
 	ExecutableError string          `json:"executableError,omitempty"`
 	ExecutableFrom  string          `json:"executableFrom"` // project | default
 	JDK             *store.JDK      `json:"jdk"`            // nil = daemon's own JAVA_HOME
-	JDKFrom         string          `json:"jdkFrom"`        // project | default | environment
+	JDKFrom         string          `json:"jdkFrom"`        // tool (project's build tool JDK) | project (project JDK) | default | environment
+	ProjectJDK      *store.JDK      `json:"projectJdk"`     // the project JDK, if set
 	Wrapper         *maven.Wrapper  `json:"wrapper"`
 	Tools           maven.Tools     `json:"tools"`
 }
@@ -303,7 +313,8 @@ func (s *Server) projectRuntime(w http.ResponseWriter, r *http.Request) {
 	}
 	info := runtimeInfo{Tools: maven.FindTools(s.Home), Wrapper: maven.FindWrapper(p.RootPath)}
 
-	mode := settings.DefaultExecutable
+	tool := settings.Tool(p.BuildTool)
+	mode := tool.Executable
 	info.ExecutableFrom = "default"
 	if p.Executable != nil {
 		mode, info.ExecutableFrom = *p.Executable, "project"
@@ -314,10 +325,17 @@ func (s *Server) projectRuntime(w http.ResponseWriter, r *http.Request) {
 		info.Executable = &res
 	}
 
-	jdkID := settings.DefaultJdkID
+	// Same order as IntelliJ: the tool's own JDK, else the project JDK, else the tool's global default.
+	jdkID := tool.JdkID
 	info.JDKFrom = "default"
 	if p.JdkID != nil {
 		jdkID, info.JDKFrom = p.JdkID, "project"
+		if j, err := s.Store.GetJDK(ctx, *p.JdkID); err == nil {
+			info.ProjectJDK = &j
+		}
+	}
+	if p.ToolJdkID != nil {
+		jdkID, info.JDKFrom = p.ToolJdkID, "tool"
 	}
 	if jdkID == nil {
 		info.JDKFrom = "environment"

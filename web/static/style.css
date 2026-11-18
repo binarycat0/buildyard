@@ -66,3 +66,9 @@ button.link { border: none; background: none; color: var(--accent); padding: 0 4
 table.list .path { font-size: .78rem; }
 tr.group td { background: var(--bg); font-weight: 600; padding-top: 10px; }
 tr.group td .muted { font-weight: 400; }
+
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: -4px 0 8px; }
+.tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 14px; margin-bottom: -1px; color: var(--muted); cursor: pointer; font: inherit; }
+.tabs button:hover { color: inherit; }
+.tabs button.active { color: inherit; border-bottom-color: var(--accent); font-weight: 600; }
+.card > .stack { gap: 10px; }

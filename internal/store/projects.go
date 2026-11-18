@@ -16,7 +16,8 @@ type Project struct {
 	RootPath    string            `json:"rootPath"`
 	BuildTool   string            `json:"buildTool"`
 	Executable  *string           `json:"executable"` // nil = global default; else auto|wrapper|mvnd|mvn|/abs/path
-	JdkID       *int64            `json:"jdkId"`      // nil = global default JDK
+	JdkID       *int64            `json:"jdkId"`      // project JDK; nil = none set
+	ToolJdkID   *int64            `json:"toolJdkId"`  // JDK for the build tool; nil = project JDK, then the tool's global default
 	Env         map[string]string `json:"env"`
 	SkipPresets json.RawMessage   `json:"skipPresets"`
 	CreatedAt   time.Time         `json:"createdAt"`
@@ -36,12 +37,13 @@ type JobSummary struct {
 type ProjectPatch struct {
 	Name        *string            `json:"name"`
 	Executable  *string            `json:"executable"` // "" resets to the global default
-	JdkID       *int64             `json:"jdkId"`      // 0 resets to the global default
+	JdkID       *int64             `json:"jdkId"`      // 0 clears the project JDK
+	ToolJdkID   *int64             `json:"toolJdkId"`  // 0 resets to "use the project JDK"
 	Env         *map[string]string `json:"env"`
 	SkipPresets *json.RawMessage   `json:"skipPresets"`
 }
 
-const projectCols = `p.id, p.name, p.root_path, p.build_tool, p.executable, p.jdk_id,
+const projectCols = `p.id, p.name, p.root_path, p.build_tool, p.executable, p.jdk_id, p.tool_jdk_id,
 	p.env_json, p.skip_presets_json, p.created_at,
 	j.id, j.status, j.queued_at, j.started_at, j.finished_at`
 
@@ -107,11 +109,10 @@ func (s *Store) UpdateProject(ctx context.Context, id int64, patch ProjectPatch)
 		sets, args = append(sets, "executable = ?"), append(args, nullIfEmpty(*patch.Executable))
 	}
 	if patch.JdkID != nil {
-		var v any
-		if *patch.JdkID > 0 {
-			v = *patch.JdkID
-		}
-		sets, args = append(sets, "jdk_id = ?"), append(args, v)
+		sets, args = append(sets, "jdk_id = ?"), append(args, nullIfZero(*patch.JdkID))
+	}
+	if patch.ToolJdkID != nil {
+		sets, args = append(sets, "tool_jdk_id = ?"), append(args, nullIfZero(*patch.ToolJdkID))
 	}
 	if patch.Env != nil {
 		env := *patch.Env
@@ -158,7 +159,7 @@ func scanProject(r scanner) (Project, error) {
 		jobID                              sql.NullInt64
 		jobStatus, queued, started, finish sql.NullString
 	)
-	if err := r.Scan(&p.ID, &p.Name, &p.RootPath, &p.BuildTool, &p.Executable, &p.JdkID,
+	if err := r.Scan(&p.ID, &p.Name, &p.RootPath, &p.BuildTool, &p.Executable, &p.JdkID, &p.ToolJdkID,
 		&env, &presets, &created, &jobID, &jobStatus, &queued, &started, &finish); err != nil {
 		return Project{}, err
 	}
@@ -201,4 +202,11 @@ func mapErr(err error) error {
 		return ErrConflict
 	}
 	return err
+}
+
+func nullIfZero(id int64) any {
+	if id > 0 {
+		return id
+	}
+	return nil
 }

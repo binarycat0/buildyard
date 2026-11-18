@@ -52,8 +52,9 @@ document.addEventListener('alpine:init', () => {
     pform: {},
     pformError: '',
 
-    settings: { defaultExecutable: 'auto', defaultJdkId: null },
-    sform: { defaultExecutable: 'auto', defaultJdkId: 0 },
+    ptab: 'general',
+    settings: { tools: { maven: { executable: 'auto', jdkId: null } } },
+    sform: { maven: { executable: 'auto', jdkId: 0 } },
     tools: {},
     jdks: [],
     jdkPath: '',
@@ -160,6 +161,7 @@ document.addEventListener('alpine:init', () => {
         execChoice: known ? exe : 'custom',
         customPath: known ? '' : exe,
         jdkId: p.jdkId ?? 0,
+        toolJdkId: p.toolJdkId ?? 0,
         envText: envToText(p.env),
       };
       this.pformError = '';
@@ -174,7 +176,8 @@ document.addEventListener('alpine:init', () => {
         const executable = f.execChoice === 'custom' ? f.customPath.trim() : f.execChoice;
         if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Enter an absolute path to the executable');
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
-          name: f.name, executable, jdkId: Number(f.jdkId) || 0, env: textToEnv(f.envText),
+          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: Number(f.toolJdkId) || 0,
+          env: textToEnv(f.envText),
         });
         this.proj = p;
         this.runtime = await api('GET', `/projects/${p.id}/runtime`);
@@ -190,9 +193,24 @@ document.addEventListener('alpine:init', () => {
       return execNames[mode] ?? mode;
     },
 
-    defaultJdkText() {
-      const j = this.jdks.find((x) => x.id === this.settings.defaultJdkId);
-      return j ? this.jdkLabel(j) : 'daemon JAVA_HOME';
+    maven() {
+      return this.settings.tools?.maven ?? { executable: 'auto', jdkId: null };
+    },
+
+    jdkText(id, fallback) {
+      const j = this.jdks.find((x) => x.id === id);
+      return j ? this.jdkLabel(j) : fallback;
+    },
+
+    // What "JDK for Maven: use the project JDK" resolves to in the project form.
+    toolJdkFallbackText() {
+      const pid = Number(this.pform.jdkId) || 0;
+      if (pid) return 'Project JDK: ' + this.jdkText(pid, '?');
+      return 'Global Maven default: ' + this.jdkText(this.maven().jdkId, 'daemon JAVA_HOME');
+    },
+
+    jdkFromText(from) {
+      return { tool: 'Maven tab', project: 'project JDK', default: 'global Maven default' }[from] ?? '';
     },
 
     jdkLabel(j) {
@@ -206,16 +224,17 @@ document.addEventListener('alpine:init', () => {
         api('GET', '/settings'), api('GET', '/tools'), api('GET', '/jdks'), api('GET', '/jdk-managers'),
       ]);
       Object.assign(this, { settings, tools, jdks, managers });
-      this.sform = { defaultExecutable: settings.defaultExecutable, defaultJdkId: settings.defaultJdkId ?? 0 };
+      const mv = settings.tools?.maven ?? {};
+      this.sform = { maven: { executable: mv.executable || 'auto', jdkId: mv.jdkId ?? 0 } };
     },
 
     async saveSettings() {
       this.busy = true;
       this.saved = false;
       try {
+        const mv = this.sform.maven;
         this.settings = await api('PUT', '/settings', {
-          defaultExecutable: this.sform.defaultExecutable,
-          defaultJdkId: Number(this.sform.defaultJdkId) || null,
+          tools: { maven: { executable: mv.executable, jdkId: Number(mv.jdkId) || null } },
         });
         this.saved = true;
       } catch (e) {

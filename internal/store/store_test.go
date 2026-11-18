@@ -2,12 +2,14 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/binarycat0/buildyard/internal/jdk"
+	"github.com/pressly/goose/v3"
 )
 
 func openTemp(t *testing.T) (*Store, string) {
@@ -135,15 +137,15 @@ func TestJDKSyncAndSettings(t *testing.T) {
 
 	// Settings default, save, and dangling JDK reference.
 	st, _ := s.GetSettings(ctx)
-	if st.DefaultExecutable != "auto" || st.DefaultJdkID != nil {
+	if mv := st.Tool("maven"); mv.Executable != "auto" || mv.JdkID != nil {
 		t.Fatalf("defaults: %+v", st)
 	}
 	id := byHome["/jdk/17"].ID
-	if err := s.SaveSettings(ctx, Settings{DefaultExecutable: "mvnd", DefaultJdkID: &id}); err != nil {
+	if err := s.SaveSettings(ctx, Settings{Tools: map[string]ToolSettings{"maven": {Executable: "mvnd", JdkID: &id}}}); err != nil {
 		t.Fatal(err)
 	}
 	st, _ = s.GetSettings(ctx)
-	if st.DefaultExecutable != "mvnd" || st.DefaultJdkID == nil || *st.DefaultJdkID != id {
+	if mv := st.Tool("maven"); mv.Executable != "mvnd" || mv.JdkID == nil || *mv.JdkID != id {
 		t.Fatalf("saved: %+v", st)
 	}
 
@@ -156,11 +158,54 @@ func TestJDKSyncAndSettings(t *testing.T) {
 	s.DeleteJDK(ctx, id)
 	p, _ = s.GetProject(ctx, p.ID)
 	st, _ = s.GetSettings(ctx)
-	if p.JdkID != nil || st.DefaultJdkID != nil {
-		t.Fatalf("after delete: project %v default %v", p.JdkID, st.DefaultJdkID)
+	if p.JdkID != nil || st.Tool("maven").JdkID != nil {
+		t.Fatalf("after delete: project %v default %v", p.JdkID, st.Tool("maven").JdkID)
 	}
 	zero := int64(0)
 	if p, _ = s.UpdateProject(ctx, p.ID, ProjectPatch{JdkID: &zero}); p.JdkID != nil {
 		t.Fatal("zero should reset")
+	}
+}
+
+func TestMigrateFlatSettingsToMaven(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "old.db")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := goose.NewProvider(goose.DialectSQLite3, db, mustSub(migrations, "migrations"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.UpTo(ctx, 3); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO jdk (id, home, label, name, version, major, vendor, arch, source, detected_at) VALUES (7, '/jdk/21', '', '', '21', 21, '', '', 'manual', '2026-01-01')`,
+		`INSERT INTO setting (key, value) VALUES ('defaultExecutable', '"mvnd"'), ('defaultJdkId', '7')`,
+	} {
+		if _, err := db.ExecContext(ctx, q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	db.Close()
+
+	s, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	st, err := s.GetSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mv := st.Tool("maven"); mv.Executable != "mvnd" || mv.JdkID == nil || *mv.JdkID != 7 {
+		t.Fatalf("migrated: %+v", mv)
+	}
+	var n int
+	s.db.QueryRowContext(ctx, `SELECT count(*) FROM setting WHERE key IN ('defaultExecutable','defaultJdkId')`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("old keys left: %d", n)
 	}
 }
