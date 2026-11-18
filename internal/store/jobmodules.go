@@ -59,3 +59,51 @@ func (s *Store) ListJobModules(ctx context.Context, jobID int64) ([]JobModule, e
 	}
 	return out, rows.Err()
 }
+
+// JobProblem is a problem found in a job's log: a compile error, a failed test, a failed goal.
+type JobProblem struct {
+	Kind    string `json:"kind"`
+	Module  string `json:"module"`
+	File    string `json:"file"`
+	Line    int    `json:"line"`
+	Message string `json:"message"`
+	LogLine int    `json:"logLine"`
+}
+
+// SaveJobProblems replaces a job's problems.
+func (s *Store) SaveJobProblems(ctx context.Context, jobID int64, probs []JobProblem) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM job_problem WHERE job_id = ?`, jobID); err != nil {
+		return err
+	}
+	for _, p := range probs {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO job_problem (job_id, module_key, kind, file, line, message, log_line)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`, jobID, p.Module, p.Kind, p.File, p.Line, p.Message, p.LogLine); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ListJobProblems returns a job's problems in log order.
+func (s *Store) ListJobProblems(ctx context.Context, jobID int64) ([]JobProblem, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT kind, COALESCE(module_key, ''), COALESCE(file, ''), COALESCE(line, 0), message, COALESCE(log_line, 0)
+		FROM job_problem WHERE job_id = ? ORDER BY id`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []JobProblem{}
+	for rows.Next() {
+		var p JobProblem
+		if err := rows.Scan(&p.Kind, &p.Module, &p.File, &p.Line, &p.Message, &p.LogLine); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}

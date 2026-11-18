@@ -68,6 +68,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/jobs/{id}/rerun", s.rerunJob)
 	mux.HandleFunc("GET /api/jobs/{id}/log", s.jobLog)
 	mux.HandleFunc("GET /api/jobs/{id}/modules", s.jobModules)
+	mux.HandleFunc("GET /api/jobs/{id}/problems", s.jobProblems)
 	mux.HandleFunc("GET /api/jobs/{id}/stream", s.jobStream)
 	mux.HandleFunc("GET /api/config", s.getConfig)
 	mux.HandleFunc("PUT /api/config", s.putConfig)

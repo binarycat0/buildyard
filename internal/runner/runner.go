@@ -32,7 +32,21 @@ type Command struct {
 	// events to path (inserted right after the executable). The runner tails that file
 	// for per-module progress. The job's recorded argv leaves them out.
 	EventArgs func(path string) []string
+	// Parser, when set, returns a parser for the job's output: it finds problems and,
+	// when the build tool sent no events, module progress.
+	Parser func() OutputParser
 }
+
+// OutputParser reads a job's output one line at a time.
+type OutputParser interface {
+	// Line parses line n (1-based); it returns new problems and whether Modules changed.
+	Line(n int, text string) (problems []store.JobProblem, modulesChanged bool)
+	// Modules is the module list as the log shows it (Key, Name, Ord, Status, DurationMs).
+	Modules() []store.JobModule
+}
+
+// maxProblems caps what one job keeps: a broken API can produce thousands of errors.
+const maxProblems = 500
 
 // Runner owns the job queue. Create it with New.
 type Runner struct {
@@ -194,6 +208,18 @@ func (r *Runner) Modules(id int64) []store.JobModule {
 	return rn.prog.snapshot()
 }
 
+// Problems returns the problems found so far in an active job's output (nil when it is
+// not active).
+func (r *Runner) Problems(id int64) []store.JobProblem {
+	r.mu.Lock()
+	rn, ok := r.runs[id]
+	r.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	return rn.problemsSnapshot()
+}
+
 // Lines returns the live line count of an active job, or -1.
 func (r *Runner) Lines(id int64) int {
 	r.mu.Lock()
@@ -265,6 +291,11 @@ func (r *Runner) execute(rn *run) {
 	id := rn.job.ID
 	status, exit := r.runProcess(ctx, rn)
 
+	if probs := rn.problemsSnapshot(); len(probs) > 0 {
+		if err := r.store.SaveJobProblems(ctx, id, probs); err != nil {
+			r.log.Error("save job problems", "job", id, "err", err)
+		}
+	}
 	if mods := rn.finishProgress(status); mods != nil {
 		if err := r.store.SaveJobModules(ctx, id, mods); err != nil {
 			r.log.Error("save job modules", "job", id, "err", err)
@@ -304,6 +335,11 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 	}
 	if err := r.store.StartJob(ctx, id, gitHead(rn.cmd.Dir)); err != nil {
 		r.log.Error("start job", "job", id, "err", err)
+	}
+	if rn.cmd.Parser != nil {
+		rn.mu.Lock()
+		rn.parser = rn.cmd.Parser()
+		rn.mu.Unlock()
 	}
 	rn.publishStatus(store.JobRunning)
 	r.log.Info("job started", "job", id, "project", rn.job.ProjectID, "argv", rn.cmd.Argv)
