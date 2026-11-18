@@ -106,6 +106,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		"goVersion": runtime.Version(),
 		"dataDir":   s.DataDir,
 		"uptimeSec": int(time.Since(s.started).Seconds()),
+		"startedAt": s.started.UTC(), // a change tells an open page it runs an older UI
 	})
 }
 

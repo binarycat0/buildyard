@@ -29,6 +29,9 @@ button:disabled { opacity: .6; cursor: default; }
 .badge { font-size: .75rem; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--muted); }
 .muted { color: var(--muted); }
 .error { color: var(--danger); margin: 0; }
+.notice { margin: 0; padding: 6px 10px; border: 1px solid #e2c98a; background: #f1e7cf; color: #7a5a12; border-radius: 6px; gap: 10px; align-items: center; }
+@media (prefers-color-scheme: dark) { .notice { background: #3d321a; color: #e2c98a; border-color: #7a5a12; } }
+button.link.fail-reason { color: var(--danger); min-width: 0; max-width: 60ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .rename { flex: 1; }
 .brand { font-weight: 700; color: var(--fg); text-decoration: none; }
 .top nav { display: flex; gap: 14px; }
