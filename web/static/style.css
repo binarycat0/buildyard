@@ -192,3 +192,14 @@ table.projects .actions > * { margin-left: 4px; }
 table.projects .pname { white-space: nowrap; }
 table.projects .path { max-width: 340px; }
 table.projects .actions .button, table.projects .actions button { padding: 3px 10px; font-size: .85em; }
+
+/* Run form: goals, the command and Run on top; parameters in tabs */
+input.goal-add { width: 220px; padding: 3px 10px; border-radius: 999px; font-size: .9em; }
+.final { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.subtabs { flex-wrap: wrap; margin: 6px 0 0; }
+.subtabs .count { margin-left: 5px; font-size: .78em; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.tabbody { min-height: 90px; }
+.projhead { display: flex; flex-direction: column; gap: 6px; }
+.projhead .toolbar { margin-bottom: 0; }
+.uses { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.uses code { font-size: .9em; }

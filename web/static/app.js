@@ -337,6 +337,8 @@ document.addEventListener('alpine:init', () => {
     moduleInfo: null,
     openState: {},
     modScroll: 0,
+    rtab: loadPref('runTab', 'modules'),
+    goalDraft: '',
     discoverTask: null,
     discoverError: '',
     profiles: [],
@@ -947,6 +949,39 @@ document.addEventListener('alpine:init', () => {
 
     resetPresets() {
       this.pform.presets = this.defaultPresets.map((sp) => ({ id: sp.id, label: sp.label, argsText: sp.args.join(' '), builtin: true }));
+    },
+
+    customGoals() {
+      return splitArgs(this.rform.goals).filter((g) => !this.commonGoals.includes(g));
+    },
+
+    addGoals() {
+      const add = splitArgs(this.goalDraft).filter((g) => !this.hasGoal(g));
+      this.goalDraft = '';
+      if (!add.length) return;
+      this.rform.goals = [...splitArgs(this.rform.goals), ...add].join(' ');
+      this.refreshPreview();
+    },
+
+    // Run form tabs, each with a count of what is set in it.
+    runTabs() {
+      const f = this.rform;
+      const n = (x) => (x ? String(x) : '');
+      const props = f.props.split('\n').filter((l) => l.trim()).length;
+      const profiles = f.profiles.split(/[\s,]+/).filter(Boolean).length;
+      return [
+        { id: 'modules', label: 'Modules', count: f.modulesMode === 'selected' ? n(f.selected.length) : '' },
+        { id: 'skip', label: 'Skip', count: n(f.skips.length) },
+        { id: 'options', label: 'Options', count: n([f.offline, f.nsu, f.errors, f.failMode, f.logLevel !== 'default'].filter(Boolean).length) },
+        { id: 'resources', label: 'Resources', count: n([f.cpu, f.heap, f.forks].filter(Boolean).length) },
+        { id: 'properties', label: 'Profiles & properties', count: n(props + profiles) },
+        { id: 'extra', label: 'Extra args', count: n(splitArgs(f.args).length) },
+      ];
+    },
+
+    setRunTab(id) {
+      this.rtab = id;
+      savePref('runTab', id);
     },
 
     hasGoal(g) {
