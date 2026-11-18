@@ -11,18 +11,24 @@ import (
 
 // Event is one item on a job's live bus.
 type Event struct {
-	Type   string `json:"type"`             // line | status
+	Type   string `json:"type"`             // line | status | module | modules
 	N      int    `json:"n,omitempty"`      // line number, 1-based
 	Text   string `json:"text,omitempty"`   // line text
 	Status string `json:"status,omitempty"` // for status events
+	// Module is one changed module (module events); Modules the whole list (modules
+	// events, sent when the reactor becomes known).
+	Module  *store.JobModule  `json:"module,omitempty"`
+	Modules []store.JobModule `json:"modules,omitempty"`
 }
 
 // Sub is a live subscription to one job.
 type Sub struct {
 	C    <-chan Event
 	From int // lines 1..From are in the log file; C starts at From+1
-	c    chan Event
-	run  *run
+	// Modules is the per-module progress at subscription time; C carries later changes.
+	Modules []store.JobModule
+	c       chan Event
+	run     *run
 	// Dropped is set when the subscriber fell behind and C was closed early.
 	Dropped bool
 }
@@ -54,6 +60,7 @@ type run struct {
 	stopAt      time.Time // when a stop was first requested
 	reaper      bool
 	done        chan struct{}
+	prog        progress
 }
 
 func (rn *run) openLog(path string) error {
@@ -101,7 +108,7 @@ func (rn *run) subscribe() *Sub {
 	rn.mu.Lock()
 	defer rn.mu.Unlock()
 	c := make(chan Event, subBuffer)
-	s := &Sub{C: c, c: c, From: rn.lines, run: rn}
+	s := &Sub{C: c, c: c, From: rn.lines, Modules: rn.prog.snapshot(), run: rn}
 	if rn.ended {
 		close(c)
 		return s
