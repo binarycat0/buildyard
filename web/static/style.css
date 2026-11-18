@@ -64,3 +64,5 @@ button.small { padding: 3px 8px; font-size: .85rem; }
 .name-cell { min-width: 220px; }
 button.link { border: none; background: none; color: var(--accent); padding: 0 4px; cursor: pointer; }
 table.list .path { font-size: .78rem; }
+tr.group td { background: var(--bg); font-weight: 600; padding-top: 10px; }
+tr.group td .muted { font-weight: 400; }

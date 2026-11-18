@@ -167,6 +167,48 @@
 
       <div class="card">
         <div class="row spread">
+          <h2>Build tools</h2>
+          <button @click="detectTools()" :disabled="toolsTask">
+            <span x-text="toolsTask ? 'Detecting…' : 'Detect again'"></span>
+          </button>
+        </div>
+        <p class="muted small">Projects with <code>./mvnw</code> use the Maven version their wrapper pins; a global <code>mvn</code> is only used for projects without a wrapper. <code>mvnd</code> is installed globally and bundles its own Maven.</p>
+        <table class="list">
+          <thead><tr><th>Tool</th><th>Version</th><th>Path</th></tr></thead>
+          <tbody>
+            <template x-for="t in tools.installed || []" :key="t.id">
+              <tr :class="{missing: !t.installed}">
+                <td><strong x-text="t.name"></strong></td>
+                <td>
+                  <template x-if="t.installed">
+                    <span><span x-text="t.version || 'unknown'"></span>
+                      <span class="muted small" x-show="t.id === 'mvnd' && t.mavenVersion" x-text="'(Maven ' + t.mavenVersion + ')'"></span></span>
+                  </template>
+                  <span class="muted" x-show="!t.installed">not installed</span>
+                </td>
+                <td>
+                  <code class="path" x-show="t.installed" x-text="t.resolvedPath"></code>
+                  <div class="muted small" x-show="t.installed && t.path !== t.resolvedPath">found at <code x-text="t.path"></code></div>
+                  <span class="muted small" x-show="!t.installed" x-text="t.installHint"></span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+          <tbody x-show="(tools.wrappers || []).length">
+            <tr class="group"><td colspan="3">Project wrappers <span class="muted small">(./mvnw)</span></td></tr>
+            <template x-for="w in tools.wrappers || []" :key="w.projectId">
+              <tr>
+                <td><a :href="'#/projects/' + w.projectId" x-text="w.project"></a></td>
+                <td x-text="w.mavenVersion ? 'Maven ' + w.mavenVersion : 'unknown'"></td>
+                <td class="muted small">pinned in .mvn/wrapper/maven-wrapper.properties</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="row spread">
           <h2>Available JDKs</h2>
           <button @click="detect()" :disabled="detectTask">
             <span x-text="detectTask ? 'Detecting…' : 'Detect again'"></span>
@@ -174,33 +216,49 @@
         </div>
         <p class="muted" x-show="detectResult" x-text="detectResult"></p>
         <table class="list" x-show="jdks.length">
-          <thead><tr><th>Version</th><th>Name</th><th>Path</th><th>Source</th><th></th></tr></thead>
-          <tbody>
-            <template x-for="j in jdks" :key="j.id">
-              <tr :class="{missing: j.missing}">
-                <td><strong x-text="j.version || '?'"></strong> <span class="muted" x-text="j.arch"></span>
-                  <div class="muted small" x-text="j.vendor"></div></td>
-                <td class="name-cell">
-                  <template x-if="editingJdk !== j.id">
-                    <span><span x-text="j.name || j.label || j.vendor"></span>
-                      <button class="link small" @click="editingJdk = j.id" title="Rename">rename</button></span>
-                  </template>
-                  <template x-if="editingJdk === j.id">
-                    <input class="inline" :value="j.name" :placeholder="j.label || j.vendor" x-init="$el.focus()"
-                      @keydown.enter="renameJdk(j, $event.target.value); editingJdk = null"
-                      @keydown.escape="editingJdk = null" @blur="renameJdk(j, $event.target.value); editingJdk = null"
-                      title="Leave empty to use the detected name">
-                  </template>
+          <thead><tr><th>Version</th><th>Name</th><th>Path</th><th></th></tr></thead>
+          <template x-for="g in jdkGroups()" :key="g.key">
+            <tbody>
+              <tr class="group">
+                <td colspan="4">
+                  <span x-text="g.title"></span>
+                  <span class="muted small" x-text="g.kind ? ' · ' + g.kind : ''"></span>
+                  <span class="muted small" x-show="g.location"> · <code x-text="g.location"></code></span>
+                  <div class="muted small" x-show="g.description" x-text="g.description"></div>
                 </td>
-                <td><code class="path" x-text="j.home"></code> <span class="error" x-show="j.missing">not found</span>
-                  <div class="muted small" x-show="j.foundAt">found at <code x-text="j.foundAt"></code></div></td>
-                <td class="muted" x-text="j.source"></td>
-                <td><button class="danger small" @click="deleteJdk(j)">Remove</button></td>
               </tr>
-            </template>
-          </tbody>
+              <template x-for="j in g.jdks" :key="j.id">
+                <tr :class="{missing: j.missing}">
+                  <td><strong x-text="j.version || '?'"></strong> <span class="muted" x-text="j.arch"></span>
+                    <div class="muted small" x-text="j.vendor"></div></td>
+                  <td class="name-cell">
+                    <template x-if="editingJdk !== j.id">
+                      <span><span x-text="j.name || j.label || j.vendor"></span>
+                        <button class="link small" @click="editingJdk = j.id" title="Rename">rename</button></span>
+                    </template>
+                    <template x-if="editingJdk === j.id">
+                      <input class="inline" :value="j.name" :placeholder="j.label || j.vendor" x-init="$el.focus()"
+                        @keydown.enter="renameJdk(j, $event.target.value); editingJdk = null"
+                        @keydown.escape="editingJdk = null" @blur="renameJdk(j, $event.target.value); editingJdk = null"
+                        title="Leave empty to use the detected name">
+                    </template>
+                  </td>
+                  <td><code class="path" x-text="j.home"></code> <span class="error" x-show="j.missing">not found</span>
+                    <div class="muted small" x-show="j.foundAt">found at <code x-text="j.foundAt"></code></div></td>
+                  <td><button class="danger small" @click="deleteJdk(j)">Remove</button></td>
+                </tr>
+              </template>
+              <tr x-show="!g.jdks.length"><td colspan="4" class="muted small">Installed, but no JDKs found through it.</td></tr>
+            </tbody>
+          </template>
         </table>
         <p class="muted" x-show="!jdks.length && !detectTask">No JDKs found. Add one by path.</p>
+        <p class="muted small" x-show="missingManagers().length">
+          Not found on this machine:
+          <template x-for="(m, i) in missingManagers()" :key="m.id">
+            <span><span x-text="(i ? ', ' : '') + m.name" :title="m.description"></span></span>
+          </template>
+        </p>
         <form class="row" @submit.prevent="addJdk()">
           <input class="grow" x-model="jdkPath" placeholder="JDK path, e.g. /Library/Java/JavaVirtualMachines/temurin-21.jdk">
           <button type="submit">Add</button>

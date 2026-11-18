@@ -16,15 +16,37 @@ import (
 // TaskJDKDetect is the background task kind that rescans installed JDKs.
 const TaskJDKDetect = "jdk.detect"
 
-// DetectJDKs runs a JDK scan and syncs the result into the store. Used by the task and at startup.
+// TaskToolsDetect is the background task kind that finds mvn and mvnd and their versions.
+const TaskToolsDetect = "tools.detect"
+
+// Keys under which detection results are cached in the setting table.
+const (
+	keyJDKManagers = "detected.jdkManagers"
+	keyBuildTools  = "detected.buildTools"
+)
+
+// DetectJDKs runs a JDK scan, syncs the result into the store and caches the list of
+// JDK managers. Used by the task and at startup.
 func DetectJDKs(ctx context.Context, st *store.Store, d jdk.Detector) (store.SyncResult, error) {
 	found := d.Detect()
+	managers := d.Managers()
 	if err := ctx.Err(); err != nil {
+		return store.SyncResult{}, err
+	}
+	if err := st.PutJSON(ctx, keyJDKManagers, managers); err != nil {
 		return store.SyncResult{}, err
 	}
 	return st.SyncDetectedJDKs(ctx, found, func(home string) bool {
 		_, err := jdk.Inspect(home)
 		return err == nil
+	})
+}
+
+// SubmitToolsDetect enqueues detection of mvn/mvnd (deduplicated: one at a time).
+func (s *Server) SubmitToolsDetect() (tasks.Task, error) {
+	return s.Tasks.Submit(TaskToolsDetect, TaskToolsDetect, func(ctx context.Context) (any, error) {
+		tools := maven.DetectTools(s.Home)
+		return tools, s.Store.PutJSON(ctx, keyBuildTools, tools)
 	})
 }
 
@@ -73,11 +95,82 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 	s.getSettings(w, r)
 }
 
+// projectWrapper is a project's ./mvnw and the Maven version it pins.
+type projectWrapper struct {
+	ProjectID    int64  `json:"projectId"`
+	Project      string `json:"project"`
+	MavenVersion string `json:"mavenVersion"`
+}
+
+// getTools returns the launchers found on PATH (live), their versions (from the last
+// tools.detect task) and the Maven wrappers of registered projects.
 func (s *Server) getTools(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var installed []maven.InstalledTool
+	if _, err := s.Store.GetJSON(ctx, keyBuildTools, &installed); err != nil {
+		s.internal(w, err)
+		return
+	}
+	projects, err := s.Store.ListProjects(ctx)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	wrappers := []projectWrapper{}
+	for _, p := range projects {
+		if wr := maven.FindWrapper(p.RootPath); wr != nil {
+			wrappers = append(wrappers, projectWrapper{ProjectID: p.ID, Project: p.Name, MavenVersion: wr.MavenVersion})
+		}
+	}
+	if installed == nil {
+		installed = []maven.InstalledTool{}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"tools":    maven.FindTools(s.Home),
-		"javaHome": os.Getenv("JAVA_HOME"),
+		"tools":     maven.FindTools(s.Home),
+		"installed": installed,
+		"wrappers":  wrappers,
+		"javaHome":  os.Getenv("JAVA_HOME"),
 	})
+}
+
+func (s *Server) detectTools(w http.ResponseWriter, r *http.Request) {
+	t, err := s.SubmitToolsDetect()
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "busy", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, t)
+}
+
+// jdkManager is a JDK manager with the number of known JDKs that came from it.
+type jdkManager struct {
+	jdk.Manager
+	JDKs int `json:"jdks"`
+}
+
+func (s *Server) listJDKManagers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var managers []jdk.Manager
+	if _, err := s.Store.GetJSON(ctx, keyJDKManagers, &managers); err != nil {
+		s.internal(w, err)
+		return
+	}
+	jdks, err := s.Store.ListJDKs(ctx)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	count := map[string]int{}
+	for _, j := range jdks {
+		if !j.Missing {
+			count[j.Source]++
+		}
+	}
+	out := make([]jdkManager, 0, len(managers))
+	for _, m := range managers {
+		out = append(out, jdkManager{Manager: m, JDKs: count[m.ID]})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) listJDKs(w http.ResponseWriter, r *http.Request) {

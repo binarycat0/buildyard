@@ -57,3 +57,28 @@ func (s *Store) SaveSettings(ctx context.Context, st Settings) error {
 	}
 	return tx.Commit()
 }
+
+// GetJSON reads a raw JSON value stored under key (used for cached detection results).
+// It returns ok=false when the key was never written.
+func (s *Store) GetJSON(ctx context.Context, key string, dst any) (bool, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM setting WHERE key = ?`, key).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, json.Unmarshal([]byte(raw), dst)
+}
+
+// PutJSON stores v as JSON under key.
+func (s *Store) PutJSON(ctx context.Context, key string, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO setting (key, value) VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, string(b))
+	return err
+}
