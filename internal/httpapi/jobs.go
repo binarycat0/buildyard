@@ -341,6 +341,19 @@ func (s *Server) rerunJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "this job has no reusable spec")
 		return
 	}
+	// ?without=failed leaves out the modules that failed and everything depending on them.
+	if r.URL.Query().Get("without") == "failed" {
+		refs, err := s.failedModules(r.Context(), j)
+		if err != nil {
+			s.internal(w, err)
+			return
+		}
+		if len(refs) == 0 {
+			writeError(w, http.StatusBadRequest, "bad_request", "this job has no failed modules recorded")
+			return
+		}
+		spec = spec.Without(refs)
+	}
 	s.start(w, r, p, spec, j.ProfileID)
 }
 

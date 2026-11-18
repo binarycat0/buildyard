@@ -115,6 +115,12 @@ let rowsCache = null; // the last tree rows, keyed by what they were built from
 
 const ROW_H = 26; // px, the fixed height of a module row (virtual scrolling)
 
+function fmtMs(ms) {
+  if (ms < 1000) return ms + ' ms';
+  const sec = Math.round(ms / 1000);
+  return sec < 60 ? sec + ' s' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+
 function buildGraph(modules) {
   const byKey = new Map(modules.map((m) => [m.key, m]));
   const kids = new Map();
@@ -253,8 +259,10 @@ function specToForm(spec) {
     cpu, cpuCustom, heap, heapCustom, forks, forksCustom,
     goals: (spec.goals || []).join(' '),
     args: (spec.extraArgs || []).map(shellQuote).join(' '),
-    modulesMode: m.mode === 'selected' ? 'selected' : 'all',
-    selected: [...(m.list || [])],
+    // A list of only "!" exclusions is "all modules except" (also how a rerun without
+    // failed modules is saved).
+    modulesMode: m.mode !== 'selected' ? 'all' : (m.list || []).length && m.list.every((r) => r.startsWith('!')) ? 'exclude' : 'selected',
+    selected: m.mode === 'selected' && (m.list || []).length && m.list.every((r) => r.startsWith('!')) ? m.list.map((r) => r.slice(1)) : [...(m.list || [])],
     alsoMake: m.mode === 'selected' ? !!m.alsoMake : true,
     alsoMakeDependents: !!m.alsoMakeDependents,
     skips: [...(spec.skips || [])],
@@ -361,7 +369,10 @@ document.addEventListener('alpine:init', () => {
     probOpen: {},
     modIndex: {},
     modsOpen: false,
-    modsSort: 'reactor',
+    modsSort: 'tree',
+    jobTreeMods: [], // the job's project modules (folders), for the module tree
+    jobOpen: {},
+    jobModScroll: 0,
     firstLine: 0,
     logCount: 0,
     logFilter: loadPref('logFilter', 'important'),
@@ -498,6 +509,7 @@ document.addEventListener('alpine:init', () => {
       // Start from the last run's spec.
       const last = pjobs.find((j) => j.spec?.goals?.length);
       this.rform = specToForm(last?.spec);
+      this.rform.selected = this.expandRefs(this.rform.selected);
       this.editingTask = null;
       this.saveAsNew = false;
       this.runError = '';
@@ -583,6 +595,19 @@ document.addEventListener('alpine:init', () => {
       return `Project default (${v ? resLabel(kind, v) : none})`;
     },
 
+    // The Build / Skip switch over the ticked modules. Flipping it keeps the same modules
+    // built: the ticks are inverted.
+    setPickMode(mode) {
+      if (this.rform.modulesMode === mode) return;
+      if (this.rform.selected.length && this.modules.length) {
+        const sel = this.selection().keys;
+        const g = this.graph();
+        this.rform.selected = this.modules.filter((m) => !sel.has(m.key)).map((m) => g.ref.get(m.key));
+      }
+      this.rform.modulesMode = mode;
+      this.refreshPreview();
+    },
+
     // ---------- runs ----------
     spec() {
       const spec = formToSpec(this.rform);
@@ -590,8 +615,59 @@ document.addEventListener('alpine:init', () => {
       // without a -pl list of hundreds of modules.
       if (spec.modules.mode === 'selected' && this.modules.length && this.allSelected()) {
         spec.modules = { mode: 'all', list: [], alsoMake: false, alsoMakeDependents: false };
+      } else if (spec.modules.mode === 'selected' && this.modules.length) {
+        spec.modules.list = this.moduleArgs();
+      } else if (spec.modules.mode === 'exclude') {
+        const list = this.excludeArgs();
+        spec.modules = list.length ? { mode: 'selected', list, alsoMake: false, alsoMakeDependents: false }
+          : { mode: 'all', list: [], alsoMake: false, alsoMakeDependents: false };
       }
       return spec;
+    },
+
+    // The -pl list for the ticked modules, in the shorter of two forms:
+    //  - the ticked modules, plus "!" for unticked modules inside a ticked folder (Maven 4
+    //    and mvnd 2 build a listed aggregator's whole subtree);
+    //  - "!" for the unticked modules only, leaving out a folder that still has ticked
+    //    modules under it (excluding it would drop them in Maven 4; its pom is built).
+    moduleArgs() {
+      const g = this.graph();
+      const sel = this.selection().keys;
+      const ref = (k) => g.ref.get(k) ?? k;
+      const unticked = this.modules.filter((m) => !sel.has(m.key)).map((m) => m.key);
+      const tickedAbove = (k) => {
+        for (let a = g.parent(k); a; a = g.parent(a)) if (sel.has(a)) return true;
+        return false;
+      };
+      const positive = [...Alpine.raw(this.rform.selected).filter((r) => !r.startsWith('!')),
+        ...unticked.filter(tickedAbove).map((k) => '!' + ref(k))];
+      const negative = unticked.filter((k) => !(g.sub.get(k) || [k]).some((x) => sel.has(x))).map((k) => '!' + ref(k));
+      return negative.length && negative.length < positive.length ? negative : positive;
+    },
+
+    // "All modules except": the ticked modules as "!" exclusions. A folder is excluded
+    // only when everything under it is (Maven 3 would still build its children; Maven 4
+    // would drop the ones still wanted).
+    excludeArgs() {
+      const sel = this.selection().keys;
+      if (!this.modules.length) return Alpine.raw(this.rform.selected).map((r) => '!' + r.replace(/^!/, ''));
+      const g = this.graph();
+      return this.modules.filter((m) => sel.has(m.key) && (g.sub.get(m.key) || [m.key]).every((k) => sel.has(k)))
+        .map((m) => '!' + g.ref.get(m.key));
+    },
+
+    // A saved list may hold "!" exclusions (see moduleArgs, or a rerun without failed
+    // modules); the form works with ticked modules, so turn it back into those.
+    expandRefs(list) {
+      if (!list.some((r) => r.startsWith('!')) || !this.modules.length) return list;
+      const g = this.graph();
+      const keyOf = (r) => g.keyOf.get(r) ?? r;
+      const pos = list.filter((r) => !r.startsWith('!')).map(keyOf).filter((k) => g.byKey.has(k));
+      const keys = new Set(pos.length ? pos : this.modules.map((m) => m.key));
+      for (const r of list.filter((x) => x.startsWith('!'))) {
+        for (const k of g.sub.get(keyOf(r.slice(1))) || [keyOf(r.slice(1))]) keys.delete(k);
+      }
+      return this.modules.filter((m) => keys.has(m.key)).map((m) => g.ref.get(m.key));
     },
 
     allSelected() {
@@ -620,7 +696,9 @@ document.addEventListener('alpine:init', () => {
       const s = spec || {};
       const tags = (s.goals || []).map((g) => ({ text: g, cls: 'goal' }));
       const m = s.modules || {};
-      if (m.mode === 'selected' && m.list?.length) {
+      if (m.mode === 'selected' && m.list?.length && m.list.every((r) => r.startsWith('!'))) {
+        tags.push({ text: `all except ${m.list.length}`, title: m.list.join('\n') });
+      } else if (m.mode === 'selected' && m.list?.length) {
         const list = m.list;
         const text = list.length <= 2 ? list.map((r) => r.replace(/^:/, '')).join(', ') : `${list.length} modules`;
         const extra = [m.alsoMake && '-am', m.alsoMakeDependents && '-amd'].filter(Boolean).join(' ');
@@ -814,7 +892,8 @@ document.addEventListener('alpine:init', () => {
     // matches under it; hit: a module that matches the filter.
     rowClass(r) {
       const hit = !r.flat && !r.ctx && this.moduleFilter.trim() !== '';
-      return [this.moduleInfo === r.m.key && 'focus', r.ctx && 'ctx', hit && 'hit'].filter(Boolean).join(' ');
+      const skip = this.rform.modulesMode === 'exclude' && this.checkState(r) === 'all';
+      return [this.moduleInfo === r.m.key && 'focus', r.ctx && 'ctx', hit && 'hit', skip && 'skip'].filter(Boolean).join(' ');
     },
 
     toggleOpen(r) {
@@ -865,7 +944,7 @@ document.addEventListener('alpine:init', () => {
       const drop = new Set(keys.map((k) => g.ref.get(k) ?? k));
       const sel = Alpine.raw(this.rform.selected).filter((x) => !drop.has(x) && !drop.has(g.ref.get(g.keyOf.get(x))));
       this.rform.selected = on ? [...sel, ...drop] : sel;
-      if (this.rform.selected.length) this.rform.modulesMode = 'selected';
+      if (this.rform.selected.length && this.rform.modulesMode === 'all') this.rform.modulesMode = 'selected';
       this.refreshPreview();
     },
 
@@ -911,6 +990,7 @@ document.addEventListener('alpine:init', () => {
       this.editingTask = t;
       this.saveAsNew = false;
       this.rform = specToForm(t.spec);
+      this.rform.selected = this.expandRefs(this.rform.selected);
       this.refreshPreview();
     },
 
@@ -992,7 +1072,7 @@ document.addEventListener('alpine:init', () => {
         if (a === '-pl' && i + 1 < argv.length) {
           const list = argv[++i].split(',');
           out.push(list.length > 3
-            ? { text: `-pl ${list.length} modules`, title: list.join('\n') }
+            ? { text: list.every((x) => x.startsWith('!')) ? `-pl all except ${list.length}` : `-pl ${list.length} modules`, title: list.join('\n') }
             : { text: '-pl ' + list.join(',') });
           continue;
         }
@@ -1063,7 +1143,7 @@ document.addEventListener('alpine:init', () => {
       const props = f.props.split('\n').filter((l) => l.trim()).length;
       const profiles = f.profiles.split(/[\s,]+/).filter(Boolean).length;
       return [
-        { id: 'modules', label: 'Modules', count: f.modulesMode === 'selected' ? n(f.selected.length) : '' },
+        { id: 'modules', label: 'Modules', count: f.modulesMode === 'selected' ? n(f.selected.length) : f.modulesMode === 'exclude' ? (f.selected.length ? '−' + f.selected.length : '') : '' },
         { id: 'skip', label: 'Skip', count: n(f.skips.length) },
         { id: 'options', label: 'Options', count: n([f.offline, f.nsu, f.errors, f.failMode, f.logLevel !== 'default'].filter(Boolean).length) },
         { id: 'resources', label: 'Resources', count: n([f.cpu, f.heap, f.forks].filter(Boolean).length) },
@@ -1114,9 +1194,14 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    async rerun(j) {
+    // The modules that failed in the open job (from its per-module progress).
+    failedMods() {
+      return (this.jobMods || []).filter((m) => m.status === 'failed');
+    },
+
+    async rerun(j, withoutFailed = false) {
       try {
-        const n = await api('POST', `/jobs/${j.id}/rerun`);
+        const n = await api('POST', `/jobs/${j.id}/rerun` + (withoutFailed ? '?without=failed' : ''));
         location.hash = `#/jobs/${n.id}`;
       } catch (e) {
         this.error = e.message;
@@ -1150,7 +1235,13 @@ document.addEventListener('alpine:init', () => {
       this.probOpen = {};
       this.firstLine = 0;
       this.logCount = job.liveLines;
-      if (this.jobProject?.id !== job.projectId) this.jobProject = await api('GET', `/projects/${job.projectId}`);
+      if (this.jobProject?.id !== job.projectId) {
+        this.jobProject = await api('GET', `/projects/${job.projectId}`);
+        this.jobTreeMods = [];
+        api('GET', `/projects/${job.projectId}/modules`).then((r) => { this.jobTreeMods = r.modules || []; }).catch(() => {});
+      }
+      this.jobOpen = {};
+      this.jobModScroll = 0;
       await this.$nextTick();
       logView.onCounts = (c) => { this.logCounts = { ...c }; };
       logView.reset(this.$refs.log);
@@ -1201,6 +1292,10 @@ document.addEventListener('alpine:init', () => {
       const total = this.jobMods.length;
       const done = this.modsWith('succeeded', 'failed', 'skipped', 'cancelled').length;
       const parts = [`${done} of ${total} modules`];
+      // Building modules come and go every second: a count keeps the card still (the
+      // tree shows which ones, and the title lists them).
+      const running = this.modsWith('running').length;
+      if (running) parts.push(`${running} building`);
       const failed = this.modsWith('failed').length;
       if (failed) parts.push(`${failed} failed`);
       const skipped = this.modsWith('skipped').length;
@@ -1223,6 +1318,88 @@ document.addEventListener('alpine:init', () => {
       return rows;
     },
 
+    jobGraph() {
+      const mods = Alpine.raw(this.jobTreeMods);
+      let g = graphCache.get(mods);
+      if (!g) {
+        g = buildGraph(mods);
+        graphCache.set(mods, g);
+      }
+      return g;
+    },
+
+    // The job's modules in the project's folder tree. Folders show a roll-up of the
+    // modules under them; the ones with running or failed modules start open. Only
+    // modules in this build and the folders above them are shown.
+    jobTreeRows() {
+      const g = this.jobGraph();
+      if (!g.hasTree || !this.jobMods.length) return null;
+      const byName = new Map(Alpine.raw(this.jobTreeMods).map((m) => [m.name, m.key]));
+      const agg = new Map(); // key -> { n, done, failed, running, ms, jm }
+      const get = (k) => {
+        let a = agg.get(k);
+        if (!a) agg.set(k, (a = { n: 0, done: 0, failed: 0, running: 0, skipped: 0, ms: 0, jm: null }));
+        return a;
+      };
+      let mapped = 0;
+      for (const jm of this.jobMods) {
+        const key = g.byKey.has(jm.key) ? jm.key : byName.get(jm.name);
+        if (!key || !g.byKey.has(key)) continue;
+        mapped++;
+        get(key).jm = jm;
+        const ms = this.modMs(jm);
+        for (let a = key; a; a = g.parent(a)) {
+          const x = get(a);
+          x.n++;
+          x.ms += ms;
+          if (jm.status === 'failed') x.failed++;
+          else if (jm.status === 'running') x.running++;
+          else if (jm.status === 'skipped' || jm.status === 'cancelled') x.skipped++;
+          if (jm.status !== 'pending' && jm.status !== 'running') x.done++;
+        }
+      }
+      if (mapped < this.jobMods.length / 2) return null;
+      const open = this.jobOpen;
+      const rows = [];
+      const stack = g.roots.filter((m) => agg.has(m.key)).map((m) => [m, 0]).reverse();
+      while (stack.length) {
+        const [m, depth] = stack.pop();
+        const a = agg.get(m.key);
+        const kids = (g.kids.get(m.key) || []).filter((k) => agg.has(k.key));
+        const isOpen = m.key in open ? open[m.key] : depth === 0 || a.failed > 0 || a.running > 0;
+        rows.push({ key: m.key, name: m.name, depth, kids: kids.length, open: isOpen, a });
+        if (isOpen) for (let i = kids.length - 1; i >= 0; i--) stack.push([kids[i], depth + 1]);
+      }
+      return rows;
+    },
+
+    jobTreeVisible() {
+      const rows = this.jobTreeRows() || [];
+      const h = 360;
+      const from = Math.max(0, Math.floor(this.jobModScroll / ROW_H) - 10);
+      const to = Math.min(rows.length, from + Math.ceil(h / ROW_H) + 20);
+      return { rows: rows.slice(from, to), top: from * ROW_H, bottom: (rows.length - to) * ROW_H };
+    },
+
+    toggleJobOpen(r) {
+      this.jobOpen = { ...this.jobOpen, [r.key]: !r.open };
+    },
+
+    // Status of a tree row: its own for a module, a roll-up for a folder.
+    treeStatus(r) {
+      const a = r.a;
+      if (a.jm && !r.kids) return { cls: a.jm.status, text: this.modStatus(a.jm) };
+      if (a.failed) return { cls: 'failed', text: a.failed + ' failed' };
+      if (a.running) return { cls: 'running', text: a.running + ' running' };
+      if (a.done === a.n) return { cls: a.skipped === a.n ? 'skipped' : 'succeeded', text: a.skipped === a.n ? 'skipped' : 'done' };
+      return { cls: 'pending', text: a.done + ' / ' + a.n };
+    },
+
+    treeTime(r) {
+      if (r.a.jm && !r.kids) return this.modTime(r.a.jm);
+      return r.a.ms ? fmtMs(r.a.ms) : '';
+    },
+
     modMs(m) {
       if (m.status === 'running' && m.startedAt) return this.now - new Date(m.startedAt);
       return m.ms || 0;
@@ -1230,10 +1407,7 @@ document.addEventListener('alpine:init', () => {
 
     modTime(m) {
       if (m.status === 'pending') return '';
-      const ms = this.modMs(m);
-      if (ms < 1000) return ms + ' ms';
-      const sec = Math.round(ms / 1000);
-      return sec < 60 ? sec + ' s' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+      return fmtMs(this.modMs(m));
     },
 
     modStatus(m) {

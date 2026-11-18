@@ -18,7 +18,11 @@ import (
 // mavenProject makes a project whose ./mvnw prints its arguments and environment.
 func mavenProject(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
+	// Projects are stored with symlinks resolved (/var -> /private/var on macOS).
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<project/>"), 0o644)
 	os.WriteFile(filepath.Join(root, "mvnw"), []byte(`#!/bin/sh
 echo "args: $*"

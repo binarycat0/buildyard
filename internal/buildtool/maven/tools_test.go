@@ -50,6 +50,9 @@ func TestVersionsFromInstallFiles(t *testing.T) {
 func TestDetectToolsViaSdkman(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("PATH", t.TempDir()) // nothing on PATH
+	old := systemBinDirs
+	systemBinDirs = nil // the CI machine may have Homebrew's own Maven
+	t.Cleanup(func() { systemBinDirs = old })
 	touch(t, filepath.Join(home, ".sdkman/candidates/maven/3.9.9/bin/mvn"), true)
 	touch(t, filepath.Join(home, ".sdkman/candidates/maven/3.9.9/lib/maven-core-3.9.9.jar"), false)
 	os.Symlink(filepath.Join(home, ".sdkman/candidates/maven/3.9.9"), filepath.Join(home, ".sdkman/candidates/maven/current"))
