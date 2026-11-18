@@ -115,6 +115,12 @@ let rowsCache = null; // the last tree rows, keyed by what they were built from
 
 const ROW_H = 26; // px, the fixed height of a module row (virtual scrolling)
 
+function fmtMs(ms) {
+  if (ms < 1000) return ms + ' ms';
+  const sec = Math.round(ms / 1000);
+  return sec < 60 ? sec + ' s' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+
 function buildGraph(modules) {
   const byKey = new Map(modules.map((m) => [m.key, m]));
   const kids = new Map();
@@ -361,7 +367,10 @@ document.addEventListener('alpine:init', () => {
     probOpen: {},
     modIndex: {},
     modsOpen: false,
-    modsSort: 'reactor',
+    modsSort: 'tree',
+    jobTreeMods: [], // the job's project modules (folders), for the module tree
+    jobOpen: {},
+    jobModScroll: 0,
     firstLine: 0,
     logCount: 0,
     logFilter: loadPref('logFilter', 'important'),
@@ -1193,7 +1202,13 @@ document.addEventListener('alpine:init', () => {
       this.probOpen = {};
       this.firstLine = 0;
       this.logCount = job.liveLines;
-      if (this.jobProject?.id !== job.projectId) this.jobProject = await api('GET', `/projects/${job.projectId}`);
+      if (this.jobProject?.id !== job.projectId) {
+        this.jobProject = await api('GET', `/projects/${job.projectId}`);
+        this.jobTreeMods = [];
+        api('GET', `/projects/${job.projectId}/modules`).then((r) => { this.jobTreeMods = r.modules || []; }).catch(() => {});
+      }
+      this.jobOpen = {};
+      this.jobModScroll = 0;
       await this.$nextTick();
       logView.onCounts = (c) => { this.logCounts = { ...c }; };
       logView.reset(this.$refs.log);
@@ -1266,6 +1281,88 @@ document.addEventListener('alpine:init', () => {
       return rows;
     },
 
+    jobGraph() {
+      const mods = Alpine.raw(this.jobTreeMods);
+      let g = graphCache.get(mods);
+      if (!g) {
+        g = buildGraph(mods);
+        graphCache.set(mods, g);
+      }
+      return g;
+    },
+
+    // The job's modules in the project's folder tree. Folders show a roll-up of the
+    // modules under them; the ones with running or failed modules start open. Only
+    // modules in this build and the folders above them are shown.
+    jobTreeRows() {
+      const g = this.jobGraph();
+      if (!g.hasTree || !this.jobMods.length) return null;
+      const byName = new Map(Alpine.raw(this.jobTreeMods).map((m) => [m.name, m.key]));
+      const agg = new Map(); // key -> { n, done, failed, running, ms, jm }
+      const get = (k) => {
+        let a = agg.get(k);
+        if (!a) agg.set(k, (a = { n: 0, done: 0, failed: 0, running: 0, skipped: 0, ms: 0, jm: null }));
+        return a;
+      };
+      let mapped = 0;
+      for (const jm of this.jobMods) {
+        const key = g.byKey.has(jm.key) ? jm.key : byName.get(jm.name);
+        if (!key || !g.byKey.has(key)) continue;
+        mapped++;
+        get(key).jm = jm;
+        const ms = this.modMs(jm);
+        for (let a = key; a; a = g.parent(a)) {
+          const x = get(a);
+          x.n++;
+          x.ms += ms;
+          if (jm.status === 'failed') x.failed++;
+          else if (jm.status === 'running') x.running++;
+          else if (jm.status === 'skipped' || jm.status === 'cancelled') x.skipped++;
+          if (jm.status !== 'pending' && jm.status !== 'running') x.done++;
+        }
+      }
+      if (mapped < this.jobMods.length / 2) return null;
+      const open = this.jobOpen;
+      const rows = [];
+      const stack = g.roots.filter((m) => agg.has(m.key)).map((m) => [m, 0]).reverse();
+      while (stack.length) {
+        const [m, depth] = stack.pop();
+        const a = agg.get(m.key);
+        const kids = (g.kids.get(m.key) || []).filter((k) => agg.has(k.key));
+        const isOpen = m.key in open ? open[m.key] : depth === 0 || a.failed > 0 || a.running > 0;
+        rows.push({ key: m.key, name: m.name, depth, kids: kids.length, open: isOpen, a });
+        if (isOpen) for (let i = kids.length - 1; i >= 0; i--) stack.push([kids[i], depth + 1]);
+      }
+      return rows;
+    },
+
+    jobTreeVisible() {
+      const rows = this.jobTreeRows() || [];
+      const h = 360;
+      const from = Math.max(0, Math.floor(this.jobModScroll / ROW_H) - 10);
+      const to = Math.min(rows.length, from + Math.ceil(h / ROW_H) + 20);
+      return { rows: rows.slice(from, to), top: from * ROW_H, bottom: (rows.length - to) * ROW_H };
+    },
+
+    toggleJobOpen(r) {
+      this.jobOpen = { ...this.jobOpen, [r.key]: !r.open };
+    },
+
+    // Status of a tree row: its own for a module, a roll-up for a folder.
+    treeStatus(r) {
+      const a = r.a;
+      if (a.jm && !r.kids) return { cls: a.jm.status, text: this.modStatus(a.jm) };
+      if (a.failed) return { cls: 'failed', text: a.failed + ' failed' };
+      if (a.running) return { cls: 'running', text: a.running + ' running' };
+      if (a.done === a.n) return { cls: a.skipped === a.n ? 'skipped' : 'succeeded', text: a.skipped === a.n ? 'skipped' : 'done' };
+      return { cls: 'pending', text: a.done + ' / ' + a.n };
+    },
+
+    treeTime(r) {
+      if (r.a.jm && !r.kids) return this.modTime(r.a.jm);
+      return r.a.ms ? fmtMs(r.a.ms) : '';
+    },
+
     modMs(m) {
       if (m.status === 'running' && m.startedAt) return this.now - new Date(m.startedAt);
       return m.ms || 0;
@@ -1273,10 +1370,7 @@ document.addEventListener('alpine:init', () => {
 
     modTime(m) {
       if (m.status === 'pending') return '';
-      const ms = this.modMs(m);
-      if (ms < 1000) return ms + ' ms';
-      const sec = Math.round(ms / 1000);
-      return sec < 60 ? sec + ' s' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+      return fmtMs(this.modMs(m));
     },
 
     modStatus(m) {

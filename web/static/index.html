@@ -559,10 +559,30 @@
             <template x-if="modsOpen">
               <div class="stack">
                 <div class="seg small">
-                  <button :class="{active: modsSort === 'reactor'}" @click="modsSort = 'reactor'">Build order</button>
+                  <button x-show="jobTreeRows()" :class="{active: modsSort === 'tree'}" @click="modsSort = 'tree'">Tree</button>
+                  <button :class="{active: modsSort === 'reactor' || (modsSort === 'tree' && !jobTreeRows())}" @click="modsSort = 'reactor'">Build order</button>
                   <button :class="{active: modsSort === 'slowest'}" @click="modsSort = 'slowest'">Slowest first</button>
                 </div>
-                <div class="modtable">
+                <div class="modtable modtree" x-show="modsSort === 'tree' && jobTreeRows()" @scroll="jobModScroll = $event.target.scrollTop">
+                  <div x-data="{ v: { rows: [], top: 0, bottom: 0 } }" x-effect="v = jobTreeVisible()">
+                    <div :style="'height:' + v.top + 'px'"></div>
+                    <template x-for="r in v.rows" :key="r.key + treeStatus(r).cls">
+                      <div class="trow" :style="'padding-left:' + (8 + r.depth * 18) + 'px'">
+                        <button type="button" class="caret" x-show="r.kids" @click="toggleJobOpen(r)" x-text="r.open ? '▾' : '▸'"
+                          :title="r.open ? 'Collapse' : 'Expand'"></button>
+                        <span class="caret" x-show="!r.kids"></span>
+                        <span class="status" :class="treeStatus(r).cls" x-text="treeStatus(r).text"></span>
+                        <a href="javascript:void 0" class="modname" x-show="r.a.jm" @click="findModule(r.a.jm)" :title="'Find ' + r.key + ' in the log'" x-text="r.name"></a>
+                        <span class="modname" x-show="!r.a.jm" :title="r.key" x-text="r.name"></span>
+                        <span class="muted small" x-show="r.kids" x-text="'(' + r.a.n + ')'"></span>
+                        <span class="grow"></span>
+                        <span class="num muted" x-text="treeTime(r)" :title="r.kids ? 'Total time of the modules under it (they may run in parallel)' : ''"></span>
+                      </div>
+                    </template>
+                    <div :style="'height:' + v.bottom + 'px'"></div>
+                  </div>
+                </div>
+                <div class="modtable" x-show="modsSort !== 'tree' || !jobTreeRows()">
                   <table>
                     <tbody>
                       <template x-for="m in modsTable()" :key="m.key">
