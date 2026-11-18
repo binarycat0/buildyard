@@ -213,3 +213,41 @@ func TestInterruptUnfinished(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+// Stop sends SIGINT and waits for the build to end by itself; Kill ends it at once.
+func TestStopAndKill(t *testing.T) {
+	r, st, pid := setup(t, 1)
+	r.KillGrace = time.Hour // Stop and Kill must not rely on the Cancel timer
+	dir := t.TempDir()
+	// Handles SIGINT like Maven: prints, cleans up for a moment, exits 130.
+	graceful := `trap 'echo stopping; sleep 0.3; echo cleaned; exit 130' INT; echo ready; while :; do sleep 0.05; done`
+	j, _ := r.Enqueue(context.Background(), store.Job{ProjectID: pid}, sh(dir, graceful))
+	waitLines(t, r, j.ID, 1)
+	if err := r.Stop(j.ID); err != nil {
+		t.Fatal(err)
+	}
+	if r.StopRequested(j.ID).IsZero() {
+		t.Fatal("stop time not recorded")
+	}
+	got := wait(t, st, j.ID)
+	lines, _, _ := ReadLines(got.LogPath, 1, 10)
+	if got.Status != store.JobCancelled || strings.Join(lines, ",") != "ready,stopping,cleaned" {
+		t.Fatalf("stop: %s %q", got.Status, lines)
+	}
+
+	// Ignores SIGINT and SIGTERM: only Kill ends it.
+	stubborn := `trap '' INT TERM; echo ready; while :; do sleep 0.05; done`
+	j, _ = r.Enqueue(context.Background(), store.Job{ProjectID: pid}, sh(dir, stubborn))
+	waitLines(t, r, j.ID, 1)
+	r.Stop(j.ID)
+	time.Sleep(300 * time.Millisecond)
+	if cur, _ := st.GetJob(context.Background(), j.ID); cur.Finished() {
+		t.Fatal("stop should not kill")
+	}
+	if err := r.Kill(j.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := wait(t, st, j.ID); got.Status != store.JobCancelled {
+		t.Fatalf("kill: %s", got.Status)
+	}
+}

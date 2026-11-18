@@ -339,7 +339,7 @@ Starting a job:
 4. A second goroutine tails `events/<job>.jsonl`, updates `job_module` and publishes `module` events.
 5. After `cmd.Wait()` the exit code, status and line count are written and the job releases the project lock.
 
-Cancel: `syscall.Kill(-pgid, SIGTERM)` to the whole process group, `SIGKILL` after 10 seconds. For mvnd, `SIGINT` goes to the client first. The build itself runs in the long-lived mvnd daemon outside our group, so that daemon must not be killed. Whether SIGINT to the client really cancels the build is still to be verified (mvnd was not available in the spike).
+Controls for a running job: **Stop** sends `SIGINT` to the process group, like Ctrl+C in a terminal. Maven runs its shutdown hooks and the build ends by itself; nothing is killed automatically. **Kill** sends `SIGKILL` to the group at once. After the main process exits, anything left in its group is killed. `cancel` (used on daemon shutdown) is `SIGTERM`, then `SIGKILL` after 10 seconds. For a queued job, any of them just removes it from the queue. For mvnd, `SIGINT` goes to the client first. The build itself runs in the long-lived mvnd daemon outside our group, so that daemon must not be killed. Whether SIGINT to the client really cancels the build is still to be verified (mvnd was not available in the spike).
 
 Job bus and SSE:
 
@@ -424,7 +424,9 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | GET | `/api/projects/{id}/jobs?limit=` | The project's job history, newest first |
 | POST | `/api/projects/{id}/jobs` | Run: `{spec}` or `{profileId}` → `201 job` |
 | GET | `/api/jobs/{id}` | A job (with `liveLines` while running); later its modules and problems |
-| POST | `/api/jobs/{id}/cancel` | Cancel |
+| POST | `/api/jobs/{id}/stop` | Graceful stop (`SIGINT`, like Ctrl+C); the job shows `stopRequestedAt` until it ends |
+| POST | `/api/jobs/{id}/kill` | Kill the process group at once (`SIGKILL`) |
+| POST | `/api/jobs/{id}/cancel` | `SIGTERM`, then `SIGKILL` after 10 s |
 | POST | `/api/jobs/{id}/rerun` | Rerun with the same RunSpec snapshot |
 | GET | `/api/jobs/{id}/log?from=&limit=` | A batch of log lines `{from, lines, total}` (`levels=` later) |
 | GET | `/api/jobs/{id}/stream?from=` | SSE: log, status (modules later) |

@@ -284,7 +284,12 @@
                     <td><code x-text="specText(j)"></code></td>
                     <td class="small" x-text="when(j.startedAt || j.queuedAt)"></td>
                     <td class="small" x-text="duration(j)"></td>
-                    <td><button class="small" @click.stop="rerun(j)">Rerun</button></td>
+                    <td class="nowrap">
+                      <button class="small" x-show="j.status !== 'running' && j.status !== 'queued'" @click.stop="rerun(j)">Rerun</button>
+                      <button class="small" x-show="j.status === 'queued'" @click.stop="controlJob('stop', j)">Cancel</button>
+                      <button class="small" x-show="j.status === 'running' && !j.stopRequestedAt" @click.stop="controlJob('stop', j)" title="Graceful, like Ctrl+C">Stop</button>
+                      <button class="small danger" x-show="j.status === 'running'" @click.stop="controlJob('kill', j)" title="SIGKILL at once">Kill</button>
+                    </td>
                   </tr>
                 </template>
               </tbody>
@@ -414,7 +419,13 @@
               <span class="muted" x-text="duration(job)"></span>
             </div>
             <div class="row">
-              <button class="danger" x-show="job.status === 'running' || job.status === 'queued'" @click="cancelJob()">Cancel</button>
+              <span class="muted small" x-show="job.status === 'running' && job.stopRequestedAt"
+                x-text="'Stopping for ' + since(job.stopRequestedAt) + '…'"></span>
+              <button x-show="job.status === 'queued'" @click="controlJob('stop')">Cancel</button>
+              <button x-show="job.status === 'running' && !job.stopRequestedAt" @click="controlJob('stop')"
+                title="Like Ctrl+C: Maven finishes its shutdown and the build ends by itself">Stop</button>
+              <button class="danger" x-show="job.status === 'running'" @click="controlJob('kill')"
+                title="Ends the build and all its processes at once (SIGKILL)">Kill</button>
               <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="rerun(job)">Rerun</button>
             </div>
           </div>

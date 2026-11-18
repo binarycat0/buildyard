@@ -114,8 +114,24 @@ func (r *Runner) dispatchLocked() {
 	r.queue = rest
 }
 
-// Cancel stops a queued or running job.
+// Cancel stops a queued or running job: SIGTERM, then SIGKILL after KillGrace.
 func (r *Runner) Cancel(id int64) error {
+	return r.control(id, func(rn *run) { rn.stop(r.KillGrace, false) })
+}
+
+// Stop asks a running job to finish like Ctrl+C in a terminal (SIGINT): Maven runs its
+// shutdown hooks and the build ends on its own. Nothing is killed; use Kill for that.
+// A queued job is dropped.
+func (r *Runner) Stop(id int64) error {
+	return r.control(id, func(rn *run) { rn.signal(syscall.SIGINT, false) })
+}
+
+// Kill ends a running job at once (SIGKILL to its process group). A queued job is dropped.
+func (r *Runner) Kill(id int64) error {
+	return r.control(id, func(rn *run) { rn.signal(syscall.SIGKILL, false) })
+}
+
+func (r *Runner) control(id int64, running func(*run)) error {
 	r.mu.Lock()
 	rn, ok := r.runs[id]
 	if !ok {
@@ -132,8 +148,21 @@ func (r *Runner) Cancel(id int64) error {
 		}
 	}
 	r.mu.Unlock()
-	rn.stop(r.KillGrace, false)
+	running(rn)
 	return nil
+}
+
+// StopRequested returns when a stop or kill was first requested for an active job.
+func (r *Runner) StopRequested(id int64) time.Time {
+	r.mu.Lock()
+	rn, ok := r.runs[id]
+	r.mu.Unlock()
+	if !ok {
+		return time.Time{}
+	}
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+	return rn.stopAt
 }
 
 // Lines returns the live line count of an active job, or -1.

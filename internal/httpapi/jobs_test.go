@@ -211,6 +211,25 @@ func TestCancelJobAPI(t *testing.T) {
 	if got := waitJob(t, h, j.ID); got.Status != store.JobCancelled {
 		t.Fatalf("status: %s", got.Status)
 	}
+
+	// Stop marks the job as stopping; kill ends it.
+	decodeInto(do(t, h, req{method: "POST", path: "/api/projects/" + strconv.FormatInt(p.ID, 10) + "/jobs",
+		body: `{"spec":{"goals":["slow"]}}`}), &j)
+	time.Sleep(200 * time.Millisecond)
+	id := strconv.FormatInt(j.ID, 10)
+	w := do(t, h, req{method: "POST", path: "/api/jobs/" + id + "/stop"})
+	var v jobView
+	decodeInto(w, &v)
+	if w.Code != 202 || (v.Status == store.JobRunning && v.StopRequestedAt == nil) {
+		t.Fatalf("stop: %d %s", w.Code, w.Body)
+	}
+	do(t, h, req{method: "POST", path: "/api/jobs/" + id + "/kill"})
+	if got := waitJob(t, h, j.ID); got.Status != store.JobCancelled || got.StopRequestedAt != nil {
+		t.Fatalf("after kill: %+v", got)
+	}
+	if w := do(t, h, req{method: "POST", path: "/api/jobs/" + id + "/kill"}); w.Code != 409 {
+		t.Fatalf("kill finished: %d", w.Code)
+	}
 }
 
 func TestBuildEnv(t *testing.T) {
