@@ -20,6 +20,7 @@ type Project struct {
 	ToolJdkID   *int64            `json:"toolJdkId"`  // JDK for the build tool; nil = project JDK, then the tool's global default
 	Env         map[string]string `json:"env"`
 	SkipPresets json.RawMessage   `json:"skipPresets"`
+	Resources   json.RawMessage   `json:"resources"` // default CPU, memory and test JVMs for runs
 	CreatedAt   time.Time         `json:"createdAt"`
 	LastJob     *JobSummary       `json:"lastJob"`
 }
@@ -41,10 +42,11 @@ type ProjectPatch struct {
 	ToolJdkID   *int64             `json:"toolJdkId"`  // 0 resets to "use the project JDK"
 	Env         *map[string]string `json:"env"`
 	SkipPresets *json.RawMessage   `json:"skipPresets"`
+	Resources   *json.RawMessage   `json:"resources"`
 }
 
 const projectCols = `p.id, p.name, p.root_path, p.build_tool, p.executable, p.jdk_id, p.tool_jdk_id,
-	p.env_json, p.skip_presets_json, p.created_at,
+	p.env_json, p.skip_presets_json, p.resources_json, p.created_at,
 	j.id, j.status, j.queued_at, j.started_at, j.finished_at`
 
 const projectFrom = ` FROM project p LEFT JOIN job j ON j.id = (
@@ -125,6 +127,9 @@ func (s *Store) UpdateProject(ctx context.Context, id int64, patch ProjectPatch)
 	if patch.SkipPresets != nil {
 		sets, args = append(sets, "skip_presets_json = ?"), append(args, string(*patch.SkipPresets))
 	}
+	if patch.Resources != nil {
+		sets, args = append(sets, "resources_json = ?"), append(args, string(*patch.Resources))
+	}
 	if len(sets) > 0 {
 		args = append(args, id)
 		res, err := s.db.ExecContext(ctx, `UPDATE project SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
@@ -155,18 +160,19 @@ type scanner interface{ Scan(...any) error }
 func scanProject(r scanner) (Project, error) {
 	var (
 		p                                  Project
-		env, presets, created              string
+		env, presets, res, created         string
 		jobID                              sql.NullInt64
 		jobStatus, queued, started, finish sql.NullString
 	)
 	if err := r.Scan(&p.ID, &p.Name, &p.RootPath, &p.BuildTool, &p.Executable, &p.JdkID, &p.ToolJdkID,
-		&env, &presets, &created, &jobID, &jobStatus, &queued, &started, &finish); err != nil {
+		&env, &presets, &res, &created, &jobID, &jobStatus, &queued, &started, &finish); err != nil {
 		return Project{}, err
 	}
 	if err := json.Unmarshal([]byte(env), &p.Env); err != nil || p.Env == nil {
 		p.Env = map[string]string{}
 	}
 	p.SkipPresets = json.RawMessage(presets)
+	p.Resources = json.RawMessage(res)
 	p.CreatedAt = parseTime(created)
 	if jobID.Valid {
 		p.LastJob = &JobSummary{

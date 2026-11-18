@@ -126,3 +126,46 @@ not json
 		t.Fatal("no session expected")
 	}
 }
+
+func TestResources(t *testing.T) {
+	presets := DefaultSkipPresets()
+	defaults := Resources{Threads: "1C", HeapMB: 8192, TestForks: "2"}
+
+	s := RunSpec{Goals: []string{"install"}}.Normalize().WithDefaults(defaults)
+	if got := strings.Join(s.Argv("/x/mvnw", presets), " "); got != "/x/mvnw -B -T 1C -DforkCount=2 install" {
+		t.Errorf("project defaults: %s", got)
+	}
+	if opts, ok := s.MavenOpts("-Xss4m -Xmx2g"); !ok || opts != "-Xss4m -Xmx8g" {
+		t.Errorf("MAVEN_OPTS: %q %v", opts, ok)
+	}
+	if got := strings.Join(s.Argv("/usr/bin/mvnd", presets), " "); !strings.Contains(got, "-Dmvnd.maxHeapSize=8g") {
+		t.Errorf("mvnd heap: %s", got)
+	}
+
+	// The run overrides the defaults; "1", -1 and "none" mean Maven's own behaviour.
+	s = RunSpec{Goals: []string{"install"}, Flags: Flags{Threads: "1"}, Resources: Resources{HeapMB: -1, TestForks: "none"}}.
+		Normalize().WithDefaults(defaults)
+	if got := strings.Join(s.Argv("mvn", presets), " "); got != "mvn -B install" {
+		t.Errorf("explicit Maven defaults: %s", got)
+	}
+	if _, ok := s.MavenOpts("-Xmx2g"); ok {
+		t.Error("HeapMB -1 must leave MAVEN_OPTS alone")
+	}
+	s = RunSpec{Goals: []string{"install"}, Resources: Resources{HeapMB: 1536, TestForks: "0.5C"},
+		Properties: map[string]string{"forkCount": "3"}}.Normalize()
+	if opts, _ := s.MavenOpts(""); opts != "-Xmx1536m" {
+		t.Errorf("heap in MB: %q", opts)
+	}
+	if got := strings.Join(s.Argv("mvn", presets), " "); got != "mvn -B -DforkCount=3 install" {
+		t.Errorf("an explicit -DforkCount wins: %s", got)
+	}
+
+	for _, r := range []Resources{{HeapMB: -2}, {TestForks: "many"}, {Threads: "x"}} {
+		if ValidateResources(r) == nil {
+			t.Errorf("%+v should be invalid", r)
+		}
+	}
+	if (RunSpec{Goals: []string{"install"}, Resources: Resources{TestForks: "lots"}}).Normalize().Validate(presets) == nil {
+		t.Error("bad testForks in a run should be invalid")
+	}
+}

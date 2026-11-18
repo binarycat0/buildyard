@@ -3,6 +3,7 @@ package maven
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -18,7 +19,76 @@ type RunSpec struct {
 	Properties map[string]string `json:"properties"` // -Dkey=value; empty value gives -Dkey
 	Flags      Flags             `json:"flags"`
 	LogLevel   string            `json:"logLevel"`  // default | warn | quiet | debug
+	Resources  Resources         `json:"resources"`
 	ExtraArgs  []string          `json:"extraArgs"` // appended as is
+}
+
+// Resources are the CPU and memory knobs, without JVM flags. An empty value takes the
+// project default (see WithDefaults); "1" threads, HeapMB -1 and TestForks "none" ask
+// for Maven's own behaviour explicitly. Threads lives in Flags.Threads for a run; here
+// it is used for project defaults.
+type Resources struct {
+	Threads   string `json:"threads,omitempty"`   // -T, project defaults only
+	HeapMB    int    `json:"heapMb,omitempty"`    // Maven's heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)
+	TestForks string `json:"testForks,omitempty"` // Surefire/Failsafe -DforkCount: "2", "1C"; "none" = plugin default
+}
+
+// MaxHeapMB caps the heap setting at 1 TB, to catch typos.
+const MaxHeapMB = 1 << 20
+
+// ValidateResources checks project defaults.
+func ValidateResources(r Resources) error {
+	if r.Threads != "" && !threadsRe.MatchString(r.Threads) {
+		return fmt.Errorf("threads %q: use a number like 4 or a per-core factor like 1C", r.Threads)
+	}
+	return r.validate()
+}
+
+func (r Resources) validate() error {
+	if r.HeapMB < -1 || r.HeapMB > MaxHeapMB {
+		return fmt.Errorf("Maven memory %d MB is out of range", r.HeapMB)
+	}
+	if r.TestForks != "" && r.TestForks != "none" && !threadsRe.MatchString(r.TestForks) {
+		return fmt.Errorf("test JVMs %q: use a number like 2 or a per-core factor like 1C", r.TestForks)
+	}
+	return nil
+}
+
+// WithDefaults fills empty resource settings from the project defaults.
+func (s RunSpec) WithDefaults(d Resources) RunSpec {
+	if s.Flags.Threads == "" {
+		s.Flags.Threads = d.Threads
+	}
+	if s.Resources.HeapMB == 0 {
+		s.Resources.HeapMB = d.HeapMB
+	}
+	if s.Resources.TestForks == "" {
+		s.Resources.TestForks = d.TestForks
+	}
+	return s
+}
+
+// MavenOpts returns MAVEN_OPTS with the heap setting applied (replacing any -Xmx in it),
+// and whether it changed. mvnd ignores MAVEN_OPTS; Argv passes its own property.
+func (s RunSpec) MavenOpts(current string) (string, bool) {
+	if s.Resources.HeapMB <= 0 {
+		return current, false
+	}
+	var keep []string
+	for _, f := range strings.Fields(current) {
+		if !strings.HasPrefix(f, "-Xmx") {
+			keep = append(keep, f)
+		}
+	}
+	return strings.Join(append(keep, "-Xmx"+heapSize(s.Resources.HeapMB)), " "), true
+}
+
+// heapSize writes MB as a JVM size: whole gigabytes as "8g", else "1536m".
+func heapSize(mb int) string {
+	if mb%1024 == 0 {
+		return fmt.Sprintf("%dg", mb/1024)
+	}
+	return fmt.Sprintf("%dm", mb)
 }
 
 // Modules selects part of the reactor.
@@ -131,6 +201,8 @@ func (s RunSpec) Normalize() RunSpec {
 	}
 	s.Properties = props
 	s.Flags.Threads = strings.TrimSpace(s.Flags.Threads)
+	s.Resources.Threads = ""
+	s.Resources.TestForks = strings.TrimSpace(s.Resources.TestForks)
 	if s.LogLevel == "" {
 		s.LogLevel = "default"
 	}
@@ -175,6 +247,9 @@ func (s RunSpec) Validate(presets []SkipPreset) error {
 	if s.Flags.Threads != "" && !threadsRe.MatchString(s.Flags.Threads) {
 		return fmt.Errorf("threads %q: use a number like 4 or a per-core factor like 1C", s.Flags.Threads)
 	}
+	if err := s.Resources.validate(); err != nil {
+		return err
+	}
 	switch s.Flags.FailMode {
 	case "", "fast", "end", "never":
 	default:
@@ -199,7 +274,7 @@ func (s RunSpec) Argv(executable string, presets []SkipPreset) []string {
 	if f.NoSnapshotUpdates {
 		argv = append(argv, "-nsu")
 	}
-	if f.Threads != "" {
+	if f.Threads != "" && f.Threads != "1" {
 		argv = append(argv, "-T", f.Threads)
 	}
 	if f.NoTransferProgress {
@@ -235,6 +310,14 @@ func (s RunSpec) Argv(executable string, presets []SkipPreset) []string {
 		}
 	}
 	argv = append(argv, s.selectionArgs(presets)...)
+	if f := s.Resources.TestForks; f != "" && f != "none" {
+		if _, own := s.Properties["forkCount"]; !own {
+			argv = append(argv, "-DforkCount="+f)
+		}
+	}
+	if s.Resources.HeapMB > 0 && filepath.Base(executable) == "mvnd" {
+		argv = append(argv, "-Dmvnd.maxHeapSize="+heapSize(s.Resources.HeapMB))
+	}
 	argv = append(argv, s.Goals...)
 	return append(argv, s.ExtraArgs...)
 }

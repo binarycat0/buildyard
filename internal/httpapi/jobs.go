@@ -46,6 +46,8 @@ type preview struct {
 	Dir      string            `json:"dir"`
 	JavaHome string            `json:"javaHome"` // "" = the daemon's environment
 	Env      map[string]string `json:"env"`      // project variables added to the daemon's environment
+	// MavenOpts is MAVEN_OPTS as the run gets it, when the memory setting changed it.
+	MavenOpts string `json:"mavenOpts,omitempty"`
 	Error    string            `json:"error,omitempty"`
 }
 
@@ -58,7 +60,7 @@ func presetsFor(p store.Project) []maven.SkipPreset {
 
 // prepare resolves a spec into a command. A non-empty preview.Error means it cannot run.
 func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpec) (preview, runner.Command, error) {
-	spec = spec.Normalize()
+	spec = spec.Normalize().WithDefaults(resourcesFor(p))
 	presets := presetsFor(p)
 	pv := preview{Dir: p.RootPath, Env: p.Env}
 	info, err := s.runtimeFor(ctx, p)
@@ -81,12 +83,36 @@ func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpe
 	case info.JDK != nil && info.JDK.Missing:
 		pv.Error = "JDK " + info.JDK.Home + " was not found by the last detection"
 	}
-	cmd := runner.Command{Argv: pv.Argv, Dir: p.RootPath, Env: buildEnv(os.Environ(), p.Env, pv.JavaHome)}
+	env := buildEnv(os.Environ(), p.Env, pv.JavaHome)
+	if exe := filepath.Base(exe); exe != "mvnd" {
+		if opts, ok := spec.MavenOpts(lookupEnv(env, "MAVEN_OPTS")); ok {
+			pv.MavenOpts = opts
+			env = append(env, "MAVEN_OPTS="+opts) // later entries win in exec
+		}
+	}
+	cmd := runner.Command{Argv: pv.Argv, Dir: p.RootPath, Env: env}
 	cmd.SignalLeaderOnly = info.Executable != nil && info.Executable.Kind == maven.ModeMvnd
 	if jar := s.ExtJar; jar != "" {
 		cmd.EventArgs = func(path string) []string { return maven.ExtArgs(jar, path) }
 	}
 	return pv, cmd, nil
+}
+
+// resourcesFor returns the project's default resources.
+func resourcesFor(p store.Project) maven.Resources {
+	var r maven.Resources
+	_ = json.Unmarshal(p.Resources, &r)
+	return r
+}
+
+func lookupEnv(env []string, key string) string {
+	v := ""
+	for _, kv := range env {
+		if k, val, ok := strings.Cut(kv, "="); ok && k == key {
+			v = val
+		}
+	}
+	return v
 }
 
 // buildEnv layers the project variables and the chosen JDK over the daemon's environment.
