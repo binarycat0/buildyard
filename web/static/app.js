@@ -1300,6 +1300,8 @@ document.addEventListener('alpine:init', () => {
       if (failed) parts.push(`${failed} failed`);
       const skipped = this.modsWith('skipped').length;
       if (skipped) parts.push(`${skipped} skipped`);
+      const stopped = this.modsWith('cancelled').length;
+      if (stopped) parts.push(`${stopped} interrupted`);
       if (this.job && !['queued', 'running'].includes(this.job.status)) {
         const notBuilt = this.modsWith('pending').length;
         if (notBuilt) parts.push(`${notBuilt} not built`);
@@ -1412,6 +1414,7 @@ document.addEventListener('alpine:init', () => {
 
     modStatus(m) {
       if (m.status === 'pending') return this.job && ['queued', 'running'].includes(this.job.status) ? 'waiting' : 'not built';
+      if (m.status === 'cancelled') return 'interrupted';
       return m.status;
     },
 
@@ -1544,7 +1547,7 @@ document.addEventListener('alpine:init', () => {
 
     // ---------- problems ----------
     problemGroups() {
-      const titles = { compile: 'Compile errors', test: 'Failed tests', goal: 'Failed goals', dependency: 'Dependency problems' };
+      const titles = { crash: 'Build tool crashed', compile: 'Compile errors', test: 'Failed tests', goal: 'Failed goals', dependency: 'Dependency problems' };
       return Object.keys(titles)
         .map((kind) => ({ kind, title: titles[kind], items: this.jobProblems.filter((p) => p.kind === kind) }))
         .filter((g) => g.items.length);
