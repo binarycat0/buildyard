@@ -148,6 +148,9 @@ func TestResources(t *testing.T) {
 	if got := strings.Join(s.Argv("mvn", presets), " "); got != "mvn -B install" {
 		t.Errorf("explicit Maven defaults: %s", got)
 	}
+	if got := strings.Join(s.Argv("/usr/bin/mvnd", presets), " "); got != "/usr/bin/mvnd -B -T 1 install" {
+		t.Errorf("mvnd is parallel by default, so 1 thread must be explicit: %s", got)
+	}
 	if _, ok := s.MavenOpts("-Xmx2g"); ok {
 		t.Error("HeapMB -1 must leave MAVEN_OPTS alone")
 	}
