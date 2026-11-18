@@ -45,9 +45,17 @@ type preview struct {
 	Error    string            `json:"error,omitempty"`
 }
 
+// presetsFor returns the default skip presets with the project's own applied.
+func presetsFor(p store.Project) []maven.SkipPreset {
+	var own []maven.SkipPreset
+	_ = json.Unmarshal(p.SkipPresets, &own)
+	return maven.MergePresets(own)
+}
+
 // prepare resolves a spec into a command. A non-empty preview.Error means it cannot run.
 func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpec) (preview, runner.Command, error) {
 	spec = spec.Normalize()
+	presets := presetsFor(p)
 	pv := preview{Dir: p.RootPath, Env: p.Env}
 	info, err := s.runtimeFor(ctx, p)
 	if err != nil {
@@ -60,12 +68,12 @@ func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpe
 	if info.Executable != nil {
 		exe = info.Executable.Path
 	}
-	pv.Argv = spec.Argv(exe)
+	pv.Argv = spec.Argv(exe, presets)
 	switch {
 	case info.ExecutableError != "":
 		pv.Error = info.ExecutableError
-	case spec.Validate() != nil:
-		pv.Error = spec.Validate().Error()
+	case spec.Validate(presets) != nil:
+		pv.Error = spec.Validate(presets).Error()
 	case info.JDK != nil && info.JDK.Missing:
 		pv.Error = "JDK " + info.JDK.Home + " was not found by the last detection"
 	}
@@ -108,7 +116,8 @@ func buildEnv(base []string, project map[string]string, javaHome string) []strin
 }
 
 type runRequest struct {
-	Spec maven.RunSpec `json:"spec"`
+	Spec      *maven.RunSpec `json:"spec"`
+	ProfileID int64          `json:"profileId"` // run a saved task instead of spec
 }
 
 func (s *Server) projectFor(w http.ResponseWriter, r *http.Request) (store.Project, bool) {
@@ -134,7 +143,11 @@ func (s *Server) previewJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON: "+err.Error())
 		return
 	}
-	pv, _, err := s.prepare(r.Context(), p, req.Spec)
+	var spec maven.RunSpec
+	if req.Spec != nil {
+		spec = *req.Spec
+	}
+	pv, _, err := s.prepare(r.Context(), p, spec)
 	if err != nil {
 		s.internal(w, err)
 		return
@@ -152,10 +165,30 @@ func (s *Server) createJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON: "+err.Error())
 		return
 	}
-	s.start(w, r, p, req.Spec)
+	var profileID *int64
+	var spec maven.RunSpec
+	switch {
+	case req.ProfileID > 0:
+		prof, err := s.Store.GetProfile(r.Context(), req.ProfileID)
+		if err != nil || prof.ProjectID != p.ID {
+			writeError(w, http.StatusBadRequest, "bad_request", "unknown task for this project")
+			return
+		}
+		if err := json.Unmarshal(prof.Spec, &spec); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "the saved task has an invalid spec")
+			return
+		}
+		profileID = &prof.ID
+	case req.Spec != nil:
+		spec = *req.Spec
+	default:
+		writeError(w, http.StatusBadRequest, "bad_request", "give spec or profileId")
+		return
+	}
+	s.start(w, r, p, spec, profileID)
 }
 
-func (s *Server) start(w http.ResponseWriter, r *http.Request, p store.Project, spec maven.RunSpec) {
+func (s *Server) start(w http.ResponseWriter, r *http.Request, p store.Project, spec maven.RunSpec, profileID *int64) {
 	pv, cmd, err := s.prepare(r.Context(), p, spec)
 	if err != nil {
 		s.internal(w, err)
@@ -166,7 +199,7 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request, p store.Project, 
 		return
 	}
 	specJSON, _ := json.Marshal(spec.Normalize())
-	job, err := s.Runner.Enqueue(r.Context(), store.Job{ProjectID: p.ID, Spec: specJSON}, cmd)
+	job, err := s.Runner.Enqueue(r.Context(), store.Job{ProjectID: p.ID, ProfileID: profileID, Spec: specJSON}, cmd)
 	if errors.Is(err, runner.ErrClosed) {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", err.Error())
 		return
@@ -246,7 +279,7 @@ func (s *Server) rerunJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "this job has no reusable spec")
 		return
 	}
-	s.start(w, r, p, spec)
+	s.start(w, r, p, spec, j.ProfileID)
 }
 
 type logPage struct {

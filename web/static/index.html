@@ -32,7 +32,7 @@
         <label>Project root path
           <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
         </label>
-        <label>Name <span class="muted">(optional, defaults to the folder name)</span>
+        <label><span>Name <span class="muted">(optional, defaults to the folder name)</span></span>
           <input x-model="form.name">
         </label>
         <p class="error" x-show="formError" x-text="formError"></p>
@@ -85,27 +85,159 @@
           </nav>
 
           <!-- Run -->
-          <form class="card" x-show="pview === 'run'" @submit.prevent="runJob()">
-            <label>Goals</label>
-            <div class="row wrap">
-              <template x-for="g in commonGoals" :key="g">
-                <button type="button" class="chip" :class="{active: hasGoal(g)}" @click="toggleGoal(g)" x-text="g"></button>
+          <div class="run-layout" x-show="pview === 'run'">
+            <aside class="card tasks">
+              <h2>Tasks</h2>
+              <p class="muted small" x-show="!profiles.length">No saved tasks yet. Set up a run on the right and save it as a task.</p>
+              <template x-for="t in profiles" :key="t.id">
+                <div class="task" :class="{active: editingTask?.id === t.id}">
+                  <div class="row spread">
+                    <button type="button" class="link pin" :class="{on: t.pinned}" @click="togglePin(t)" :title="t.pinned ? 'Unpin' : 'Pin to the top'">★</button>
+                    <a href="javascript:void 0" class="grow" @click="editTask(t)" x-text="t.name" title="Load into the form"></a>
+                    <button type="button" class="small primary" @click="runTask(t)" :disabled="busy">Run</button>
+                  </div>
+                  <code class="small muted" x-text="specSummary(t.spec)"></code>
+                  <div class="row small" x-show="t.lastJob">
+                    <a :href="'#/jobs/' + t.lastJob?.id"><span class="status" :class="t.lastJob?.status" x-text="t.lastJob?.status"></span></a>
+                    <span class="muted" x-text="t.lastJob && when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt)"></span>
+                  </div>
+                </div>
               </template>
-            </div>
-            <input x-model="rform.goals" placeholder="clean install" @input.debounce.250ms="refreshPreview()" aria-label="Goals">
-            <label>Arguments <span class="muted">(options and properties, e.g. -DskipTests -pl :core -am -T 1C)</span>
-              <input x-model="rform.args" placeholder="-DskipTests" @input.debounce.250ms="refreshPreview()">
-            </label>
-            <div class="preview" x-show="rpreview">
-              <div class="muted small">Command <span x-show="rpreview?.javaHome" x-text="'· JAVA_HOME=' + rpreview?.javaHome"></span></div>
-              <pre class="cmd" x-text="rpreview ? shellJoin(rpreview.argv) : ''"></pre>
-            </div>
-            <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
-            <div class="row">
-              <button class="primary" type="submit" :disabled="busy || !!rpreview?.error">Run</button>
-              <span class="muted small">One job per project runs at a time; more wait in the queue.</span>
-            </div>
-          </form>
+            </aside>
+
+            <form class="card runform" @submit.prevent="runJob()">
+              <div class="row spread editing" x-show="editingTask">
+                <span>Editing task <strong x-text="editingTask?.name"></strong></span>
+                <span class="row">
+                  <button type="button" class="small danger" @click="deleteTask(editingTask)">Delete</button>
+                  <button type="button" class="small" @click="stopEditing()">Close</button>
+                </span>
+              </div>
+
+              <label>Goals</label>
+              <div class="row wrap">
+                <template x-for="g in commonGoals" :key="g">
+                  <button type="button" class="chip" :class="{active: hasGoal(g)}" @click="toggleGoal(g)" x-text="g"></button>
+                </template>
+              </div>
+              <input x-model="rform.goals" placeholder="clean install" @input.debounce.250ms="refreshPreview()" aria-label="Goals">
+
+              <fieldset>
+                <legend>Modules</legend>
+                <div class="row wrap">
+                  <label class="radio"><input type="radio" value="all" x-model="rform.modulesMode" @change="refreshPreview()"> All modules</label>
+                  <label class="radio"><input type="radio" value="selected" x-model="rform.modulesMode" @change="refreshPreview()">
+                    Selected <span class="muted" x-text="'(' + rform.selected.length + ')'"></span></label>
+                  <span class="grow"></span>
+                  <span class="muted small" x-text="moduleStatus()"></span>
+                  <button type="button" class="small" @click="discover()" :disabled="discoverTask" x-text="discoverTask ? 'Discovering…' : (modules.length ? 'Rediscover' : 'Discover modules')"
+                    title="Lists the reactor with mvn help:active-profiles, using the profiles, skips and properties below"></button>
+                </div>
+                <pre class="error small" x-show="discoverError" x-text="discoverError"></pre>
+                <div x-show="rform.modulesMode === 'selected'" class="stack tight">
+                  <div class="row wrap">
+                    <label class="radio"><input type="checkbox" x-model="rform.alsoMake" @change="refreshPreview()"> also make dependencies <code>-am</code></label>
+                    <label class="radio"><input type="checkbox" x-model="rform.alsoMakeDependents" @change="refreshPreview()"> also make dependents <code>-amd</code></label>
+                  </div>
+                  <div class="row">
+                    <input class="grow" x-model="moduleFilter" placeholder="Filter modules by name or artifactId">
+                    <button type="button" class="small" @click="selectShown()">Select shown</button>
+                    <button type="button" class="small" @click="rform.selected = []; refreshPreview()">Clear</button>
+                  </div>
+                  <div class="modules">
+                    <template x-for="m in shownModules()" :key="m.key">
+                      <label class="module">
+                        <input type="checkbox" :checked="rform.selected.includes(moduleRef(m))" @change="toggleModule(m)">
+                        <span x-text="m.name"></span>
+                        <code class="muted small" x-text="m.artifactId"></code>
+                        <span class="badge small" x-show="m.packaging !== 'jar'" x-text="m.packaging"></span>
+                      </label>
+                    </template>
+                    <p class="muted small" x-show="moreModules()" x-text="moreModules() + ' more; refine the filter'"></p>
+                    <p class="muted small" x-show="!modules.length">No modules yet. Discover them, or type them as extra arguments.</p>
+                  </div>
+                  <p class="small" x-show="rform.selected.length">
+                    <span class="muted">Selected:</span> <code x-text="rform.selected.join(', ')"></code>
+                  </p>
+                </div>
+              </fieldset>
+
+              <fieldset x-show="skipPresets.length">
+                <legend>Skip</legend>
+                <div class="row wrap">
+                  <template x-for="sp in skipPresets" :key="sp.id">
+                    <label class="radio" :title="sp.args.join(' ') + (sp.note ? ' — ' + sp.note : '')">
+                      <input type="checkbox" :checked="rform.skips.includes(sp.id)" @change="toggleSkip(sp.id)"> <span x-text="sp.label || sp.id"></span>
+                    </label>
+                  </template>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Options</legend>
+                <div class="row wrap">
+                  <label class="radio" title="-o"><input type="checkbox" x-model="rform.offline" @change="refreshPreview()"> Offline</label>
+                  <label class="radio" title="-nsu"><input type="checkbox" x-model="rform.nsu" @change="refreshPreview()"> No snapshot updates</label>
+                  <label class="radio" title="-ntp"><input type="checkbox" x-model="rform.ntp" @change="refreshPreview()"> No transfer progress</label>
+                  <label class="radio" title="-e"><input type="checkbox" x-model="rform.errors" @change="refreshPreview()"> Error details</label>
+                </div>
+                <div class="row wrap">
+                  <label class="inline"><span>Threads <code>-T</code></span>
+                    <input class="short" x-model="rform.threads" placeholder="1C" @input.debounce.250ms="refreshPreview()"></label>
+                  <label class="inline">On failure
+                    <select x-model="rform.failMode" @change="refreshPreview()">
+                      <option value="">Maven default</option>
+                      <option value="fast">Stop at once (-ff)</option>
+                      <option value="end">Fail at end (-fae)</option>
+                      <option value="never">Never fail (-fn)</option>
+                    </select></label>
+                  <label class="inline">Log
+                    <select x-model="rform.logLevel" @change="refreshPreview()">
+                      <option value="default">Normal</option>
+                      <option value="quiet">Quiet (-q)</option>
+                      <option value="debug">Debug (-X)</option>
+                    </select></label>
+                </div>
+              </fieldset>
+
+              <label><span>Maven profiles <code>-P</code> <span class="muted">(comma or space separated; !id turns one off)</span></span>
+                <input x-model="rform.profiles" list="known-profiles" placeholder="fast,!slow" @input.debounce.250ms="refreshPreview()">
+              </label>
+              <datalist id="known-profiles">
+                <template x-for="p in knownProfiles()" :key="p"><option :value="p"></option></template>
+              </datalist>
+              <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
+                <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
+              </label>
+              <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
+                <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
+              </label>
+
+              <div class="preview" x-show="rpreview">
+                <div class="row spread">
+                  <span class="muted small">Command <span x-show="rpreview?.javaHome" x-text="'· JAVA_HOME=' + rpreview?.javaHome"></span></span>
+                  <button type="button" class="link small" @click="copyCommand()" x-text="copied ? 'Copied' : 'Copy'"></button>
+                </div>
+                <pre class="cmd" x-text="rpreview ? shellJoin(rpreview.argv) : ''"></pre>
+              </div>
+              <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
+              <div class="row wrap">
+                <button class="primary" type="submit" :disabled="busy || !!rpreview?.error">Run</button>
+                <template x-if="editingTask">
+                  <span class="row">
+                    <button type="button" @click="updateTask()" :disabled="busy || !!rpreview?.error">Update task</button>
+                    <button type="button" @click="saveAsNew = true" x-show="!saveAsNew">Save as new task</button>
+                  </span>
+                </template>
+                <button type="button" x-show="!editingTask && !saveAsNew" @click="saveAsNew = true" :disabled="!!rpreview?.error">Save as task</button>
+                <span class="row" x-show="saveAsNew">
+                  <input x-model="taskName" placeholder="Task name, e.g. Fast core build" @keydown.enter.prevent="createTask()" x-effect="saveAsNew && $nextTick(() => $el.focus())">
+                  <button type="button" class="primary" @click="createTask()">Save</button>
+                  <button type="button" @click="saveAsNew = false">Cancel</button>
+                </span>
+              </div>
+            </form>
+          </div>
 
           <!-- History -->
           <div class="card" x-show="pview === 'history'">
@@ -158,7 +290,7 @@
 
             <div class="stack" x-show="ptab === 'general'">
               <label>Name <input x-model="pform.name" required></label>
-              <label>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span>
+              <label><span>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span></span>
                 <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
               </label>
             </div>
@@ -191,6 +323,28 @@
                   mvn <span class="muted" x-text="runtime?.tools.mvn ? '— ' + runtime.tools.mvn : '— not found'"></span></label>
                 <label class="radio"><input type="radio" value="custom" x-model="pform.execChoice"> Custom path</label>
                 <input x-show="pform.execChoice === 'custom'" x-model="pform.customPath" placeholder="/opt/maven/bin/mvn">
+              </fieldset>
+
+              <fieldset>
+                <legend>Skip presets</legend>
+                <p class="muted small">Checkboxes in the run form. Change the built-in ones or add project flags such as <code>-Ddremio.no-ui</code>.</p>
+                <table class="list presets">
+                  <thead><tr><th>Id</th><th>Label</th><th>Arguments</th><th></th></tr></thead>
+                  <tbody>
+                    <template x-for="(sp, i) in pform.presets" :key="i">
+                      <tr>
+                        <td><input class="short" x-model="sp.id" :readonly="!!sp.builtin"></td>
+                        <td><input x-model="sp.label"></td>
+                        <td><input x-model="sp.argsText" placeholder="-Dsome.skip"></td>
+                        <td><button type="button" class="small danger" @click="pform.presets.splice(i, 1)">Remove</button></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div class="row">
+                  <button type="button" class="small" @click="pform.presets.push({id: '', label: '', argsText: '', builtin: false})">Add preset</button>
+                  <button type="button" class="small" @click="resetPresets()">Reset to built-in</button>
+                </div>
               </fieldset>
 
               <label>JDK for Maven

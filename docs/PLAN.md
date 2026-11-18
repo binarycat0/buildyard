@@ -411,17 +411,17 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | POST | `/api/projects` | Add `{name, rootPath}`: detect the build system |
 | GET / PATCH / DELETE | `/api/projects/{id}` | A project and its settings (`executable`, `jdkId`, `toolJdkId`, `env`, `skipPresets`) |
 | GET | `/api/projects/{id}/runtime` | Which executable and JDK a run will use and why; whether `./mvnw` exists |
-| GET | `/api/projects/{id}/modules` | Module tree |
-| POST | `/api/projects/{id}/modules/refresh` | Rediscover modules (background task) |
+| GET | `/api/projects/{id}/modules` | Modules in reactor order (name, packaging, active profiles), the project's skip presets merged with the built-in ones, and the built-in ones |
+| POST | `/api/projects/{id}/modules/refresh` | Rediscover modules with `{spec}`'s profiles, skips and properties → `202 {task}` |
 | GET | `/api/projects/{id}/packages?node=&module=` | Children of a package tree node |
 | POST | `/api/projects/{id}/packages/rescan` | Rescan packages (background task) |
 | GET | `/api/projects/{id}/changes?base=` | Changed files and modules |
-| GET / POST | `/api/projects/{id}/profiles` | The project's run profiles |
+| GET / POST | `/api/projects/{id}/profiles` | The project's run profiles ("tasks" in the UI) `{name, spec, pinned}`, with their last job |
 | PUT / DELETE | `/api/profiles/{id}` | Update or delete a profile |
 | GET / POST | `/api/projects/{id}/commands` | Arbitrary project commands |
 | POST | `/api/projects/{id}/preview` | `{spec}` → `{argv, dir, javaHome, env, error}` without running |
 | GET | `/api/projects/{id}/jobs?limit=` | The project's job history, newest first |
-| POST | `/api/projects/{id}/jobs` | Run: `{spec}` (later also `{profileId}`) → `201 job` |
+| POST | `/api/projects/{id}/jobs` | Run: `{spec}` or `{profileId}` → `201 job` |
 | GET | `/api/jobs/{id}` | A job (with `liveLines` while running); later its modules and problems |
 | POST | `/api/jobs/{id}/cancel` | Cancel |
 | POST | `/api/jobs/{id}/rerun` | Rerun with the same RunSpec snapshot |
@@ -528,9 +528,10 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
    - Job screen with a plain log, history. The project screen gets Run / History / Settings tabs.
    - Checked by `internal/runner` and `internal/httpapi` tests: cancel kills a parent and children that ignore SIGTERM; a subscriber that joins mid-run gets every line exactly once; two jobs of one project run one after another while another project runs in parallel.
    - **Done when:** a test script that spawns a child process is cancelled with no processes left (automated test); a browser opened mid-job receives the whole log; two jobs of one project run sequentially.
-3. **Maven adapter and profiles**
-   - Module discovery through Maven (background task), tree with checkboxes.
-   - RunSpec → argv, preview, skip presets, run profiles, log level.
+3. **Maven adapter and profiles** — **done 2026-11-18** (checked on `testdata/sample-maven` with real Maven; the Dremio check is left to the user)
+   - Module discovery through Maven (background task), module list with checkboxes and a filter. Without directories (phase 4) it is a flat list in reactor order, not a tree.
+   - RunSpec → argv, preview, skip presets (editable per project, stored as changes to the built-in ones), run profiles, log level.
+   - The UI calls run profiles **tasks**, because "profile" already means a Maven `-P` profile. Pinned tasks come first. `spec.executable` and `spec.env` overrides are not in the form yet.
    - **Done when:** on a large project (e.g. Dremio) you can pick 2 modules + `-am` + skip tests, see the command, run it, save it as a profile and rerun it in 1 click; table tests for the command builder are green.
 4. **Events, timings, logs** (end of MVP)
    - The production extension and its embedding, `job_module`, n/m progress, per-module bars.

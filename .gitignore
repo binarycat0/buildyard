@@ -2,3 +2,4 @@
 /dist/
 # built by `make ext` from maven-ext/ (phase 4)
 /internal/ext/*.jar
+/testdata/sample-maven/**/target/
