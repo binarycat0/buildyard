@@ -179,3 +179,16 @@ pre.cmd.full { max-height: 60vh; overflow: auto; }
 .tag.prof { border-color: #b08bd9; color: #7d4fb3; }
 .tag.dim { color: var(--muted); }
 @media (prefers-color-scheme: dark) { .tag.prof { color: #c6a6ef; } }
+
+/* Projects table on the home page */
+.card.flush { padding: 0; overflow-x: auto; }
+table.projects th:first-child, table.projects td:first-child { padding-left: 14px; }
+table.projects tbody tr:last-child td { border-bottom: none; }
+table.projects .pname { font-weight: 600; }
+table.projects .path { display: inline-block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+table.projects .actions { text-align: right; white-space: nowrap; }
+table.projects .actions > * { margin-left: 4px; }
+.nowrap { white-space: nowrap; }
+table.projects .pname { white-space: nowrap; }
+table.projects .path { max-width: 340px; }
+table.projects .actions .button, table.projects .actions button { padding: 3px 10px; font-size: .85em; }
