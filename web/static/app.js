@@ -1259,6 +1259,10 @@ document.addEventListener('alpine:init', () => {
       const total = this.jobMods.length;
       const done = this.modsWith('succeeded', 'failed', 'skipped', 'cancelled').length;
       const parts = [`${done} of ${total} modules`];
+      // Building modules come and go every second: a count keeps the card still (the
+      // tree shows which ones, and the title lists them).
+      const running = this.modsWith('running').length;
+      if (running) parts.push(`${running} building`);
       const failed = this.modsWith('failed').length;
       if (failed) parts.push(`${failed} failed`);
       const skipped = this.modsWith('skipped').length;
