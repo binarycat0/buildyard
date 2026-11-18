@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -124,5 +125,53 @@ func TestSavedTasks(t *testing.T) {
 	decodeInto(call("GET", "/api/jobs/"+strconv.FormatInt(j.ID, 10), ""), &job)
 	if job.ProfileID != nil || !strings.Contains(string(job.Spec), `":core"`) {
 		t.Fatalf("job after task delete: %+v", job)
+	}
+}
+
+// With the extension, discovery stores folders, aggregators and dependencies.
+func TestModuleDiscoveryTree(t *testing.T) {
+	srv, _ := newTestServer(t, t.TempDir())
+	srv.ExtJar = "/opt/buildyard/ext.jar"
+	h := srv.Handler()
+	call := func(method, path, body string) *httptest.ResponseRecorder {
+		return do(t, h, req{method: method, path: path, body: body})
+	}
+	fixture, _ := filepath.Abs("../../testdata/maven-logs/07-active-profiles.log")
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<project/>"), 0o644)
+	// Like the extension: write the session event to the file named by -Dbuildyard.events.
+	os.WriteFile(filepath.Join(root, "mvnw"), []byte(`#!/bin/sh
+for a in "$@"; do
+  case "$a" in
+    -Dmaven.ext.class.path=*) echo "$a" > "`+root+`/ext" ;;
+    -Dbuildyard.events=*) ev="${a#-Dbuildyard.events=}" ;;
+  esac
+done
+R="`+root+`"
+printf '{"t":"session","projects":[{"key":"demo:demo-parent","dir":"%s","deps":[]},{"key":"demo:demo-core","dir":"%s/core","aggregator":"demo:demo-parent","deps":["demo:demo-parent"]},{"key":"demo:demo-app","dir":"%s/app","aggregator":"demo:demo-parent","deps":["demo:demo-parent","demo:demo-core"]},{"key":"demo:demo-extra","dir":"%s/extra","aggregator":"demo:demo-parent","deps":[]}]}\n' "$R" "$R" "$R" "$R" > "$ev"
+cat "`+fixture+`"
+`), 0o755)
+	var p store.Project
+	decodeInto(call("POST", "/api/projects", `{"rootPath":"`+root+`"}`), &p)
+	pid := strconv.FormatInt(p.ID, 10)
+	var task tasks.Task
+	decodeInto(call("POST", "/api/projects/"+pid+"/modules/refresh", ""), &task)
+	deadline := time.Now().Add(10 * time.Second)
+	for task.Status != tasks.Succeeded && task.Status != tasks.Failed && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+		decodeInto(call("GET", "/api/tasks/"+strconv.FormatInt(task.ID, 10), ""), &task)
+	}
+	if task.Status != tasks.Succeeded || !strings.Contains(fmt.Sprint(task.Result), "tree:true") {
+		t.Fatalf("task: %+v", task)
+	}
+	if ext, _ := os.ReadFile(filepath.Join(root, "ext")); strings.TrimSpace(string(ext)) != "-Dmaven.ext.class.path=/opt/buildyard/ext.jar" {
+		t.Fatalf("ext arg: %q", ext)
+	}
+	var mods modulesResponse
+	decodeInto(call("GET", "/api/projects/"+pid+"/modules", ""), &mods)
+	app := mods.Modules[2]
+	if mods.Modules[0].RelPath != "" || app.RelPath != "app" || app.Aggregator != "demo:demo-parent" ||
+		strings.Join(app.Deps, ",") != "demo:demo-parent,demo:demo-core" {
+		t.Fatalf("modules: %+v", mods.Modules)
 	}
 }

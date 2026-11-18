@@ -24,12 +24,14 @@ func (m Module) Key() string { return m.GroupID + ":" + m.ArtifactID }
 // help:active-profiles prints every module with its active profiles and runs no
 // lifecycle plugins (5.5 s for Dremio's 952 modules, see docs/SPIKE.md). The spec's
 // profiles, skips and properties are passed because they can add or remove modules.
-func DiscoverArgs(spec RunSpec, presets []SkipPreset, offline bool) []string {
+// extArgs (see ExtArgs) add module folders and dependencies through the extension.
+func DiscoverArgs(spec RunSpec, presets []SkipPreset, offline bool, extArgs []string) []string {
 	args := []string{"-B"}
 	if offline {
 		args = append(args, "-o")
 	}
 	args = append(args, spec.selectionArgs(presets)...)
+	args = append(args, extArgs...)
 	return append(args, "help:active-profiles")
 }
 

@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +50,7 @@ type discoveryResult struct {
 	Modules int      `json:"modules"`
 	Argv    []string `json:"argv"`
 	Offline bool     `json:"offline"`
+	Tree    bool     `json:"tree"` // folders and dependencies came from the extension
 	Seconds float64  `json:"seconds"`
 }
 
@@ -104,21 +107,27 @@ func (s *Server) discover(ctx context.Context, p store.Project, spec maven.RunSp
 	// Offline first: fast and no network. If the help plugin is not in the local
 	// repository yet, retry once online.
 	for _, offline := range []bool{true, false} {
-		argv := append([]string{exe}, maven.DiscoverArgs(spec, presets, offline)...)
+		events := ""
+		if s.ExtJar != "" {
+			f, err := os.CreateTemp("", "buildyard-discovery-*.jsonl")
+			if err != nil {
+				return discoveryResult{}, err
+			}
+			f.Close()
+			events = f.Name()
+			defer os.Remove(events)
+		}
+		argv := append([]string{exe}, maven.DiscoverArgs(spec, presets, offline, maven.ExtArgs(s.ExtJar, events))...)
 		c := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		c.Dir, c.Env = cmd.Dir, cmd.Env
 		out, err := c.CombinedOutput()
 		mods := maven.ParseDiscovery(out)
 		if err == nil && len(mods) > 0 {
-			stored := make([]store.Module, len(mods))
-			for i, m := range mods {
-				stored[i] = store.Module{GroupID: m.GroupID, ArtifactID: m.ArtifactID, Name: m.Name,
-					Packaging: m.Packaging, Profiles: m.Profiles}
-			}
+			stored, tree := mergeSession(p.RootPath, mods, readSession(events))
 			if err := s.Store.ReplaceModules(ctx, p.ID, stored, "maven"); err != nil {
 				return discoveryResult{}, err
 			}
-			return discoveryResult{Modules: len(mods), Argv: argv, Offline: offline,
+			return discoveryResult{Modules: len(mods), Argv: argv, Offline: offline, Tree: tree,
 				Seconds: time.Since(start).Round(100 * time.Millisecond).Seconds()}, nil
 		}
 		lastOut, lastErr = out, err
@@ -130,6 +139,46 @@ func (s *Server) discover(ctx context.Context, p store.Project, spec maven.RunSp
 		lastErr = errors.New("no modules in the output")
 	}
 	return discoveryResult{}, fmt.Errorf("%v\n%s", lastErr, tail(lastOut, 25))
+}
+
+func readSession(path string) *maven.Session {
+	if path == "" {
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	return maven.ReadSession(f)
+}
+
+// mergeSession adds folders, aggregators and dependencies from the extension's session
+// event to the modules listed by help:active-profiles. Without the event (the extension
+// did not load, e.g. a build tool that ignores maven.ext.class.path) the list stays flat.
+func mergeSession(root string, mods []maven.Module, sess *maven.Session) ([]store.Module, bool) {
+	byKey := map[string]maven.SessionProject{}
+	if sess != nil {
+		for _, sp := range sess.Projects {
+			byKey[sp.Key] = sp
+		}
+	}
+	out := make([]store.Module, len(mods))
+	for i, m := range mods {
+		sm := store.Module{GroupID: m.GroupID, ArtifactID: m.ArtifactID, Name: m.Name, Packaging: m.Packaging, Profiles: m.Profiles}
+		if sp, ok := byKey[m.Key()]; ok {
+			if rel, err := filepath.Rel(root, sp.Dir); err == nil && !strings.HasPrefix(rel, "..") {
+				if rel == "." {
+					rel = ""
+				}
+				sm.RelPath = filepath.ToSlash(rel)
+			}
+			sm.Aggregator = sp.Aggregator
+			sm.Deps = sp.Deps
+		}
+		out[i] = sm
+	}
+	return out, len(byKey) > 0
 }
 
 // tail returns the last n lines of the output, without Maven's download noise.

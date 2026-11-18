@@ -86,6 +86,10 @@ const logView = {
   },
 };
 
+// Module graphs per module list, kept outside Alpine so building them does not
+// write reactive state during rendering.
+const graphCache = new WeakMap();
+
 let stream = null;
 let ticker = 0;
 
@@ -190,6 +194,8 @@ document.addEventListener('alpine:init', () => {
     skipPresets: [],
     defaultPresets: [],
     moduleFilter: '',
+    moduleInfo: null,
+    openState: {},
     discoverTask: null,
     discoverError: '',
     profiles: [],
@@ -323,6 +329,8 @@ document.addEventListener('alpine:init', () => {
       this.runError = '';
       this.discoverError = '';
       this.moduleFilter = '';
+      this.moduleInfo = null;
+      this.openState = {};
       this.refreshPreview();
       // First visit: list the modules in the background.
       if (!this.modules.length && !this.discoverTask) this.discover();
@@ -403,30 +411,165 @@ document.addEventListener('alpine:init', () => {
       return dup ? m.key : ':' + m.artifactId;
     },
 
+    hasTree() {
+      return this.modules.some((m) => m.aggregator);
+    },
+
+    // Rebuilt when modules change: lookups and the aggregator / dependency graphs.
+    graph() {
+      const cached = graphCache.get(this.modules);
+      if (cached) return cached;
+      const byKey = new Map(this.modules.map((m) => [m.key, m]));
+      const kids = new Map();
+      const users = new Map();
+      for (const m of this.modules) {
+        if (m.aggregator && byKey.has(m.aggregator)) {
+          if (!kids.has(m.aggregator)) kids.set(m.aggregator, []);
+          kids.get(m.aggregator).push(m);
+        }
+        for (const d of m.deps || []) {
+          if (!users.has(d)) users.set(d, []);
+          users.get(d).push(m.key);
+        }
+      }
+      const roots = this.modules.filter((m) => !m.aggregator || !byKey.has(m.aggregator));
+      const g = { byKey, kids, users, roots };
+      graphCache.set(this.modules, g);
+      return g;
+    },
+
+    // Keys reachable through deps (up) or users (down), not including the start keys.
+    closure(keys, dir) {
+      const g = this.graph();
+      const seen = new Set();
+      const stack = [...keys];
+      while (stack.length) {
+        const k = stack.pop();
+        const next = dir === 'up' ? (g.byKey.get(k)?.deps || []) : (g.users.get(k) || []);
+        for (const n of next) {
+          if (!seen.has(n)) {
+            seen.add(n);
+            stack.push(n);
+          }
+        }
+      }
+      for (const k of keys) seen.delete(k);
+      return seen;
+    },
+
+    subtree(m) {
+      const g = this.graph();
+      const out = [];
+      const walk = (x) => {
+        out.push(x);
+        for (const c of g.kids.get(x.key) || []) walk(c);
+      };
+      walk(m);
+      return out;
+    },
+
+    refToKey(ref) {
+      if (!ref.startsWith(':')) return ref;
+      return this.modules.find((m) => m.artifactId === ref.slice(1))?.key ?? ref;
+    },
+
+    selectedKeys() {
+      return this.rform.selected.map((r) => this.refToKey(r));
+    },
+
+    impactText() {
+      const keys = this.selectedKeys();
+      const parts = [];
+      if (this.rform.alsoMake) parts.push(`-am adds ${this.plural(this.closure(keys, 'up').size, 'module')}`);
+      if (this.rform.alsoMakeDependents) parts.push(`-amd adds ${this.plural(this.closure(keys, 'down').size, 'module')}`);
+      return parts.length ? `${parts.join(', ')} to the build.` : '';
+    },
+
+    plural(n, word) {
+      return `${n} ${word}${n === 1 ? '' : 's'}`;
+    },
+
+    infoFor(key) {
+      const g = this.graph();
+      const m = g.byKey.get(key);
+      if (!m) return null;
+      const named = (keys) => keys.map((k) => g.byKey.get(k) || { key: k, name: k });
+      return {
+        m,
+        deps: named(m.deps || []),
+        users: named(g.users.get(key) || []),
+        upAll: this.closure([key], 'up').size,
+        downAll: this.closure([key], 'down').size,
+      };
+    },
+
+    // Rows to render: the aggregator tree (top level open by default), or a flat list
+    // when filtering or when discovery had no folder information.
+    shownRows() {
+      const q = this.moduleFilter.trim().toLowerCase();
+      if (q || !this.hasTree()) {
+        return this.filteredModules().slice(0, 300).map((m) => ({ m, depth: 0, kids: 0, open: false, flat: true }));
+      }
+      const g = this.graph();
+      const rows = [];
+      const walk = (m, depth) => {
+        const kids = g.kids.get(m.key) || [];
+        const open = this.isOpen(m.key, depth);
+        rows.push({ m, depth, kids: kids.length, open });
+        if (open) for (const c of kids) walk(c, depth + 1);
+      };
+      for (const r of g.roots) walk(r, 0);
+      return rows;
+    },
+
+    isOpen(key, depth) {
+      return key in this.openState ? this.openState[key] : depth === 0;
+    },
+
+    toggleOpen(key) {
+      const depth = this.shownRows().find((r) => r.m.key === key)?.depth ?? 1;
+      this.openState = { ...this.openState, [key]: !this.isOpen(key, depth) };
+    },
+
+    setAllOpen(open) {
+      const st = {};
+      for (const k of this.graph().kids.keys()) st[k] = open;
+      this.openState = st;
+    },
+
     filteredModules() {
       const q = this.moduleFilter.trim().toLowerCase();
       if (!q) return this.modules;
-      return this.modules.filter((m) => m.name.toLowerCase().includes(q) || m.key.toLowerCase().includes(q));
-    },
-
-    shownModules() {
-      return this.filteredModules().slice(0, 300);
+      return this.modules.filter((m) => m.name.toLowerCase().includes(q) || m.key.toLowerCase().includes(q) || (m.relPath || '').toLowerCase().includes(q));
     },
 
     moreModules() {
+      const q = this.moduleFilter.trim();
+      if (!q && this.hasTree()) return 0;
       return Math.max(0, this.filteredModules().length - 300);
     },
 
-    toggleModule(m) {
-      const ref = this.moduleRef(m);
-      const sel = this.rform.selected;
-      this.rform.selected = sel.includes(ref) ? sel.filter((x) => x !== ref) : [...sel, ref];
-      this.rform.modulesMode = 'selected';
+    // all | some | none for a row: a parent counts its whole subtree.
+    checkState(r) {
+      const sel = new Set(this.selectedKeys());
+      const keys = r.kids && !r.flat ? this.subtree(r.m).map((m) => m.key) : [r.m.key];
+      const n = keys.filter((k) => sel.has(k)).length;
+      return n === 0 ? 'none' : n === keys.length ? 'all' : 'some';
+    },
+
+    // Ticking a tree parent ticks everything under it.
+    toggleModule(r) {
+      const group = r.kids && !r.flat ? this.subtree(r.m) : [r.m];
+      const refs = group.map((m) => this.moduleRef(m));
+      const on = this.checkState(r) !== 'all';
+      const sel = this.rform.selected.filter((x) => !refs.includes(x));
+      this.rform.selected = on ? [...sel, ...refs] : sel;
+      if (this.rform.selected.length) this.rform.modulesMode = 'selected';
       this.refreshPreview();
     },
 
     selectShown() {
-      const add = this.shownModules().map((m) => this.moduleRef(m)).filter((r) => !this.rform.selected.includes(r));
+      const add = this.shownRows().map((r) => this.moduleRef(r.m)).filter((x) => !this.rform.selected.includes(x));
       this.rform.selected = [...this.rform.selected, ...add];
       this.refreshPreview();
     },

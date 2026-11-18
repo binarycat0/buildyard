@@ -106,8 +106,22 @@ func TestParseDiscovery(t *testing.T) {
 func TestDiscoverArgs(t *testing.T) {
 	s := RunSpec{Goals: []string{"install"}, Profiles: []string{"x"}, Skips: []string{"tests"},
 		Modules: Modules{Mode: "selected", List: []string{":a"}}, ExtraArgs: []string{"-q"}}.Normalize()
-	got := strings.Join(DiscoverArgs(s, DefaultSkipPresets(), true), " ")
-	if got != "-B -o -P x -DskipTests help:active-profiles" {
+	got := strings.Join(DiscoverArgs(s, DefaultSkipPresets(), true, ExtArgs("/e.jar", "/ev")), " ")
+	if got != "-B -o -P x -DskipTests -Dmaven.ext.class.path=/e.jar -Dbuildyard.events=/ev help:active-profiles" {
 		t.Fatal(got)
+	}
+}
+
+func TestReadSession(t *testing.T) {
+	in := `{"t":"project_start","key":"a:b"}
+not json
+{"t":"session","ts":1,"root":"/r","projects":[{"key":"g:p","name":"P","packaging":"pom","dir":"/r","deps":[]},{"key":"g:c","name":"C","packaging":"jar","dir":"/r/c","aggregator":"g:p","parent":"g:p","deps":["g:p"]}]}
+`
+	s := ReadSession(strings.NewReader(in))
+	if s == nil || s.Root != "/r" || len(s.Projects) != 2 || s.Projects[1].Aggregator != "g:p" || s.Projects[1].Deps[0] != "g:p" {
+		t.Fatalf("%+v", s)
+	}
+	if ReadSession(strings.NewReader("{}\n")) != nil {
+		t.Fatal("no session expected")
 	}
 }
