@@ -8,7 +8,7 @@ import (
 
 // Problem is something that went wrong in a build, found in its log.
 type Problem struct {
-	Kind    string `json:"kind"`    // compile | test | goal | dependency
+	Kind    string `json:"kind"`    // crash | compile | test | goal | dependency
 	Module  string `json:"module"`  // artifactId, when known
 	File    string `json:"file"`    // source file (compile)
 	Line    int    `json:"line"`    // line in the file (compile) or test source (test)
@@ -57,6 +57,9 @@ var (
 	goalRe     = regexp.MustCompile(`^Failed to execute goal (?:(\S+) (\([^)]*\) ))?on project ([\w.-]+): (.+)$`)
 	testHdrRe  = regexp.MustCompile(`^(Failures|Errors|Failed tests|Tests in error):\s*$`)
 	testItemRe = regexp.MustCompile(`^\s{2,}(?:Run \d+: )?([\w.$]+?)(?::(\d+))?(?:\s+»\s+|\s+|$)(.*)$`)
+	// The build tool itself died: an uncaught exception in its main thread (mvnd's client
+	// losing its daemon prints only this, no [ERROR]) or a JVM fatal error.
+	crashRe = regexp.MustCompile(`^Exception in thread "main" ([\w.$]+)(?:: (.*))?$`)
 )
 
 // Line parses log line n (1-based). It returns new problems and whether the module list
@@ -128,6 +131,15 @@ func (p *LogParser) Line(n int, text string) (problems []Problem, modulesChanged
 	}
 	if m := buildingRe.FindStringSubmatch(body); m != nil {
 		return nil, p.start(thread, strings.TrimSpace(m[1]))
+	}
+	if level == "" && thread == "" {
+		if m := crashRe.FindStringSubmatch(body); m != nil {
+			name := m[1][strings.LastIndexAny(m[1], ".$")+1:]
+			return p.add(Problem{Kind: "crash", Message: clip(strings.TrimSpace(name + ": " + m[2])), LogLine: n}), false
+		}
+		if strings.HasPrefix(body, "# A fatal error has been detected by the Java Runtime") {
+			return p.add(Problem{Kind: "crash", Message: "The JVM crashed (fatal error)", LogLine: n}), false
+		}
 	}
 	if level != "ERROR" {
 		return nil, false

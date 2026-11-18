@@ -12,6 +12,17 @@ const importantRe = [
   /^Total time:/,
   /^Failed to execute goal/,
   /^(COMPILATION ERROR|Compilation failure)/,
+  /^-{5,} .+ -{5,}$/, // mvnd: ----- Last 200 lines from daemon log file ... -----
+];
+
+// Lines without a level that still report a failure: a JVM or build-tool crash (mvnd's
+// daemon dying prints only this, with no [ERROR] line at all). Its "Caused by:" and
+// stack lines follow without a level, so they continue the error.
+const crashRe = [
+  /^Exception in thread "/,
+  /daemon may have crashed/i,
+  /^# A fatal error has been detected by the Java Runtime/,
+  /^java\.lang\.OutOfMemoryError/,
 ];
 
 export class LineClassifier {
@@ -27,6 +38,12 @@ export class LineClassifier {
     if (m) {
       level = { ERROR: 'error', WARNING: 'warn', WARN: 'warn', INFO: 'info', DEBUG: 'debug' }[m[1]];
       msg = text.slice(m[0].length);
+      this.prev = level;
+    } else if (crashRe.some((re) => re.test(text))) {
+      level = 'error';
+      this.prev = level; // the stack trace below continues it
+    } else if (/^-{5,} .+ -{5,}$/.test(text.trim())) {
+      level = 'plain'; // a banner (mvnd's daemon log tail) ends a stack trace
       this.prev = level;
     } else {
       level = this.prev === 'error' || this.prev === 'warn' ? this.prev : 'plain';
