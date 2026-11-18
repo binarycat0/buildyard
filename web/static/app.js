@@ -94,6 +94,57 @@ function closeStream() {
   stream = null;
 }
 
+function emptyForm() {
+  return {
+    goals: 'clean install', args: '', modulesMode: 'all', selected: [], alsoMake: true, alsoMakeDependents: false,
+    skips: [], offline: false, nsu: false, ntp: true, errors: false, threads: '', failMode: '', logLevel: 'default',
+    profiles: '', props: '',
+  };
+}
+
+// RunSpec <-> run form.
+function specToForm(spec) {
+  const f = emptyForm();
+  if (!spec) return f;
+  const m = spec.modules || {};
+  const fl = spec.flags || {};
+  return {
+    goals: (spec.goals || []).join(' '),
+    args: (spec.extraArgs || []).map(shellQuote).join(' '),
+    modulesMode: m.mode === 'selected' ? 'selected' : 'all',
+    selected: [...(m.list || [])],
+    alsoMake: m.mode === 'selected' ? !!m.alsoMake : true,
+    alsoMakeDependents: !!m.alsoMakeDependents,
+    skips: [...(spec.skips || [])],
+    offline: !!fl.offline, nsu: !!fl.noSnapshotUpdates, ntp: spec.flags ? !!fl.noTransferProgress : true,
+    errors: !!fl.errors, threads: fl.threads || '', failMode: fl.failMode || '', logLevel: spec.logLevel || 'default',
+    profiles: (spec.profiles || []).join(','),
+    props: Object.entries(spec.properties || {}).map(([k, v]) => (v === '' ? k : `${k}=${v}`)).join('\n'),
+  };
+}
+
+function formToSpec(f) {
+  const properties = {};
+  for (const raw of f.props.split('\n')) {
+    const line = raw.trim().replace(/^-D/, '');
+    if (!line) continue;
+    const i = line.indexOf('=');
+    if (i < 0) properties[line] = '';
+    else properties[line.slice(0, i).trim()] = line.slice(i + 1);
+  }
+  return {
+    kind: 'maven',
+    goals: splitArgs(f.goals),
+    modules: { mode: f.modulesMode, list: f.modulesMode === 'selected' ? f.selected : [], alsoMake: f.alsoMake, alsoMakeDependents: f.alsoMakeDependents },
+    profiles: f.profiles.split(/[\s,]+/).filter(Boolean),
+    skips: f.skips,
+    properties,
+    flags: { offline: f.offline, noSnapshotUpdates: f.nsu, threads: f.threads.trim(), noTransferProgress: f.ntp, failMode: f.failMode, errors: f.errors },
+    logLevel: f.logLevel,
+    extraArgs: splitArgs(f.args),
+  };
+}
+
 function envToText(env) {
   return Object.entries(env || {}).map(([k, v]) => `${k}=${v}`).join('\n');
 }
@@ -133,7 +184,19 @@ document.addEventListener('alpine:init', () => {
     pview: 'run',
     pjobs: [],
     commonGoals: ['clean', 'compile', 'test', 'package', 'verify', 'install'],
-    rform: { goals: 'clean install', args: '' },
+    rform: emptyForm(),
+    modules: [],
+    modulesAt: null,
+    skipPresets: [],
+    defaultPresets: [],
+    moduleFilter: '',
+    discoverTask: null,
+    discoverError: '',
+    profiles: [],
+    editingTask: null,
+    saveAsNew: false,
+    taskName: '',
+    copied: false,
     rpreview: null,
     runError: '',
 
@@ -245,18 +308,24 @@ document.addEventListener('alpine:init', () => {
 
     // ---------- project settings ----------
     async loadProject(id) {
-      const [p, runtime, jdks, settings, tools, pjobs] = await Promise.all([
+      const [p, runtime, jdks, settings, tools, pjobs, mods, profiles] = await Promise.all([
         api('GET', `/projects/${id}`), api('GET', `/projects/${id}/runtime`),
         api('GET', '/jdks'), api('GET', '/settings'), api('GET', '/tools'), api('GET', `/projects/${id}/jobs`),
+        api('GET', `/projects/${id}/modules`), api('GET', `/projects/${id}/profiles`),
       ]);
-      Object.assign(this, { proj: p, runtime, jdks, settings, tools, pjobs });
+      Object.assign(this, { proj: p, runtime, jdks, settings, tools, pjobs, profiles });
+      this.setModules(mods);
       // Start from the last run's spec.
       const last = pjobs.find((j) => j.spec?.goals?.length);
-      this.rform = last
-        ? { goals: last.spec.goals.join(' '), args: (last.spec.extraArgs || []).map(shellQuote).join(' ') }
-        : { goals: 'clean install', args: '' };
+      this.rform = specToForm(last?.spec);
+      this.editingTask = null;
+      this.saveAsNew = false;
       this.runError = '';
+      this.discoverError = '';
+      this.moduleFilter = '';
       this.refreshPreview();
+      // First visit: list the modules in the background.
+      if (!this.modules.length && !this.discoverTask) this.discover();
       const exe = p.executable ?? '';
       const known = ['', 'auto', 'wrapper', 'mvnd', 'mvn'].includes(exe);
       this.pform = {
@@ -265,6 +334,10 @@ document.addEventListener('alpine:init', () => {
         customPath: known ? '' : exe,
         jdkId: p.jdkId ?? 0,
         toolJdkId: p.toolJdkId ?? 0,
+        presets: this.skipPresets.map((sp) => ({
+          id: sp.id, label: sp.label, argsText: sp.args.join(' '),
+          builtin: this.defaultPresets.some((d) => d.id === sp.id),
+        })),
         envText: envToText(p.env),
       };
       this.pformError = '';
@@ -280,10 +353,12 @@ document.addEventListener('alpine:init', () => {
         if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Enter an absolute path to the executable');
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
           name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: Number(f.toolJdkId) || 0,
-          env: textToEnv(f.envText),
+          env: textToEnv(f.envText), skipPresets: this.presetDiff(f.presets),
         });
         this.proj = p;
         this.runtime = await api('GET', `/projects/${p.id}/runtime`);
+        this.setModules(await api('GET', `/projects/${p.id}/modules`));
+        this.rform.skips = this.rform.skips.filter((id) => this.skipPresets.some((sp) => sp.id === id));
         this.saved = true;
         this.refreshPreview();
       } catch (e) {
@@ -295,7 +370,197 @@ document.addEventListener('alpine:init', () => {
 
     // ---------- runs ----------
     spec() {
-      return { kind: 'maven', goals: splitArgs(this.rform.goals), extraArgs: splitArgs(this.rform.args) };
+      return formToSpec(this.rform);
+    },
+
+    specSummary(spec) {
+      const s = spec || {};
+      const parts = [...(s.goals || [])];
+      if (s.modules?.mode === 'selected') parts.push(`-pl ${(s.modules.list || []).join(',')}${s.modules.alsoMake ? ' -am' : ''}${s.modules.alsoMakeDependents ? ' -amd' : ''}`);
+      if (s.skips?.length) parts.push('skip ' + s.skips.join(','));
+      if (s.profiles?.length) parts.push('-P ' + s.profiles.join(','));
+      if (s.flags?.threads) parts.push('-T ' + s.flags.threads);
+      return parts.join(' · ');
+    },
+
+    // ---------- modules ----------
+    setModules(resp) {
+      this.modules = resp.modules;
+      this.modulesAt = resp.discoveredAt;
+      this.skipPresets = resp.skipPresets;
+      this.defaultPresets = resp.defaultPresets;
+    },
+
+    moduleStatus() {
+      if (this.discoverTask) return 'running mvn help:active-profiles…';
+      if (!this.modules.length) return 'modules not discovered yet';
+      return `${this.modules.length} modules · discovered ${this.when(this.modulesAt)}`;
+    },
+
+    // ":artifactId" when unique, else "groupId:artifactId".
+    moduleRef(m) {
+      const dup = this.modules.filter((x) => x.artifactId === m.artifactId).length > 1;
+      return dup ? m.key : ':' + m.artifactId;
+    },
+
+    filteredModules() {
+      const q = this.moduleFilter.trim().toLowerCase();
+      if (!q) return this.modules;
+      return this.modules.filter((m) => m.name.toLowerCase().includes(q) || m.key.toLowerCase().includes(q));
+    },
+
+    shownModules() {
+      return this.filteredModules().slice(0, 300);
+    },
+
+    moreModules() {
+      return Math.max(0, this.filteredModules().length - 300);
+    },
+
+    toggleModule(m) {
+      const ref = this.moduleRef(m);
+      const sel = this.rform.selected;
+      this.rform.selected = sel.includes(ref) ? sel.filter((x) => x !== ref) : [...sel, ref];
+      this.rform.modulesMode = 'selected';
+      this.refreshPreview();
+    },
+
+    selectShown() {
+      const add = this.shownModules().map((m) => this.moduleRef(m)).filter((r) => !this.rform.selected.includes(r));
+      this.rform.selected = [...this.rform.selected, ...add];
+      this.refreshPreview();
+    },
+
+    toggleSkip(id) {
+      const s = this.rform.skips;
+      this.rform.skips = s.includes(id) ? s.filter((x) => x !== id) : [...s, id];
+      this.refreshPreview();
+    },
+
+    knownProfiles() {
+      return [...new Set(this.modules.flatMap((m) => m.profiles))].sort();
+    },
+
+    async discover() {
+      const id = this.proj.id;
+      this.discoverError = '';
+      try {
+        this.discoverTask = await api('POST', `/projects/${id}/modules/refresh`, { spec: this.spec() });
+        const t = await waitTask(this.discoverTask.id, { timeout: 15 * 60 * 1000 });
+        if (this.proj?.id !== id) return;
+        if (t.status === 'failed') this.discoverError = 'Module discovery failed: ' + t.error;
+        this.setModules(await api('GET', `/projects/${id}/modules`));
+      } catch (e) {
+        this.discoverError = e.message;
+      } finally {
+        this.discoverTask = null;
+      }
+    },
+
+    // ---------- saved tasks ----------
+    async reloadTasks() {
+      this.profiles = await api('GET', `/projects/${this.proj.id}/profiles`);
+    },
+
+    editTask(t) {
+      this.editingTask = t;
+      this.saveAsNew = false;
+      this.rform = specToForm(t.spec);
+      this.refreshPreview();
+    },
+
+    stopEditing() {
+      this.editingTask = null;
+      this.saveAsNew = false;
+    },
+
+    async createTask() {
+      this.runError = '';
+      try {
+        const t = await api('POST', `/projects/${this.proj.id}/profiles`, { name: this.taskName, spec: this.spec() });
+        this.taskName = '';
+        this.saveAsNew = false;
+        await this.reloadTasks();
+        this.editingTask = this.profiles.find((x) => x.id === t.id) || t;
+      } catch (e) {
+        this.runError = e.message;
+      }
+    },
+
+    async updateTask() {
+      this.runError = '';
+      try {
+        const t = this.editingTask;
+        await api('PUT', `/profiles/${t.id}`, { name: t.name, pinned: t.pinned, spec: this.spec() });
+        await this.reloadTasks();
+        this.editingTask = this.profiles.find((x) => x.id === t.id) || null;
+      } catch (e) {
+        this.runError = e.message;
+      }
+    },
+
+    async togglePin(t) {
+      try {
+        await api('PUT', `/profiles/${t.id}`, { name: t.name, pinned: !t.pinned, spec: t.spec });
+        await this.reloadTasks();
+      } catch (e) {
+        this.runError = e.message;
+      }
+    },
+
+    async deleteTask(t) {
+      if (!confirm(`Delete task "${t.name}"? Its past runs stay in the history.`)) return;
+      try {
+        await api('DELETE', `/profiles/${t.id}`);
+        this.stopEditing();
+        await this.reloadTasks();
+      } catch (e) {
+        this.runError = e.message;
+      }
+    },
+
+    async runTask(t) {
+      this.busy = true;
+      try {
+        const j = await api('POST', `/projects/${this.proj.id}/jobs`, { profileId: t.id });
+        location.hash = `#/jobs/${j.id}`;
+      } catch (e) {
+        this.runError = `${t.name}: ${e.message}`;
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    async copyCommand() {
+      try {
+        await navigator.clipboard.writeText(this.shellJoin(this.rpreview.argv));
+        this.copied = true;
+        setTimeout(() => { this.copied = false; }, 1500);
+      } catch (e) {
+        this.runError = 'Copy failed: ' + e.message;
+      }
+    },
+
+    // Project presets are stored as changes to the built-in ones.
+    presetDiff(rows) {
+      const out = [];
+      const ids = new Set();
+      for (const r of rows) {
+        const id = r.id.trim();
+        if (!id) continue;
+        ids.add(id);
+        const args = splitArgs(r.argsText);
+        if (!args.length) throw new Error(`Skip preset "${id}" needs arguments`);
+        const d = this.defaultPresets.find((x) => x.id === id);
+        if (d && d.label === r.label && d.args.join(' ') === args.join(' ')) continue;
+        out.push({ id, label: r.label.trim() || id, args });
+      }
+      for (const d of this.defaultPresets) if (!ids.has(d.id)) out.push({ id: d.id, label: d.label, args: [] });
+      return out;
+    },
+
+    resetPresets() {
+      this.pform.presets = this.defaultPresets.map((sp) => ({ id: sp.id, label: sp.label, argsText: sp.args.join(' '), builtin: true }));
     },
 
     hasGoal(g) {

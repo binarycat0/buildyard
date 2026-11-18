@@ -85,9 +85,13 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if patch.SkipPresets != nil {
-		var arr []json.RawMessage
+		var arr []maven.SkipPreset
 		if json.Unmarshal(*patch.SkipPresets, &arr) != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "skipPresets must be a JSON array")
+			writeError(w, http.StatusBadRequest, "bad_request", "skipPresets must be a list of {id, label, args}")
+			return
+		}
+		if err := maven.ValidatePresets(arr); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
 	}
