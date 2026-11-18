@@ -1,0 +1,7 @@
+package demo.app;
+
+public class App {
+    public static void main(String[] args) {
+        System.out.println(demo.core.Core.hello());
+    }
+}

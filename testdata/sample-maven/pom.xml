@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Small reactor for Buildyard tests: core <- app, plus a module that only a profile adds. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>demo</groupId>
+  <artifactId>demo-parent</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>Demo Parent</name>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <modules>
+    <module>core</module>
+    <module>app</module>
+  </modules>
+
+  <profiles>
+    <profile>
+      <id>with-extra</id>
+      <modules>
+        <module>extra</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>ci</id>
+      <activation>
+        <property><name>ci</name></property>
+      </activation>
+    </profile>
+  </profiles>
+</project>

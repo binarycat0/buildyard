@@ -1,0 +1,4 @@
+/bin/
+/dist/
+/maven-ext/target/
+/testdata/sample-maven/**/target/

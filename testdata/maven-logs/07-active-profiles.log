@@ -1,0 +1,66 @@
+# buildyard fixture: help:active-profiles on testdata/sample-maven with -Pwith-extra -Dci (Maven 3.9.11, offline)
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Demo Parent                                                        [pom]
+[INFO] Demo Core                                                          [jar]
+[INFO] Demo App                                                           [jar]
+[INFO] Demo Extra                                                         [pom]
+[INFO] 
+[INFO] --------------------------< demo:demo-parent >--------------------------
+[INFO] Building Demo Parent 1.0-SNAPSHOT                                  [1/4]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- help:3.6.0:active-profiles (default-cli) @ demo-parent ---
+[INFO] 
+Active Profiles for Project 'demo:demo-parent:pom:1.0-SNAPSHOT':
+
+The following profiles are active:
+
+ - with-extra (source: demo:demo-parent:1.0-SNAPSHOT)
+ - ci (source: demo:demo-parent:1.0-SNAPSHOT)
+
+
+
+Active Profiles for Project 'demo:demo-core:jar:1.0-SNAPSHOT':
+
+The following profiles are active:
+
+ - with-extra (source: demo:demo-parent:1.0-SNAPSHOT)
+ - ci (source: demo:demo-parent:1.0-SNAPSHOT)
+
+
+
+Active Profiles for Project 'demo:demo-app:jar:1.0-SNAPSHOT':
+
+The following profiles are active:
+
+ - with-extra (source: demo:demo-parent:1.0-SNAPSHOT)
+ - ci (source: demo:demo-parent:1.0-SNAPSHOT)
+
+
+
+Active Profiles for Project 'demo:demo-extra:pom:1.0-SNAPSHOT':
+
+The following profiles are active:
+
+ - with-extra (source: demo:demo-parent:1.0-SNAPSHOT)
+ - ci (source: demo:demo-parent:1.0-SNAPSHOT)
+
+
+
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Demo Parent 1.0-SNAPSHOT:
+[INFO] 
+[INFO] Demo Parent ........................................ SUCCESS [  0.144 s]
+[INFO] Demo Core .......................................... SKIPPED
+[INFO] Demo App ........................................... SKIPPED
+[INFO] Demo Extra ......................................... SKIPPED
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  0.410 s
+[INFO] Finished at: 2026-11-18T11:39:11Z
+[INFO] ------------------------------------------------------------------------
