@@ -48,7 +48,7 @@ A second instance for development: `BUILDYARD_HOME=/tmp/by-test ./bin/buildyard 
 
 Releases: push a `v*` tag, or run the **Release** workflow on `main` with a version such as `v0.1.0`. It builds darwin and linux binaries (amd64, arm64) with checksums. CI runs gofmt, vet and race tests on every pull request.
 
-Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db`, `daemon.log`.
+Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db`, `daemon.log`. Settings → Daemon edits `maxConcurrentJobs` and `retention.jobsPerProject` in `config.toml` and applies them at once (saving drops comments in the file); after editing the file by hand, `kill -HUP <pid>` reloads it. The port needs a restart.
 
 ## Status
 

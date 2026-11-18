@@ -199,6 +199,22 @@ func serve(args []string) error {
 		log.Info("jobs left by the previous run marked interrupted", "count", n)
 	}
 	jobs := runner.New(st, e.paths.Logs, e.cfg.MaxConcurrentJobs, e.cfg.Retention.JobsPerProject, log)
+	// Limits edited in the UI, or in config.toml followed by SIGHUP, apply without a restart.
+	live := config.NewLive(e.paths.Config, e.cfg)
+	live.OnChange(func(c config.Config) {
+		jobs.SetLimits(c.MaxConcurrentJobs, c.Retention.JobsPerProject)
+		log.Info("config applied", "maxConcurrentJobs", c.MaxConcurrentJobs, "jobsPerProject", c.Retention.JobsPerProject)
+	})
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
+	go func() {
+		for range hup {
+			if err := live.Reload(); err != nil {
+				log.Warn("config.toml not reloaded", "err", err)
+			}
+		}
+	}()
 
 	extJar, err := ext.Install(e.paths.Ext)
 	if err != nil {
@@ -207,7 +223,7 @@ func serve(args []string) error {
 
 	home, _ := os.UserHomeDir()
 	httpapi.Version = version
-	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, ExtJar: extJar, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, Config: live, ExtJar: extJar, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
 	if _, err := srv.SubmitJDKDetect(); err != nil {
 		log.Warn("JDK detection not started", "err", err)
 	}
