@@ -466,6 +466,7 @@ The UI has a job bar at the top, visible everywhere, and these screens. The main
   - *Packages.* A tree with a "per module / combined" switch, search and a generated toggle.
   - *Settings* (done). A "what a run will use" summary and tabs: *General* (name, environment variables), *JDK* (project JDK), *Maven* (executable: global default, auto, `./mvnw`, mvnd, mvn, custom path; JDK for Maven, defaulting to the project JDK). A future build tool gets its own tab. Later: skip preset editor, arbitrary commands.
 - **Settings** (done) — Maven defaults (executable, JDK for Maven); build tools (mvn, mvnd with versions read from their install files, project wrappers with the Maven version they pin); JDKs grouped by the manager they came from, with "Detect again", manual add, rename and remove, and the managers not found on the machine.
+- **Activity** (done 2026-11-18) — background tasks (JDK and build tool detection, module discovery) with status, duration, a short result and the first error line (full output on click). The nav link gets a red dot for a failure not seen yet and a blue one while something runs.
 - **Job** — header (status, command, time, Cancel / Rerun), n/m progress bar, horizontal per-module timing bars (current module highlighted), log viewer and problems panel.
 
 The log is rendered as a virtual list: only visible lines are in the DOM, otherwise the browser chokes on a large log. Hotkeys: `r` — rerun the current job, `/` — search the log, `e` — next error.
