@@ -374,6 +374,8 @@ document.addEventListener('alpine:init', () => {
     detectTask: null,
     detectResult: '',
     btasks: [],
+    cform: null,
+    cfgSaved: false,
     seenTasksAt: loadPref('seenTasksAt', ''), // queuedAt of the newest task shown on the Activity page
 
     async init() {
@@ -1306,6 +1308,8 @@ document.addEventListener('alpine:init', () => {
         api('GET', '/settings'), api('GET', '/tools'), api('GET', '/jdks'), api('GET', '/jdk-managers'),
       ]);
       Object.assign(this, { settings, tools, jdks, managers });
+      this.cform = await api('GET', '/config');
+      this.cfgSaved = false;
       const mv = settings.tools?.maven ?? {};
       this.sform = { maven: { executable: mv.executable || 'auto', jdkId: mv.jdkId ?? 0 } };
     },
@@ -1319,6 +1323,20 @@ document.addEventListener('alpine:init', () => {
           tools: { maven: { executable: mv.executable, jdkId: Number(mv.jdkId) || null } },
         });
         this.saved = true;
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    async saveConfig() {
+      this.busy = true;
+      this.cfgSaved = false;
+      try {
+        const { maxConcurrentJobs, jobsPerProject } = this.cform;
+        this.cform = await api('PUT', '/config', { maxConcurrentJobs, jobsPerProject });
+        this.cfgSaved = true;
       } catch (e) {
         this.error = e.message;
       } finally {

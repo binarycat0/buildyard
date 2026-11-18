@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/binarycat0/buildyard/internal/config"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -30,8 +31,9 @@ type Server struct {
 	JDKs    jdk.Detector // where to look for JDKs
 	Home    string       // user home, for finding mvn/mvnd outside PATH
 	DataDir string
-	ExtJar  string // installed Maven extension; "" disables it
-	UI      fs.FS  // static files; index.html at the root
+	Config  *config.Live // daemon settings from config.toml; nil in tests that don't need them
+	ExtJar  string       // installed Maven extension; "" disables it
+	UI      fs.FS        // static files; index.html at the root
 	Log     *slog.Logger
 	started time.Time
 }
@@ -67,6 +69,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/jobs/{id}/log", s.jobLog)
 	mux.HandleFunc("GET /api/jobs/{id}/modules", s.jobModules)
 	mux.HandleFunc("GET /api/jobs/{id}/stream", s.jobStream)
+	mux.HandleFunc("GET /api/config", s.getConfig)
+	mux.HandleFunc("PUT /api/config", s.putConfig)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/tools", s.getTools)

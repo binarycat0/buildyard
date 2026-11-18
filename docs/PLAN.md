@@ -503,6 +503,8 @@ maxLogBytes = "2GB"
 flags = ["-ntp"]
 ```
 
+**Changing config without a restart** (done 2026-11-18). Settings → Daemon edits `maxConcurrentJobs` and `retention.jobsPerProject` through `GET/PUT /api/config`; they are written to `config.toml` (as a generic table, so unknown keys survive; comments do not) and applied to the runner at once. SIGHUP reloads the file. `port` needs a restart. `retention.maxLogBytes` and `defaults.flags` are not used by the code yet.
+
 **Security:**
 
 - Bind to `127.0.0.1` only; listening on `0.0.0.0` is not possible even through the config.

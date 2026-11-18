@@ -647,6 +647,26 @@
         </div>
       </form>
 
+      <template x-if="cform">
+        <form class="card" @submit.prevent="saveConfig()">
+          <h2>Daemon</h2>
+          <p class="muted small">Saved to <code x-text="cform.path"></code> and applied at once, no restart.</p>
+          <div class="row">
+            <label>Builds at once
+              <input class="short" type="number" min="1" max="64" required x-model.number="cform.maxConcurrentJobs" title="Running builds across all projects; one project always builds one job at a time">
+            </label>
+            <label>Runs kept per project
+              <input class="short" type="number" min="0" required x-model.number="cform.jobsPerProject" title="Older finished runs and their logs are deleted; 0 keeps all">
+            </label>
+          </div>
+          <p class="muted small">Port <span x-text="cform.port"></span>: set <code>port</code> in config.toml; it needs a restart.</p>
+          <div class="row">
+            <button class="primary" type="submit" :disabled="busy">Save</button>
+            <span class="muted" x-show="cfgSaved">Saved</span>
+          </div>
+        </form>
+      </template>
+
       <div class="card">
         <div class="row spread">
           <h2>Build tools</h2>
