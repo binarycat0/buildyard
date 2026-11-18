@@ -203,3 +203,15 @@ input.goal-add { width: 220px; padding: 3px 10px; border-radius: 999px; font-siz
 .projhead .toolbar { margin-bottom: 0; }
 .uses { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .uses code { font-size: .9em; }
+
+/* Run form toolbar */
+.runbar { display: flex; align-items: center; gap: 8px; }
+.runbtn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 16px; font-weight: 600; }
+.runtitle .row { gap: 6px; }
+svg.ic { width: 16px; height: 16px; flex: none; }
+button.icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; }
+button.icon.danger { color: var(--danger); }
+.menu { position: relative; }
+.menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 200px; display: flex; flex-direction: column; padding: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .15); }
+.menu-list button { border: none; background: none; text-align: left; padding: 7px 10px; border-radius: 5px; }
+.menu-list button:hover:not(:disabled) { background: var(--bg); }

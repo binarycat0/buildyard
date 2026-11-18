@@ -876,6 +876,11 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
+    resetRunForm() {
+      this.rform = emptyForm();
+      this.refreshPreview();
+    },
+
     async deleteTask(t) {
       if (!confirm(`Delete task "${t.name}"? Its past runs stay in the history.`)) return;
       try {
