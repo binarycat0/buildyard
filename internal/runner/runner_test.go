@@ -197,8 +197,14 @@ func TestLateSubscriberGetsWholeLog(t *testing.T) {
 		t.Fatalf("got %d lines, final %q", len(got), final)
 	}
 	wait(t, st, j.ID)
-	if r.Subscribe(j.ID) != nil {
-		t.Fatal("finished job should have no live bus")
+	// The job is marked finished in the store just before its bus is dropped, so give
+	// the runner a moment.
+	deadline := time.Now().Add(5 * time.Second)
+	for r.Subscribe(j.ID) != nil {
+		if time.Now().After(deadline) {
+			t.Fatal("finished job should have no live bus")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
