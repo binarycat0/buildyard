@@ -27,6 +27,7 @@ func TestArgv(t *testing.T) {
 			LogLevel:   "quiet",
 			ExtraArgs:  []string{"-Dmaven.repo.local=/r"},
 		}, "mvn -B -o -nsu -T 1.5C -ntp -fae -e -q -pl :core,g:app -am -amd -P fast,!slow -DskipTests -Ddremio.no-ui -Da=1 -Db=2 -Dflag install -Dmaven.repo.local=/r"},
+		{"warnings only", RunSpec{Goals: []string{"install"}, LogLevel: "warn"}, "mvn -B -Dorg.slf4j.simpleLogger.defaultLogLevel=warn install"},
 		{"all modules ignores list", RunSpec{Goals: []string{"verify"}, Modules: Modules{Mode: "all", List: []string{":x"}, AlsoMake: true}, LogLevel: "debug", Flags: Flags{FailMode: "fast"}},
 			"mvn -B -ff -X verify"},
 	}

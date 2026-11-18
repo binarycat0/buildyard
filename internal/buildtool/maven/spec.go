@@ -17,7 +17,7 @@ type RunSpec struct {
 	Skips      []string          `json:"skips"`      // skip preset ids
 	Properties map[string]string `json:"properties"` // -Dkey=value; empty value gives -Dkey
 	Flags      Flags             `json:"flags"`
-	LogLevel   string            `json:"logLevel"`  // default | quiet | debug
+	LogLevel   string            `json:"logLevel"`  // default | warn | quiet | debug
 	ExtraArgs  []string          `json:"extraArgs"` // appended as is
 }
 
@@ -181,9 +181,9 @@ func (s RunSpec) Validate(presets []SkipPreset) error {
 		return fmt.Errorf("fail mode %q: use fast, end or never", s.Flags.FailMode)
 	}
 	switch s.LogLevel {
-	case "default", "quiet", "debug":
+	case "default", "warn", "quiet", "debug":
 	default:
-		return fmt.Errorf("log level %q: use default, quiet or debug", s.LogLevel)
+		return fmt.Errorf("log level %q: use default, warn, quiet or debug", s.LogLevel)
 	}
 	return nil
 }
@@ -217,6 +217,9 @@ func (s RunSpec) Argv(executable string, presets []SkipPreset) []string {
 		argv = append(argv, "-e")
 	}
 	switch s.LogLevel {
+	case "warn":
+		// Maven 3.9 logs through slf4j-simple; this keeps WARNING and ERROR lines.
+		argv = append(argv, "-Dorg.slf4j.simpleLogger.defaultLogLevel=warn")
 	case "quiet":
 		argv = append(argv, "-q")
 	case "debug":

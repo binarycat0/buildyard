@@ -226,7 +226,8 @@
                   <label class="inline">Log
                     <select x-model="rform.logLevel" @change="refreshPreview()">
                       <option value="default">Normal</option>
-                      <option value="quiet">Quiet (-q, hides progress)</option>
+                      <option value="warn">Warnings and errors (hides progress)</option>
+                      <option value="quiet">Errors only (-q, hides progress)</option>
                       <option value="debug">Debug (-X)</option>
                     </select></label>
                 </div>
@@ -436,9 +437,19 @@
             <span x-show="job.exitCode !== null && job.exitCode !== undefined" x-text="'· exit code ' + job.exitCode"></span>
             <span x-text="'· ' + logCount + ' lines'"></span>
           </div>
+          <div class="row wrap logbar">
+            <div class="seg">
+              <button :class="{active: logFilter === 'important'}" @click="setLogFilter('important')"
+                title="Errors, warnings, module starts, test summaries, the Reactor Summary and the result">Important <span x-text="logCounts.important"></span></button>
+              <button :class="{active: logFilter === 'warn'}" @click="setLogFilter('warn')">Warnings <span x-text="logCounts.warn"></span></button>
+              <button :class="{active: logFilter === 'error'}" @click="setLogFilter('error')">Errors <span x-text="logCounts.error"></span></button>
+              <button :class="{active: logFilter === 'all'}" @click="setLogFilter('all')">All <span x-text="logCounts.all"></span></button>
+            </div>
+            <input class="grow" type="search" x-model="logQuery" @input.debounce.200ms="searchLog()" placeholder="Search the log">
+          </div>
           <div class="logwrap">
             <button class="small earlier" x-show="firstLine > 1" @click="loadEarlier()" x-text="'Load ' + (firstLine - 1) + ' earlier lines'"></button>
-            <div class="log" x-ref="log" @scroll="onLogScroll($event)"></div>
+            <div class="log" x-ref="log" :data-f="logFilter" @scroll="onLogScroll($event)"></div>
           </div>
           <p class="muted small" x-show="job.status === 'queued'">Waiting for another job of this project, or for a free slot.</p>
         </div>

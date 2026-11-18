@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { LineClassifier } from './logclass.js';
 
 const execNames = { auto: 'auto', wrapper: './mvnw', mvnd: 'mvnd', mvn: 'mvn' };
 
@@ -48,19 +49,29 @@ const logView = {
   pending: [],
   frame: 0,
   follow: true,
+  cls: new LineClassifier(),
+  counts: { all: 0, important: 0, warn: 0, error: 0 },
+  query: '',
+  onCounts: null,
   reset(el) {
     this.el = el;
     this.pending = [];
     this.follow = true;
+    this.cls = new LineClassifier();
+    this.counts = { all: 0, important: 0, warn: 0, error: 0 };
     if (el) el.textContent = '';
+    this.onCounts?.(this.counts);
   },
-  lineNode(text) {
+  lineNode(text, cls) {
+    const c = cls.classify(text);
     const d = document.createElement('div');
-    const head = text.slice(0, 80);
-    if (/\[ERROR\]|BUILD FAILURE/.test(head)) d.className = 'l-error';
-    else if (/\[WARNING\]|\[WARN\]/.test(head)) d.className = 'l-warn';
-    else if (/BUILD SUCCESS/.test(head)) d.className = 'l-ok';
+    d.className = 'lv-' + c.level + (c.important ? ' imp' : '') + (c.ok ? ' l-ok' : '');
+    if (this.query && !text.toLowerCase().includes(this.query)) d.classList.add('nomatch');
     d.textContent = text;
+    this.counts.all++;
+    if (c.important) this.counts.important++;
+    if (c.level === 'error') this.counts.error++;
+    if (c.level === 'error' || c.level === 'warn') this.counts.warn++;
     return d;
   },
   push(text) {
@@ -71,18 +82,27 @@ const logView = {
     this.frame = 0;
     if (!this.el) return;
     const frag = document.createDocumentFragment();
-    for (const t of this.pending) frag.appendChild(this.lineNode(t));
+    for (const t of this.pending) frag.appendChild(this.lineNode(t, this.cls));
     this.pending = [];
     this.el.appendChild(frag);
     if (this.follow) this.el.scrollTop = this.el.scrollHeight;
+    this.onCounts?.(this.counts);
   },
   prepend(lines) {
     if (!this.el) return;
     const frag = document.createDocumentFragment();
-    for (const t of lines) frag.appendChild(this.lineNode(t));
+    const cls = new LineClassifier();
+    for (const t of lines) frag.appendChild(this.lineNode(t, cls));
     const before = this.el.scrollHeight;
     this.el.insertBefore(frag, this.el.firstChild);
     this.el.scrollTop += this.el.scrollHeight - before;
+    this.onCounts?.(this.counts);
+  },
+  search(q) {
+    this.query = q.trim().toLowerCase();
+    if (!this.el) return;
+    this.el.classList.toggle('searching', !!this.query);
+    for (const d of this.el.children) d.classList.toggle('nomatch', !!this.query && !d.textContent.toLowerCase().includes(this.query));
   },
 };
 
@@ -96,6 +116,22 @@ let ticker = 0;
 function closeStream() {
   if (stream) stream.close();
   stream = null;
+}
+
+function loadPref(key, def) {
+  try {
+    return localStorage.getItem('buildyard.' + key) ?? def;
+  } catch {
+    return def;
+  }
+}
+
+function savePref(key, value) {
+  try {
+    localStorage.setItem('buildyard.' + key, value);
+  } catch {
+    // private mode or blocked storage: the choice lasts until reload
+  }
 }
 
 function emptyForm() {
@@ -210,6 +246,9 @@ document.addEventListener('alpine:init', () => {
     jobProject: null,
     firstLine: 0,
     logCount: 0,
+    logFilter: loadPref('logFilter', 'important'),
+    logQuery: '',
+    logCounts: { all: 0, important: 0, warn: 0, error: 0 },
     now: Date.now(),
     settings: { tools: { maven: { executable: 'auto', jdkId: null } } },
     sform: { maven: { executable: 'auto', jdkId: 0 } },
@@ -795,7 +834,9 @@ document.addEventListener('alpine:init', () => {
       this.logCount = job.liveLines;
       if (this.jobProject?.id !== job.projectId) this.jobProject = await api('GET', `/projects/${job.projectId}`);
       await this.$nextTick();
+      logView.onCounts = (c) => { this.logCounts = { ...c }; };
       logView.reset(this.$refs.log);
+      logView.search(this.logQuery);
       clearInterval(ticker);
       ticker = setInterval(() => { this.now = Date.now(); }, 1000);
 
@@ -827,6 +868,16 @@ document.addEventListener('alpine:init', () => {
       const page = await api('GET', `/jobs/${this.job.id}/log?from=${from}&limit=${to - from + 1}`);
       logView.prepend(page.lines);
       this.firstLine = from;
+    },
+
+    searchLog() {
+      logView.search(this.logQuery);
+    },
+
+    setLogFilter(f) {
+      this.logFilter = f;
+      savePref('logFilter', f);
+      this.$nextTick(() => { if (logView.follow && logView.el) logView.el.scrollTop = logView.el.scrollHeight; });
     },
 
     onLogScroll(e) {
