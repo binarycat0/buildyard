@@ -207,9 +207,9 @@
                     <label class="radio"><input type="checkbox" x-model="rform.alsoMakeDependents" @change="refreshPreview()"> also make dependents <code>-amd</code></label>
                   </div>
                   <div class="row">
-                    <input class="grow" x-model="moduleFilter" placeholder="Filter modules by name or artifactId">
-                    <button type="button" class="small" x-show="hasTree() && !moduleFilter" @click="setAllOpen(true)">Expand all</button>
-                    <button type="button" class="small" x-show="hasTree() && !moduleFilter" @click="setAllOpen(false)">Collapse</button>
+                    <input class="grow" x-model="moduleFilter" @input="$refs.modlist.scrollTop = 0; modScroll = 0" placeholder="Filter modules by name or artifactId">
+                    <button type="button" class="small" x-show="hasTree()" @click="setAllOpen(true)">Expand all</button>
+                    <button type="button" class="small" x-show="hasTree()" @click="setAllOpen(false)">Collapse</button>
                     <button type="button" class="small" x-show="moduleFilter" @click="selectShown()">Select shown</button>
                     <button type="button" class="small" @click="rform.selected = []; refreshPreview()">Clear</button>
                   </div>
@@ -220,17 +220,18 @@
                     @resize.window.debounce.100ms="fitModules()">
                     <div x-data="{ v: { rows: [], top: 0, bottom: 0 } }" x-effect="v = visibleRows()">
                       <div :style="'height:' + v.top + 'px'"></div>
-                      <template x-for="r in v.rows" :key="r.m.key">
-                        <div class="module" :style="'padding-left:' + (r.depth * 18) + 'px'" :class="{focus: moduleInfo === r.m.key}">
+                      <template x-for="r in v.rows" :key="r.m.key + (r.ctx ? '~' : '')">
+                        <div class="module" :style="'padding-left:' + (r.depth * 18) + 'px'" :class="rowClass(r)">
                           <button type="button" class="caret" x-show="r.kids" @click="toggleOpen(r)" x-text="r.open ? '▾' : '▸'"
                             :title="r.open ? 'Collapse' : 'Expand'"></button>
                           <span class="caret" x-show="!r.kids"></span>
                           <input type="checkbox" :checked="checkState(r) === 'all'" x-effect="$el.indeterminate = checkState(r) === 'some'"
-                            @change="toggleModule(r)" :title="r.kids ? 'Select this module and everything under it' : 'Select'">
+                            @change="toggleModule(r)" :title="r.ctx ? 'Select the matching modules under it' : r.kids ? 'Select this module and everything under it' : 'Select'">
                           <a href="javascript:void 0" class="modname" @click="moduleInfo = moduleInfo === r.m.key ? null : r.m.key" x-text="r.m.name" :title="r.m.name + ' — show dependencies'"></a>
                           <code class="muted small" x-text="r.flat && r.m.relPath ? r.m.relPath : r.m.artifactId"></code>
                           <span class="badge small" x-show="r.m.packaging !== 'jar'" x-text="r.m.packaging"></span>
                           <span class="muted small" x-show="r.kids && !r.open" x-text="'(' + (r.size - 1) + ')'"></span>
+                          <span class="muted small" x-show="r.ctx" x-text="r.hits && r.hits.length + ' match' + (r.hits.length === 1 ? '' : 'es')"></span>
                         </div>
                       </template>
                       <div :style="'height:' + v.bottom + 'px'"></div>
