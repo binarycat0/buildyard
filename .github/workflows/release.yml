@@ -1,0 +1,78 @@
+name: Release
+
+# Two ways to cut a release:
+#   - push a v* tag;
+#   - run this workflow by hand on main with a version: it tags the
+#     current commit and publishes the release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, e.g. v0.2.0
+        required: true
+      notes:
+        description: Release notes (Markdown). Empty means generated from merged PRs.
+        required: false
+
+permissions:
+  contents: write # create the tag, the release and upload assets
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - name: Check version
+        run: |
+          [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "bad version: $VERSION"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "run it on main"; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags for `git describe`
+
+      # Manual run: tag locally so `git describe` stamps the version;
+      # `gh release create --target` creates the tag on GitHub.
+      - name: Tag commit
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "tag $VERSION already exists"; exit 1
+          fi
+          git tag "$VERSION"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Pure Go (no cgo, modernc sqlite) and the UI and Maven extension jar are
+      # committed, so every target cross-compiles from one runner without
+      # Node or Maven.
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
+            export GOOS=${target%/*} GOARCH=${target#*/}
+            make build
+            name=buildyard_${VERSION}_${GOOS}_${GOARCH}
+            tar -czf dist/$name.tar.gz -C bin buildyard
+            rm bin/buildyard
+          done
+          cd dist && sha256sum *.tar.gz > checksums.txt
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          if [ -n "$NOTES" ]; then notes=(--notes "$NOTES"); else notes=(--generate-notes); fi
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            gh release create "$VERSION" dist/* "${notes[@]}" --target "$GITHUB_SHA"
+          else
+            gh release create "$VERSION" dist/* "${notes[@]}" --verify-tag
+          fi
