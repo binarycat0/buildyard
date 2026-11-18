@@ -122,3 +122,66 @@ func parseJavaHomeX(out []byte) []string {
 	}
 	return homes
 }
+
+// Manager is a tool that installs or registers JDKs on this machine.
+type Manager struct {
+	ID          string `json:"id"`          // matches Info.Source: macos, homebrew, sdkman, jenv, asdf, mise, gradle, system
+	Name        string `json:"name"`        // display name
+	Kind        string `json:"kind"`        // registry | package manager | version manager | build tool
+	Description string `json:"description"` // one line on what it does with JDKs
+	Installed   bool   `json:"installed"`
+	Location    string `json:"location"` // binary or root directory, "" when not installed
+}
+
+// Managers reports which JDK managers exist on this machine. It only checks files and
+// runs `brew --prefix`; nothing is installed or changed.
+func (d Detector) Managers() []Manager {
+	dirOr := func(env, def string) string {
+		if v := d.getenv(env); v != "" {
+			return v
+		}
+		return filepath.Join(d.Home, def)
+	}
+	exists := func(p string) bool {
+		_, err := os.Stat(p)
+		return err == nil
+	}
+	var out []Manager
+	if d.GOOS == "darwin" {
+		jh := d.sys("/usr/libexec/java_home")
+		out = append(out, Manager{ID: "macos", Name: "macOS java_home", Kind: "registry",
+			Description: "lists JDKs installed under /Library/Java/JavaVirtualMachines",
+			Installed:   isFile(jh), Location: jh})
+	}
+	brew := Manager{ID: "homebrew", Name: "Homebrew", Kind: "package manager",
+		Description: "installs JDKs as formulae (openjdk, openjdk@21, ...)"}
+	if b := d.findBrew(); b != "" {
+		brew.Installed, brew.Location = true, b
+	}
+	out = append(out, brew)
+	for _, m := range []struct{ id, name, env, def, desc string }{
+		{"sdkman", "SDKMAN!", "SDKMAN_DIR", ".sdkman", "installs and switches JDKs from many vendors (sdk install java ...)"},
+		{"jenv", "jenv", "JENV_ROOT", ".jenv", "switches between already installed JDKs; does not install them"},
+		{"asdf", "asdf", "ASDF_DATA_DIR", ".asdf", "multi-language version manager with a java plugin"},
+		{"mise", "mise", "MISE_DATA_DIR", ".local/share/mise", "multi-language version manager (asdf-compatible)"},
+	} {
+		root := dirOr(m.env, m.def)
+		mg := Manager{ID: m.id, Name: m.name, Kind: "version manager", Description: m.desc}
+		if exists(root) {
+			mg.Installed, mg.Location = true, root
+		}
+		out = append(out, mg)
+	}
+	gradle := Manager{ID: "gradle", Name: "Gradle toolchains", Kind: "build tool",
+		Description: "JDKs auto-downloaded by Gradle into ~/.gradle/jdks"}
+	if p := filepath.Join(d.Home, ".gradle/jdks"); exists(p) {
+		gradle.Installed, gradle.Location = true, p
+	}
+	out = append(out, gradle)
+	if d.GOOS != "darwin" {
+		p := d.sys("/usr/lib/jvm")
+		out = append(out, Manager{ID: "system", Name: "System packages", Kind: "package manager",
+			Description: "JDKs from apt/dnf under /usr/lib/jvm", Installed: exists(p), Location: p})
+	}
+	return out
+}

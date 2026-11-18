@@ -133,6 +133,9 @@ func serve(args []string) error {
 	if _, err := srv.SubmitJDKDetect(); err != nil {
 		log.Warn("JDK detection not started", "err", err)
 	}
+	if _, err := srv.SubmitToolsDetect(); err != nil {
+		log.Warn("build tool detection not started", "err", err)
+	}
 	log.Info("buildyard started", "version", version, "addr", fmt.Sprintf("127.0.0.1:%d", e.cfg.Port), "dataDir", e.paths.Dir)
 	fmt.Fprintf(os.Stderr, "\nOpen Buildyard: %s\n\n", link(e))
 

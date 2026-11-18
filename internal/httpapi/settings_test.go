@@ -56,6 +56,39 @@ func TestJDKDetectSettingsAndRuntime(t *testing.T) {
 	if len(jdks) != 2 || jdks[0].Major != 21 || jdks[1].Major != 17 {
 		t.Fatalf("jdks: %+v", jdks)
 	}
+	var managers []jdkManager
+	decodeInto(call("GET", "/api/jdk-managers", ""), &managers)
+	sdk := -1
+	for i, m := range managers {
+		if m.ID == "sdkman" {
+			sdk = i
+		}
+	}
+	if sdk < 0 || !managers[sdk].Installed || managers[sdk].JDKs != 2 {
+		t.Fatalf("managers: %+v", managers)
+	}
+
+	// Build tool detection is a background task too; its result shows up in /api/tools.
+	w = call("POST", "/api/tools/detect", "")
+	if w.Code != 202 {
+		t.Fatalf("tools detect: %d", w.Code)
+	}
+	decodeInto(w, &task)
+	for task.Status != tasks.Succeeded {
+		if task.Status == tasks.Failed || time.Now().After(deadline) {
+			t.Fatalf("tools task: %+v", task)
+		}
+		time.Sleep(10 * time.Millisecond)
+		decodeInto(call("GET", "/api/tasks/"+strconv.FormatInt(task.ID, 10), ""), &task)
+	}
+	var tools struct {
+		Installed []struct{ ID string } `json:"installed"`
+	}
+	decodeInto(call("GET", "/api/tools", ""), &tools)
+	if len(tools.Installed) != 2 || tools.Installed[1].ID != "mvnd" {
+		t.Fatalf("tools: %+v", tools)
+	}
+
 	if w := call("GET", "/api/tasks/999", ""); w.Code != 404 {
 		t.Fatalf("missing task: %d", w.Code)
 	}

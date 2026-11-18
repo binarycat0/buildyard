@@ -58,6 +58,8 @@ document.addEventListener('alpine:init', () => {
     jdks: [],
     jdkPath: '',
     editingJdk: null,
+    managers: [],
+    toolsTask: null,
     jdkError: '',
     detectTask: null,
     detectResult: '',
@@ -200,8 +202,10 @@ document.addEventListener('alpine:init', () => {
 
     // ---------- global settings ----------
     async loadSettings() {
-      const [settings, tools, jdks] = await Promise.all([api('GET', '/settings'), api('GET', '/tools'), api('GET', '/jdks')]);
-      Object.assign(this, { settings, tools, jdks });
+      const [settings, tools, jdks, managers] = await Promise.all([
+        api('GET', '/settings'), api('GET', '/tools'), api('GET', '/jdks'), api('GET', '/jdk-managers'),
+      ]);
+      Object.assign(this, { settings, tools, jdks, managers });
       this.sform = { defaultExecutable: settings.defaultExecutable, defaultJdkId: settings.defaultJdkId ?? 0 };
     },
 
@@ -240,12 +244,53 @@ document.addEventListener('alpine:init', () => {
           const r = t.result || {};
           this.detectResult = `Found ${r.found ?? 0}, new ${r.added ?? 0}, missing ${r.missing ?? 0}.`;
         }
-        this.jdks = await api('GET', '/jdks');
+        [this.jdks, this.managers] = await Promise.all([api('GET', '/jdks'), api('GET', '/jdk-managers')]);
       } catch (e) {
         this.jdkError = e.message;
       } finally {
         this.detectTask = null;
       }
+    },
+
+    async detectTools() {
+      try {
+        this.toolsTask = await api('POST', '/tools/detect');
+        const t = await waitTask(this.toolsTask.id);
+        if (t.status === 'failed') this.error = 'Build tool detection failed: ' + t.error;
+        this.tools = await api('GET', '/tools');
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.toolsTask = null;
+      }
+    },
+
+    // JDKs grouped by the manager they came from: installed managers first (in their order),
+    // then sources that are not managers (manual entries, JAVA_HOME, ...).
+    jdkGroups() {
+      const extra = {
+        manual: { title: 'Added manually' },
+        JAVA_HOME: { title: 'JAVA_HOME', description: 'the JAVA_HOME the daemon was started with' },
+      };
+      const groups = [];
+      const seen = new Set();
+      for (const m of this.managers) {
+        const jdks = this.jdks.filter((j) => j.source === m.id);
+        if (!m.installed && !jdks.length) continue;
+        seen.add(m.id);
+        groups.push({ key: m.id, title: m.name, kind: m.kind, location: m.location, description: m.description, jdks });
+      }
+      for (const j of this.jdks) {
+        if (seen.has(j.source)) continue;
+        seen.add(j.source);
+        const e = extra[j.source] ?? { title: j.source };
+        groups.push({ key: j.source, ...e, jdks: this.jdks.filter((x) => x.source === j.source) });
+      }
+      return groups;
+    },
+
+    missingManagers() {
+      return this.managers.filter((m) => !m.installed && !this.jdks.some((j) => j.source === m.id));
     },
 
     async addJdk() {

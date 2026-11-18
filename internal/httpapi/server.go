@@ -49,6 +49,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/tools", s.getTools)
+	mux.HandleFunc("POST /api/tools/detect", s.detectTools)
+	mux.HandleFunc("GET /api/jdk-managers", s.listJDKManagers)
 	mux.HandleFunc("GET /api/jdks", s.listJDKs)
 	mux.HandleFunc("POST /api/jdks", s.addJDK)
 	mux.HandleFunc("POST /api/jdks/detect", s.detectJDKs)

@@ -142,3 +142,20 @@ func TestManagers(t *testing.T) {
 		}
 	}
 }
+
+func TestManagersList(t *testing.T) {
+	home := t.TempDir()
+	os.MkdirAll(filepath.Join(home, ".sdkman"), 0o755)
+	os.MkdirAll(filepath.Join(home, ".gradle/jdks"), 0o755)
+	d := isolated(Detector{Home: home, GOOS: "darwin"}, t)
+	got := map[string]Manager{}
+	for _, m := range d.Managers() {
+		got[m.ID] = m
+	}
+	if !got["sdkman"].Installed || !got["gradle"].Installed || got["jenv"].Installed || got["homebrew"].Installed || got["macos"].Installed {
+		t.Fatalf("%+v", got)
+	}
+	if _, ok := got["system"]; ok {
+		t.Fatal("no system packages entry on macOS")
+	}
+}

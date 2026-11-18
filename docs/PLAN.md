@@ -428,7 +428,9 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | GET | `/api/jobs/{id}/stream` | SSE: log, modules, status |
 | GET | `/api/events` | SSE: status of all jobs for the global job bar |
 | GET / PUT | `/api/settings` | Global settings: default executable and JDK |
-| GET | `/api/tools` | Detected mvn and mvnd, the daemon's `JAVA_HOME` |
+| GET | `/api/tools` | mvn and mvnd with versions (from the last detection), project wrappers and their Maven versions, the daemon's `JAVA_HOME` |
+| POST | `/api/tools/detect` | Detect mvn/mvnd and their versions as a background task → `202 {task}` |
+| GET | `/api/jdk-managers` | JDK managers (macOS registry, Homebrew, SDKMAN!, jenv, asdf, mise, Gradle toolchains), whether installed, and how many JDKs came from each |
 | GET / POST | `/api/jdks` | JDK list; add one manually `{home, name}` |
 | POST | `/api/jdks/detect` | Detect JDKs as a background task → `202 {task}` |
 | PATCH / DELETE | `/api/jdks/{id}` | Rename or remove a JDK |
@@ -456,7 +458,7 @@ The UI has a job bar at the top, visible everywhere, and these screens. The main
   - *History.* A job table: status, profile, modules, duration, commit, time. Selecting two jobs compares per-module timings.
   - *Packages.* A tree with a "per module / combined" switch, search and a generated toggle.
   - *Settings* (done). Executable (global default, auto, `./mvnw`, mvnd, mvn, custom path), JDK from the global list, environment variables, and a "what a run will use" summary. Later: skip preset editor, arbitrary commands.
-- **Settings** (done) — default executable and JDK; the JDK list with "Detect again", manual add, rename and remove.
+- **Settings** (done) — default executable and JDK; build tools (mvn, mvnd with versions read from their install files, project wrappers with the Maven version they pin); JDKs grouped by the manager they came from, with "Detect again", manual add, rename and remove, and the managers not found on the machine.
 - **Job** — header (status, command, time, Cancel / Rerun), n/m progress bar, horizontal per-module timing bars (current module highlighted), log viewer and problems panel.
 
 The log is rendered as a virtual list: only visible lines are in the DOM, otherwise the browser chokes on a large log. Hotkeys: `r` — rerun the current job, `/` — search the log, `e` — next error.
