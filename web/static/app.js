@@ -200,11 +200,43 @@ function savePref(key, value) {
   }
 }
 
+// Resource presets: [value, label]. Anything else is a custom value.
+const RES = {
+  cpu: [['1', '1 thread (no parallel build)'], ['0.5C', 'Half of the CPU cores (0.5C)'], ['1C', '1 thread per CPU core (1C)'],
+    ['1.5C', '1.5 threads per CPU core (1.5C)'], ['2C', '2 threads per CPU core (2C)']],
+  heap: [['2048', '2 GB'], ['4096', '4 GB'], ['8192', '8 GB'], ['12288', '12 GB'], ['16384', '16 GB'], ['24576', '24 GB'], ['32768', '32 GB']],
+  forks: [['1', '1 JVM'], ['2', '2 JVMs'], ['0.5C', 'Half of the CPU cores (0.5C)'], ['1C', '1 JVM per CPU core (1C)']],
+};
+const RES_SPECIAL = ['', '-1', 'none'];
+
+// A stored value as [choice, custom text]; heap custom values are shown in GB.
+function splitChoice(kind, v) {
+  v = v === undefined || v === null || v === 0 ? '' : String(v);
+  if (RES_SPECIAL.includes(v) || RES[kind].some(([x]) => x === v)) return [v, ''];
+  return ['custom', kind === 'heap' ? String(Math.round((Number(v) / 1024) * 100) / 100) : v];
+}
+
+function joinChoice(kind, choice, custom) {
+  const v = choice === 'custom' ? String(custom || '').trim() : choice;
+  if (kind !== 'heap') return v;
+  if (v === '') return 0;
+  return choice === 'custom' ? Math.round(Number(v) * 1024) || 0 : Number(v);
+}
+
+function resLabel(kind, v) {
+  v = v === undefined || v === null || v === 0 ? '' : String(v);
+  const hit = RES[kind].find(([x]) => x === v);
+  if (hit) return hit[1];
+  if (kind === 'heap') return Number(v) % 1024 ? `${v} MB` : `${Number(v) / 1024} GB`;
+  return v;
+}
+
 function emptyForm() {
   return {
     goals: 'clean install', args: '', modulesMode: 'all', selected: [], alsoMake: true, alsoMakeDependents: false,
-    skips: [], offline: false, nsu: false, ntp: true, errors: false, threads: '', failMode: '', logLevel: 'default',
+    skips: [], offline: false, nsu: false, ntp: true, errors: false, failMode: '', logLevel: 'default',
     profiles: '', props: '',
+    cpu: '', cpuCustom: '', heap: '', heapCustom: '', forks: '', forksCustom: '',
   };
 }
 
@@ -214,7 +246,12 @@ function specToForm(spec) {
   if (!spec) return f;
   const m = spec.modules || {};
   const fl = spec.flags || {};
+  const r = spec.resources || {};
+  const [cpu, cpuCustom] = splitChoice('cpu', fl.threads);
+  const [heap, heapCustom] = splitChoice('heap', r.heapMb);
+  const [forks, forksCustom] = splitChoice('forks', r.testForks);
   return {
+    cpu, cpuCustom, heap, heapCustom, forks, forksCustom,
     goals: (spec.goals || []).join(' '),
     args: (spec.extraArgs || []).map(shellQuote).join(' '),
     modulesMode: m.mode === 'selected' ? 'selected' : 'all',
@@ -223,7 +260,7 @@ function specToForm(spec) {
     alsoMakeDependents: !!m.alsoMakeDependents,
     skips: [...(spec.skips || [])],
     offline: !!fl.offline, nsu: !!fl.noSnapshotUpdates, ntp: spec.flags ? !!fl.noTransferProgress : true,
-    errors: !!fl.errors, threads: fl.threads || '', failMode: fl.failMode || '', logLevel: spec.logLevel || 'default',
+    errors: !!fl.errors, failMode: fl.failMode || '', logLevel: spec.logLevel || 'default',
     profiles: (spec.profiles || []).join(','),
     props: Object.entries(spec.properties || {}).map(([k, v]) => (v === '' ? k : `${k}=${v}`)).join('\n'),
   };
@@ -245,7 +282,8 @@ function formToSpec(f) {
     profiles: f.profiles.split(/[\s,]+/).filter(Boolean),
     skips: f.skips,
     properties,
-    flags: { offline: f.offline, noSnapshotUpdates: f.nsu, threads: f.threads.trim(), noTransferProgress: f.ntp, failMode: f.failMode, errors: f.errors },
+    flags: { offline: f.offline, noSnapshotUpdates: f.nsu, threads: joinChoice('cpu', f.cpu, f.cpuCustom), noTransferProgress: f.ntp, failMode: f.failMode, errors: f.errors },
+    resources: { heapMb: joinChoice('heap', f.heap, f.heapCustom), testForks: joinChoice('forks', f.forks, f.forksCustom) },
     logLevel: f.logLevel,
     extraArgs: splitArgs(f.args),
   };
@@ -459,6 +497,7 @@ document.addEventListener('alpine:init', () => {
           builtin: this.defaultPresets.some((d) => d.id === sp.id),
         })),
         envText: envToText(p.env),
+        ...this.resourcesToForm(p.resources),
       };
       this.pformError = '';
     },
@@ -474,6 +513,11 @@ document.addEventListener('alpine:init', () => {
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
           name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: Number(f.toolJdkId) || 0,
           env: textToEnv(f.envText), skipPresets: this.presetDiff(f.presets),
+          resources: {
+            threads: joinChoice('cpu', f.cpu, f.cpuCustom),
+            heapMb: joinChoice('heap', f.heap, f.heapCustom),
+            testForks: joinChoice('forks', f.forks, f.forksCustom),
+          },
         });
         this.proj = p;
         this.runtime = await api('GET', `/projects/${p.id}/runtime`);
@@ -486,6 +530,27 @@ document.addEventListener('alpine:init', () => {
       } finally {
         this.busy = false;
       }
+    },
+
+    // ---------- resources ----------
+    resChoices(kind) {
+      return RES[kind];
+    },
+
+    resourcesToForm(r) {
+      r = r || {};
+      const [cpu, cpuCustom] = splitChoice('cpu', r.threads);
+      const [heap, heapCustom] = splitChoice('heap', r.heapMb);
+      const [forks, forksCustom] = splitChoice('forks', r.testForks);
+      return { cpu, cpuCustom, heap, heapCustom, forks, forksCustom };
+    },
+
+    // "Project default (…)" options in the run form.
+    projectDefault(kind) {
+      const r = this.proj?.resources || {};
+      const v = { cpu: r.threads, heap: r.heapMb, forks: r.testForks }[kind];
+      const none = { cpu: '1 thread', heap: "the JVM's", forks: "the test plugin's" }[kind];
+      return `Project default (${v ? resLabel(kind, v) : none})`;
     },
 
     // ---------- runs ----------
@@ -536,7 +601,10 @@ document.addEventListener('alpine:init', () => {
       if (s.profiles?.length) tags.push({ text: '-P ' + s.profiles.join(','), cls: 'prof' });
       if (s.skips?.length) tags.push({ text: 'skip ' + s.skips.join(', '), cls: 'dim' });
       const f = s.flags || {};
-      if (f.threads) tags.push({ text: '-T ' + f.threads });
+      if (f.threads && f.threads !== '1') tags.push({ text: '-T ' + f.threads });
+      const r = s.resources || {};
+      if (r.heapMb > 0) tags.push({ text: resLabel('heap', r.heapMb) + ' heap', cls: 'dim' });
+      if (r.testForks && r.testForks !== 'none') tags.push({ text: 'test JVMs ' + r.testForks, cls: 'dim' });
       if (f.offline) tags.push({ text: 'offline', cls: 'dim' });
       if (s.logLevel && s.logLevel !== 'default') tags.push({ text: 'log ' + s.logLevel, cls: 'dim' });
       return tags;
@@ -839,7 +907,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     showCommand(c) {
-      this.cmdShown = { argv: c.argv, javaHome: c.javaHome, dir: c.dir };
+      this.cmdShown = { argv: c.argv, javaHome: c.javaHome, dir: c.dir, mavenOpts: c.mavenOpts };
       this.copied = false;
       this.$refs.cmdDialog.showModal();
     },

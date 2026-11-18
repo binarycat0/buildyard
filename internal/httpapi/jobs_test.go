@@ -246,3 +246,30 @@ func decodeInto(w *httptest.ResponseRecorder, v any) {
 		panic("decode " + w.Body.String() + ": " + err.Error())
 	}
 }
+
+func TestProjectResources(t *testing.T) {
+	h, _ := newServer(t)
+	call := func(method, path, body string) *httptest.ResponseRecorder {
+		return do(t, h, req{method: method, path: path, body: body})
+	}
+	root := mavenProject(t)
+	var p store.Project
+	decodeInto(call("POST", "/api/projects", `{"rootPath":"`+root+`"}`), &p)
+	pid := strconv.FormatInt(p.ID, 10)
+	if w := call("PATCH", "/api/projects/"+pid, `{"resources":{"heapMb":-5}}`); w.Code != 400 {
+		t.Fatalf("bad heap: %d", w.Code)
+	}
+	if w := call("PATCH", "/api/projects/"+pid, `{"env":{"MAVEN_OPTS":"-Xss8m -Xmx1g"},"resources":{"threads":"1C","heapMb":4096,"testForks":"2"}}`); w.Code != 200 {
+		t.Fatalf("patch: %d %s", w.Code, w.Body)
+	}
+	var pv preview
+	decodeInto(call("POST", "/api/projects/"+pid+"/preview", `{"spec":{"goals":["install"]}}`), &pv)
+	if got := strings.Join(pv.Argv[1:], " "); got != "-B -T 1C -DforkCount=2 install" || pv.MavenOpts != "-Xss8m -Xmx4g" {
+		t.Fatalf("defaults: %q %q", got, pv.MavenOpts)
+	}
+	pv = preview{}
+	decodeInto(call("POST", "/api/projects/"+pid+"/preview", `{"spec":{"goals":["install"],"flags":{"threads":"1"},"resources":{"heapMb":-1,"testForks":"none"}}}`), &pv)
+	if got := strings.Join(pv.Argv[1:], " "); got != "-B install" || pv.MavenOpts != "" {
+		t.Fatalf("overrides: %q %q", got, pv.MavenOpts)
+	}
+}

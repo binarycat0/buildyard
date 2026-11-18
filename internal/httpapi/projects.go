@@ -95,6 +95,17 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if patch.Resources != nil {
+		var res maven.Resources
+		if json.Unmarshal(*patch.Resources, &res) != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "resources must be {threads, heapMb, testForks}")
+			return
+		}
+		if err := maven.ValidateResources(res); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+	}
 	if patch.Executable != nil && *patch.Executable != "" && !maven.ValidMode(*patch.Executable) {
 		writeError(w, http.StatusBadRequest, "bad_request", "executable must be auto, wrapper, mvnd, mvn or an absolute path")
 		return

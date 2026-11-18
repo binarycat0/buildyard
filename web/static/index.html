@@ -224,8 +224,6 @@
                   <label class="radio" title="-e"><input type="checkbox" x-model="rform.errors" @change="refreshPreview()"> Error details</label>
                 </div>
                 <div class="row wrap">
-                  <label class="inline"><span>Threads <code>-T</code></span>
-                    <input class="short" x-model="rform.threads" placeholder="1C" @input.debounce.250ms="refreshPreview()"></label>
                   <label class="inline">On failure
                     <select x-model="rform.failMode" @change="refreshPreview()">
                       <option value="">Maven default</option>
@@ -240,6 +238,39 @@
                       <option value="quiet">Errors only (-q, hides progress)</option>
                       <option value="debug">Debug (-X)</option>
                     </select></label>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Resources</legend>
+                <div class="row wrap">
+                  <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
+                    <select x-model="rform.cpu" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('cpu')"></option>
+                      <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.cpu"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.cpu === 'custom'" x-model="rform.cpuCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
+                  </label>
+                  <label class="inline" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span>
+                    <select x-model="rform.heap" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('heap')"></option>
+                      <option value="-1">JVM default (a quarter of the RAM)</option>
+                      <template x-for="c in resChoices('heap')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.heap"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.heap === 'custom'" x-model="rform.heapCustom" @input.debounce.250ms="refreshPreview()" placeholder="GB" >
+                    <span class="muted" x-show="rform.heap === 'custom'">GB</span>
+                  </label>
+                  <label class="inline" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span>
+                    <select x-model="rform.forks" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('forks')"></option>
+                      <option value="none">Test plugin default (1 JVM)</option>
+                      <template x-for="c in resChoices('forks')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.forks"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.forks === 'custom'" x-model="rform.forksCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
+                  </label>
                 </div>
               </fieldset>
 
@@ -260,6 +291,7 @@
                 <template x-for="(t, i) in shortArgs(rpreview?.argv)" :key="i">
                   <code class="tok" :class="t.cls" :title="t.title || ''" x-text="t.text"></code>
                 </template>
+                <code class="tok" x-show="rpreview?.mavenOpts" title="MAVEN_OPTS" x-text="'MAVEN_OPTS ' + (rpreview?.mavenOpts || '')"></code>
                 <span class="grow"></span>
                 <button type="button" class="link small" @click="showCommand(rpreview)">Full command</button>
               </div>
@@ -392,6 +424,38 @@
                 <div class="row">
                   <button type="button" class="small" @click="pform.presets.push({id: '', label: '', argsText: '', builtin: false})">Add preset</button>
                   <button type="button" class="small" @click="resetPresets()">Reset to built-in</button>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Default resources</legend>
+                <p class="muted small">Used by every run of this project unless the run form picks something else.</p>
+                <div class="row wrap">
+                  <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
+                    <select x-model="pform.cpu" >
+                      <option value="">Maven default (1 thread)</option>
+                      <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === pform.cpu"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="pform.cpu === 'custom'" x-model="pform.cpuCustom" placeholder="e.g. 3 or 0.75C" >
+                  </label>
+                  <label class="inline" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span>
+                    <select x-model="pform.heap" >
+                      <option value="">JVM default (a quarter of the RAM)</option>
+                      <template x-for="c in resChoices('heap')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === pform.heap"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="pform.heap === 'custom'" x-model="pform.heapCustom" placeholder="GB" >
+                    <span class="muted" x-show="pform.heap === 'custom'">GB</span>
+                  </label>
+                  <label class="inline" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span>
+                    <select x-model="pform.forks" >
+                      <option value="">Test plugin default (1 JVM)</option>
+                      <template x-for="c in resChoices('forks')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === pform.forks"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="pform.forks === 'custom'" x-model="pform.forksCustom" placeholder="e.g. 3 or 0.75C" >
+                  </label>
                 </div>
               </fieldset>
 
@@ -652,6 +716,7 @@
       </div>
       <div class="muted small" x-show="cmdShown?.dir" x-text="'In ' + cmdShown?.dir"></div>
       <div class="muted small" x-show="cmdShown?.javaHome" x-text="'JAVA_HOME=' + cmdShown?.javaHome"></div>
+      <div class="muted small" x-show="cmdShown?.mavenOpts" x-text="'MAVEN_OPTS=' + cmdShown?.mavenOpts"></div>
       <pre class="cmd full" x-text="cmdShown ? shellJoin(cmdShown.argv) : ''"></pre>
       <div class="row">
         <button type="button" class="primary" @click="copyCommand(cmdShown.argv)" x-text="copied ? 'Copied' : 'Copy'"></button>
