@@ -498,6 +498,7 @@ document.addEventListener('alpine:init', () => {
       // Start from the last run's spec.
       const last = pjobs.find((j) => j.spec?.goals?.length);
       this.rform = specToForm(last?.spec);
+      this.rform.selected = this.expandRefs(this.rform.selected);
       this.editingTask = null;
       this.saveAsNew = false;
       this.runError = '';
@@ -590,8 +591,44 @@ document.addEventListener('alpine:init', () => {
       // without a -pl list of hundreds of modules.
       if (spec.modules.mode === 'selected' && this.modules.length && this.allSelected()) {
         spec.modules = { mode: 'all', list: [], alsoMake: false, alsoMakeDependents: false };
+      } else if (spec.modules.mode === 'selected' && this.modules.length) {
+        spec.modules.list = this.moduleArgs();
       }
       return spec;
+    },
+
+    // The -pl list for the ticked modules, in the shorter of two forms:
+    //  - the ticked modules, plus "!" for unticked modules inside a ticked folder (Maven 4
+    //    and mvnd 2 build a listed aggregator's whole subtree);
+    //  - "!" for the unticked modules only, leaving out a folder that still has ticked
+    //    modules under it (excluding it would drop them in Maven 4; its pom is built).
+    moduleArgs() {
+      const g = this.graph();
+      const sel = this.selection().keys;
+      const ref = (k) => g.ref.get(k) ?? k;
+      const unticked = this.modules.filter((m) => !sel.has(m.key)).map((m) => m.key);
+      const tickedAbove = (k) => {
+        for (let a = g.parent(k); a; a = g.parent(a)) if (sel.has(a)) return true;
+        return false;
+      };
+      const positive = [...Alpine.raw(this.rform.selected).filter((r) => !r.startsWith('!')),
+        ...unticked.filter(tickedAbove).map((k) => '!' + ref(k))];
+      const negative = unticked.filter((k) => !(g.sub.get(k) || [k]).some((x) => sel.has(x))).map((k) => '!' + ref(k));
+      return negative.length && negative.length < positive.length ? negative : positive;
+    },
+
+    // A saved list may hold "!" exclusions (see moduleArgs, or a rerun without failed
+    // modules); the form works with ticked modules, so turn it back into those.
+    expandRefs(list) {
+      if (!list.some((r) => r.startsWith('!')) || !this.modules.length) return list;
+      const g = this.graph();
+      const keyOf = (r) => g.keyOf.get(r) ?? r;
+      const pos = list.filter((r) => !r.startsWith('!')).map(keyOf).filter((k) => g.byKey.has(k));
+      const keys = new Set(pos.length ? pos : this.modules.map((m) => m.key));
+      for (const r of list.filter((x) => x.startsWith('!'))) {
+        for (const k of g.sub.get(keyOf(r.slice(1))) || [keyOf(r.slice(1))]) keys.delete(k);
+      }
+      return this.modules.filter((m) => keys.has(m.key)).map((m) => g.ref.get(m.key));
     },
 
     allSelected() {
@@ -911,6 +948,7 @@ document.addEventListener('alpine:init', () => {
       this.editingTask = t;
       this.saveAsNew = false;
       this.rform = specToForm(t.spec);
+      this.rform.selected = this.expandRefs(this.rform.selected);
       this.refreshPreview();
     },
 
