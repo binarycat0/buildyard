@@ -276,7 +276,7 @@ type BuildTool interface {
 Modules come from Maven, run as a background task with the project's executable, JDK, environment and the profiles/skip flags the user selects:
 
 1. `<executable> -B -o help:active-profiles <flags>` — lists every reactor module (`Active Profiles for Project 'g:a:packaging:version'`) with its active profiles, without running lifecycle plugins. If it fails offline (the help plugin is not in the local repository), it is retried once online.
-2. Module directories and inter-module dependencies come from the extension's `session` event when it is available (phase 4); until then the tree is built from the reactor order and `groupId:artifactId`.
+2. The same run loads the Buildyard extension (`-Dmaven.ext.class.path`, `-Dbuildyard.events`). Its `session` event gives each module's folder, its aggregator (the project whose `<modules>` list it) and its direct in-reactor dependencies. The UI shows the aggregator tree (ticking a parent ticks its subtree), "depends on" / "used by" per module, and how many modules `-am` / `-amd` add. Without the event (the extension did not load) the list stays flat.
 3. Results are stored in `module` and refreshed on demand and when any `pom.xml` changes.
 
 There is no hand-written pom.xml walker: the user decided the Maven listing is enough (2026-11-17).
@@ -310,15 +310,16 @@ Default skip presets. Projects can edit them and add their own in project settin
 
 ### Maven extension `buildyard-maven-ext`
 
-- A Java class extending `AbstractEventSpy`, annotated `@Named @Singleton`. Depends only on `maven-core` 3.9.x in `provided` scope; JSON is written by hand. Compiled with `--release 11` so it works with whatever JDK the project builds on.
+- A Java class extending `AbstractEventSpy`, annotated `@Named @Singleton`, registered through `META-INF/sisu/javax.inject.Named`. Depends only on `maven-core` 3.9.x in `provided` scope; JSON is written by hand. Compiled with `--release 8` so it loads on whatever JDK the project builds on.
+- Sources in `maven-ext/`; `make ext` rebuilds the jar into `internal/ext/`, where the daemon embeds it. The jar is committed (8 KB, reproducible), so `go build` does not need Maven. At startup the daemon writes it to `~/.buildyard/ext/buildyard-maven-ext-<hash>.jar`.
 - Listens to `ExecutionEvent`: SessionStarted, ProjectStarted, ProjectSucceeded, ProjectFailed, ProjectSkipped, MojoStarted, MojoSucceeded, MojoFailed, SessionEnded.
 - Writes JSON Lines to the file from `-Dbuildyard.events`, flushing after every line. Without that property it does nothing.
 
 ```text
-{"t":"session","ts":1763400000000,"projects":[{"key":"g:a","dir":"/repo/a","packaging":"jar","deps":["g:b"]}]}
+{"t":"session","ts":1763400000000,"root":"/repo","projects":[{"key":"g:a","name":"A","dir":"/repo/a","packaging":"jar","aggregator":"g:root","parent":"g:root","deps":["g:b"]}]}
 {"t":"project_start","key":"g:a","ts":1763400001000}
 {"t":"mojo_start","key":"g:a","mojo":"maven-compiler-plugin:compile","ts":1763400001200}
-{"t":"project_end","key":"g:a","status":"succeeded","ms":4210}
+{"t":"project_end","key":"g:a","status":"succeeded","ms":4210,"ts":1763400005210}
 {"t":"session_end","ts":1763400090000,"status":"failed"}
 ```
 
@@ -529,12 +530,13 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
    - Checked by `internal/runner` and `internal/httpapi` tests: cancel kills a parent and children that ignore SIGTERM; a subscriber that joins mid-run gets every line exactly once; two jobs of one project run one after another while another project runs in parallel.
    - **Done when:** a test script that spawns a child process is cancelled with no processes left (automated test); a browser opened mid-job receives the whole log; two jobs of one project run sequentially.
 3. **Maven adapter and profiles** — **done 2026-11-18** (checked on `testdata/sample-maven` with real Maven; the Dremio check is left to the user)
-   - Module discovery through Maven (background task), module list with checkboxes and a filter. Without directories (phase 4) it is a flat list in reactor order, not a tree.
+   - Module discovery through Maven (background task), module tree with checkboxes and a filter (the tree came with the extension, see phase 4).
    - RunSpec → argv, preview, skip presets (editable per project, stored as changes to the built-in ones), run profiles, log level.
    - The UI calls run profiles **tasks**, because "profile" already means a Maven `-P` profile. Pinned tasks come first. `spec.executable` and `spec.env` overrides are not in the form yet.
    - **Done when:** on a large project (e.g. Dremio) you can pick 2 modules + `-am` + skip tests, see the command, run it, save it as a profile and rerun it in 1 click; table tests for the command builder are green.
 4. **Events, timings, logs** (end of MVP)
-   - The production extension and its embedding, `job_module`, n/m progress, per-module bars.
+   - The production extension and its embedding — **done 2026-11-18**, pulled forward for the module tree (used by discovery; not yet passed to jobs).
+   - `job_module`, n/m progress, per-module bars.
    - Level filter, "Important only", problems panel, comparing two runs, fallback parser.
    - **Done when:** on the phase 0 fixtures the parser finds all compile errors and failed tests; on a live build progress and timings match the `Reactor Summary`.
 5. **Package scanner**

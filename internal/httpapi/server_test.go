@@ -29,6 +29,12 @@ func newServer(t *testing.T) (http.Handler, string) {
 // newServerHome uses userHome as the home directory for JDK and mvn/mvnd lookup.
 func newServerHome(t *testing.T, userHome string) (http.Handler, string) {
 	t.Helper()
+	s, dbPath := newTestServer(t, userHome)
+	return s.Handler(), dbPath
+}
+
+func newTestServer(t *testing.T, userHome string) (*Server, string) {
+	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "buildyard.db")
 	st, err := store.Open(context.Background(), dbPath)
 	if err != nil {
@@ -47,7 +53,7 @@ func newServerHome(t *testing.T, userHome string) (http.Handler, string) {
 		LookPath: func(string) string { return "" }}, Home: userHome, DataDir: "/tmp/x", UI: ui}
 	s.Runner = runner.New(st, t.TempDir(), 1, 0, slog.New(slog.DiscardHandler))
 	t.Cleanup(func() { s.Runner.Shutdown(context.Background()) })
-	return s.Handler(), dbPath
+	return s, dbPath
 }
 
 type req struct {

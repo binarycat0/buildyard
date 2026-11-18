@@ -141,24 +141,54 @@
                   </div>
                   <div class="row">
                     <input class="grow" x-model="moduleFilter" placeholder="Filter modules by name or artifactId">
-                    <button type="button" class="small" @click="selectShown()">Select shown</button>
+                    <button type="button" class="small" x-show="hasTree() && !moduleFilter" @click="setAllOpen(true)">Expand all</button>
+                    <button type="button" class="small" x-show="hasTree() && !moduleFilter" @click="setAllOpen(false)">Collapse</button>
+                    <button type="button" class="small" x-show="moduleFilter" @click="selectShown()">Select shown</button>
                     <button type="button" class="small" @click="rform.selected = []; refreshPreview()">Clear</button>
                   </div>
                   <div class="modules">
-                    <template x-for="m in shownModules()" :key="m.key">
-                      <label class="module">
-                        <input type="checkbox" :checked="rform.selected.includes(moduleRef(m))" @change="toggleModule(m)">
-                        <span x-text="m.name"></span>
-                        <code class="muted small" x-text="m.artifactId"></code>
-                        <span class="badge small" x-show="m.packaging !== 'jar'" x-text="m.packaging"></span>
-                      </label>
+                    <template x-for="r in shownRows()" :key="r.m.key">
+                      <div class="module" :style="'padding-left:' + (r.depth * 18) + 'px'" :class="{focus: moduleInfo === r.m.key}">
+                        <button type="button" class="caret" x-show="r.kids" @click="toggleOpen(r.m.key)" x-text="r.open ? '▾' : '▸'"
+                          :title="r.open ? 'Collapse' : 'Expand'"></button>
+                        <span class="caret" x-show="!r.kids"></span>
+                        <input type="checkbox" :checked="checkState(r) === 'all'" x-effect="$el.indeterminate = checkState(r) === 'some'"
+                          @change="toggleModule(r)" :title="r.kids ? 'Select this module and everything under it' : 'Select'">
+                        <a href="javascript:void 0" class="modname" @click="moduleInfo = moduleInfo === r.m.key ? null : r.m.key" x-text="r.m.name" title="Show dependencies"></a>
+                        <code class="muted small" x-text="r.flat && r.m.relPath ? r.m.relPath : r.m.artifactId"></code>
+                        <span class="badge small" x-show="r.m.packaging !== 'jar'" x-text="r.m.packaging"></span>
+                        <span class="muted small" x-show="r.kids && !r.open" x-text="'(' + r.kids + ')'"></span>
+                      </div>
                     </template>
                     <p class="muted small" x-show="moreModules()" x-text="moreModules() + ' more; refine the filter'"></p>
                     <p class="muted small" x-show="!modules.length">No modules yet. Discover them, or type them as extra arguments.</p>
                   </div>
+                  <template x-if="moduleInfo && infoFor(moduleInfo)">
+                    <div class="modinfo" x-data="{ i: null }" x-effect="i = infoFor(moduleInfo)">
+                      <div class="row spread">
+                        <strong x-text="i?.m.name"></strong>
+                        <button type="button" class="link small" @click="moduleInfo = null">close</button>
+                      </div>
+                      <div class="small muted"><code x-text="i?.m.key"></code> <span x-show="i?.m.relPath" x-text="'· ' + i?.m.relPath + '/'"></span></div>
+                      <div class="small" x-show="!hasTree()">Dependencies are not known: discovery ran without the Buildyard extension.</div>
+                      <div class="small" x-show="hasTree()">
+                        <span class="muted" x-text="'Depends on (' + (i?.deps.length || 0) + '):'"></span>
+                        <template x-for="d in i?.deps || []" :key="d.key"><a href="javascript:void 0" class="dep" @click="moduleInfo = d.key" x-text="d.name"></a></template>
+                        <span class="muted" x-show="!i?.deps.length">nothing in this project</span>
+                      </div>
+                      <div class="small" x-show="hasTree()">
+                        <span class="muted" x-text="'Used by (' + (i?.users.length || 0) + '):'"></span>
+                        <template x-for="d in i?.users || []" :key="d.key"><a href="javascript:void 0" class="dep" @click="moduleInfo = d.key" x-text="d.name"></a></template>
+                        <span class="muted" x-show="!i?.users.length">nothing in this project</span>
+                      </div>
+                      <div class="small muted" x-show="hasTree()"
+                        x-text="'Building it with -am adds ' + plural(i?.upAll, 'module') + ', with -amd ' + plural(i?.downAll, 'module') + '.'"></div>
+                    </div>
+                  </template>
                   <p class="small" x-show="rform.selected.length">
                     <span class="muted">Selected:</span> <code x-text="rform.selected.join(', ')"></code>
                   </p>
+                  <p class="small muted" x-show="rform.selected.length && hasTree()" x-text="impactText()"></p>
                 </div>
               </fieldset>
 

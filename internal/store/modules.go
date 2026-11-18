@@ -13,7 +13,9 @@ type Module struct {
 	ArtifactID   string    `json:"artifactId"`
 	Name         string    `json:"name"`
 	Packaging    string    `json:"packaging"`
-	RelPath      string    `json:"relPath"` // "" until the extension reports directories (phase 4)
+	RelPath      string    `json:"relPath"`    // folder relative to the project root; "" for the root or when unknown
+	Aggregator   string    `json:"aggregator"` // key of the project whose <modules> list this one
+	Deps         []string  `json:"deps"`       // keys of direct upstream modules in the reactor
 	Profiles     []string  `json:"profiles"`
 	Ord          int       `json:"ord"`
 	DiscoveredAt time.Time `json:"discoveredAt"`
@@ -32,10 +34,11 @@ func (s *Store) ReplaceModules(ctx context.Context, projectID int64, mods []Modu
 	at := now()
 	for i, m := range mods {
 		prof, _ := json.Marshal(nonNil(m.Profiles))
+		deps, _ := json.Marshal(nonNil(m.Deps))
 		if _, err := tx.ExecContext(ctx, `INSERT INTO module
-			(project_id, group_id, artifact_id, name, packaging, rel_path, profiles_json, source, ord, discovered_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			projectID, m.GroupID, m.ArtifactID, m.Name, m.Packaging, m.RelPath, string(prof), source, i, at); err != nil {
+			(project_id, group_id, artifact_id, name, packaging, rel_path, aggregator, deps_json, profiles_json, source, ord, discovered_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			projectID, m.GroupID, m.ArtifactID, m.Name, m.Packaging, m.RelPath, m.Aggregator, string(deps), string(prof), source, i, at); err != nil {
 			return mapErr(err)
 		}
 	}
@@ -44,7 +47,7 @@ func (s *Store) ReplaceModules(ctx context.Context, projectID int64, mods []Modu
 
 // ListModules returns a project's modules in reactor order.
 func (s *Store) ListModules(ctx context.Context, projectID int64) ([]Module, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT group_id, artifact_id, name, packaging, rel_path, profiles_json, ord, discovered_at
+	rows, err := s.db.QueryContext(ctx, `SELECT group_id, artifact_id, name, packaging, rel_path, aggregator, deps_json, profiles_json, ord, discovered_at
 		FROM module WHERE project_id = ? ORDER BY ord, id`, projectID)
 	if err != nil {
 		return nil, err
@@ -53,13 +56,15 @@ func (s *Store) ListModules(ctx context.Context, projectID int64) ([]Module, err
 	out := []Module{}
 	for rows.Next() {
 		var m Module
-		var prof, at string
-		if err := rows.Scan(&m.GroupID, &m.ArtifactID, &m.Name, &m.Packaging, &m.RelPath, &prof, &m.Ord, &at); err != nil {
+		var prof, deps, at string
+		if err := rows.Scan(&m.GroupID, &m.ArtifactID, &m.Name, &m.Packaging, &m.RelPath, &m.Aggregator, &deps, &prof, &m.Ord, &at); err != nil {
 			return nil, err
 		}
 		m.Key = m.GroupID + ":" + m.ArtifactID
 		_ = json.Unmarshal([]byte(prof), &m.Profiles)
 		m.Profiles = nonNil(m.Profiles)
+		_ = json.Unmarshal([]byte(deps), &m.Deps)
+		m.Deps = nonNil(m.Deps)
 		m.DiscoveredAt = parseTime(at)
 		out = append(out, m)
 	}

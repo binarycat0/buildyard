@@ -30,7 +30,8 @@ type Server struct {
 	JDKs    jdk.Detector // where to look for JDKs
 	Home    string       // user home, for finding mvn/mvnd outside PATH
 	DataDir string
-	UI      fs.FS // static files; index.html at the root
+	ExtJar  string // installed Maven extension; "" disables it
+	UI      fs.FS  // static files; index.html at the root
 	Log     *slog.Logger
 	started time.Time
 }

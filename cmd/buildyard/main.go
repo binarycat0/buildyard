@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/binarycat0/buildyard/internal/config"
+	"github.com/binarycat0/buildyard/internal/ext"
 	"github.com/binarycat0/buildyard/internal/httpapi"
 	"github.com/binarycat0/buildyard/internal/jdk"
 	"github.com/binarycat0/buildyard/internal/lock"
@@ -136,9 +137,14 @@ func serve(args []string) error {
 	}
 	jobs := runner.New(st, e.paths.Logs, e.cfg.MaxConcurrentJobs, e.cfg.Retention.JobsPerProject, log)
 
+	extJar, err := ext.Install(e.paths.Ext)
+	if err != nil {
+		log.Warn("Maven extension not installed; module folders and dependencies will be missing", "err", err)
+	}
+
 	home, _ := os.UserHomeDir()
 	httpapi.Version = version
-	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, ExtJar: extJar, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
 	if _, err := srv.SubmitJDKDetect(); err != nil {
 		log.Warn("JDK detection not started", "err", err)
 	}
