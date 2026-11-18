@@ -448,7 +448,7 @@ Events in `/api/jobs/{id}/stream` (`event:` → `data:`):
 - `status` — `{status}` whenever it changes;
 - `modules` — the whole module list `[{key, name, ord, status, startedAt, ms}]`, sent after the catch-up and again when the reactor becomes known; statuses are `pending | running | succeeded | failed | skipped | cancelled`;
 - `module` — one changed module, same shape;
-- `problem` — `{kind, module, file, line, message, logLine}` (phase 4);
+- `problems` — the problems found so far, after the catch-up; `problem` — one new problem `{kind, module, file, line, message, logLine}`;
 - `end` — the finished job; the last event. The client closes the stream after it (a reconnect would only get `end` again).
 
 Every 15 seconds the server sends a `: ping` comment so the connection does not time out.
@@ -543,7 +543,7 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
    - The production extension and its embedding — **done 2026-11-18**, pulled forward for the module tree.
    - `job_module`, n/m progress, modules being built with elapsed time, failed modules, a module table sorted by build order or duration — **done 2026-11-18**. The runner adds the extension to every Maven job (`-Dmaven.ext.class.path`, `-Dbuildyard.events=logs/<id>.events.jsonl`, left out of the recorded argv), tails the events file every 250 ms, and saves the result to `job_module` when the job ends; modules still running then become `failed` (or `cancelled` after Stop/Kill). Works at any log level, including `-q`.
    - Level filter and "Important only" — **done 2026-11-18** (client-side classification; `Warnings and errors` log level).
-   - Problems panel, comparing two runs, fallback parser.
+   - Problems panel, comparing two runs, fallback parser — **done 2026-11-18**. `maven.LogParser` reads every output line (the runner calls it through `Command.Parser`): compile errors (`/path/File.java:[l,c] msg`, deduplicated: javac errors are printed twice), failed tests from the Surefire `Failures:` / `Errors:` (and old `Failed tests:` / `Tests in error:`) blocks, `Failed to execute goal … on project X` (kind `goal`, or `dependency` without a goal), with the module from the thread name or the last `--- … @ module ---`. Bare `[ERROR]` lines are not problems (fixture 06). Problems stream as `problem` SSE events, are capped at 500 per job and saved to `job_problem` (`GET /api/jobs/{id}/problems`). The same parser rebuilds module progress from `Reactor Build Order`, `Building <name> <version> [n/m]` and the `Reactor Summary` (keys are module names); extension events replace it as soon as they arrive. Compare: `#/compare/{a}/{b}` (History checkboxes, or Compare on the job page for the previous run) shows both runs, total time change, argument differences (`-pl` as added/removed modules), new and gone problems, and per-module times sorted by the biggest change. Fixtures 09 (Surefire failures) and 10 (threaded compile error) are generated from `testdata/sample-maven`.
    - **Done when:** on the phase 0 fixtures the parser finds all compile errors and failed tests; on a live build progress and timings match the `Reactor Summary`.
 5. **Package scanner**
    - **Done when:** a large project's tree builds within the target time, rescans use mtime, split packages are highlighted.

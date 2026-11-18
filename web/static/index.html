@@ -12,7 +12,7 @@
   <header class="top">
     <a href="#/" class="brand">Buildyard</a>
     <nav>
-      <a href="#/" :class="{active: view === 'projects' || view === 'project' || view === 'job'}">Projects</a>
+      <a href="#/" :class="{active: view === 'projects' || view === 'project' || view === 'job' || view === 'compare'}">Projects</a>
       <a href="#/settings" :class="{active: view === 'settings'}">Settings</a>
     </nav>
     <span class="muted grow-right" x-text="health ? 'v' + health.version : ''"></span>
@@ -349,11 +349,16 @@
           <!-- History -->
           <div class="card" x-show="pview === 'history'">
             <p class="muted" x-show="!pjobs.length">No runs yet.</p>
+            <div class="row" x-show="pjobs.length > 1">
+              <span class="muted small" x-text="pick.length === 2 ? 'Runs ' + pick.join(' and ') + ' picked' : 'Tick two runs to compare them'"></span>
+              <button class="small" :disabled="pick.length !== 2" @click="comparePicked()">Compare</button>
+            </div>
             <table class="list" x-show="pjobs.length">
-              <thead><tr><th>#</th><th>Status</th><th>Command</th><th>Started</th><th>Duration</th><th></th></tr></thead>
+              <thead><tr><th title="Pick two runs to compare"></th><th>#</th><th>Status</th><th>Command</th><th>Started</th><th>Duration</th><th></th></tr></thead>
               <tbody>
                 <template x-for="j in pjobs" :key="j.id">
                   <tr class="clickable" @click="location.hash = '#/jobs/' + j.id">
+                    <td @click.stop><input type="checkbox" :checked="pick.includes(j.id)" @change="togglePick(j.id)" title="Pick to compare"></td>
                     <td><a :href="'#/jobs/' + j.id" x-text="j.id"></a></td>
                     <td><span class="status" :class="j.status" x-text="j.status"></span></td>
                     <td><code x-text="specText(j)"></code></td>
@@ -512,6 +517,7 @@
                 title="Like Ctrl+C: Maven finishes its shutdown and the build ends by itself">Stop</button>
               <button class="danger" x-show="job.status === 'running'" @click="controlJob('kill')"
                 title="Ends the build and all its processes at once (SIGKILL)">Kill</button>
+              <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="compareWithPrevious(job)" title="Compare with the previous finished run of this project">Compare</button>
               <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="rerun(job)">Rerun</button>
             </div>
           </div>
@@ -601,6 +607,98 @@
             <div class="log" x-ref="log" :data-f="logFilter" @scroll="onLogScroll($event)"></div>
           </div>
           <p class="muted small" x-show="job.status === 'queued'">Waiting for another job of this project, or for a free slot.</p>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===================== Compare two runs ===================== -->
+    <section x-show="view === 'compare'" x-cloak>
+      <template x-if="cmp">
+        <div class="stack">
+          <div class="toolbar">
+            <h1>
+              <a :href="'#/projects/' + cmp.B.job.projectId + '/history'" x-text="jobProject?.name"></a>
+              <span class="muted" x-text="'· run ' + cmp.A.job.id + ' vs ' + cmp.B.job.id"></span>
+            </h1>
+            <a class="button" :href="'#/compare/' + cmp.B.job.id + '/' + cmp.A.job.id">Swap</a>
+          </div>
+          <div class="cmpgrid">
+            <template x-for="side in [['A', cmp.A], ['B', cmp.B]]" :key="side[0]">
+              <a class="card cmpjob" :href="'#/jobs/' + side[1].job.id">
+                <div class="row">
+                  <strong x-text="'Run ' + side[1].job.id"></strong>
+                  <span class="status" :class="side[1].job.status" x-text="side[1].job.status"></span>
+                  <span class="grow"></span>
+                  <strong x-text="fmtMs(jobMs(side[1].job))"></strong>
+                </div>
+                <div class="muted small">
+                  <span x-text="when(side[1].job.startedAt || side[1].job.queuedAt)"></span>
+                  <span x-show="side[1].job.gitHead" x-text="'· commit ' + (side[1].job.gitHead || '').slice(0, 10)"></span>
+                  <span x-text="'· ' + plural(side[1].probs.length, 'problem')"></span>
+                </div>
+              </a>
+            </template>
+          </div>
+          <p x-text="cmpSummary()"></p>
+
+          <div class="card">
+            <h2>Command</h2>
+            <p class="muted small" x-show="cmpArgs().same">Both runs used the same command.</p>
+            <div class="row wrap" x-show="!cmpArgs().same">
+              <code class="tok" x-show="cmpArgs().exe" x-text="cmpArgs().exe"></code>
+              <template x-for="t in cmpArgs().removed" :key="'r' + t"><code class="tok removed" :title="'Only in run ' + cmp.A.job.id" x-text="t"></code></template>
+              <template x-for="t in cmpArgs().added" :key="'a' + t"><code class="tok added" :title="'Only in run ' + cmp.B.job.id" x-text="t"></code></template>
+              <code class="tok removed" x-show="cmpArgs().plRemoved.length" :title="cmpArgs().plRemoved.join('\n')" x-text="'-pl −' + cmpArgs().plRemoved.length + ' modules'"></code>
+              <code class="tok added" x-show="cmpArgs().plAdded.length" :title="cmpArgs().plAdded.join('\n')" x-text="'-pl +' + cmpArgs().plAdded.length + ' modules'"></code>
+            </div>
+          </div>
+
+          <div class="card" x-show="cmpProblems().added.length || cmpProblems().fixed.length">
+            <h2>Problems</h2>
+            <template x-for="grp in [['New in run ' + cmp.B.job.id, cmpProblems().added, 'added'], ['Gone since run ' + cmp.A.job.id, cmpProblems().fixed, 'removed']]" :key="grp[0]">
+              <div class="pgroup" x-show="grp[1].length">
+                <div class="muted small" x-text="grp[0] + ' (' + grp[1].length + ')'"></div>
+                <template x-for="(p, i) in grp[1].slice(0, 30)" :key="grp[2] + i">
+                  <div class="problem" :class="grp[2]">
+                    <code class="where" x-show="problemWhere(p)" x-text="problemWhere(p)"></code>
+                    <span class="badge small" x-show="p.module" x-text="p.module"></span>
+                    <span class="msg" x-text="p.message"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <div class="card" x-show="cmpRows().length">
+            <div class="row spread">
+              <h2>Modules</h2>
+              <div class="seg small">
+                <button :class="{active: cmpSort === 'delta'}" @click="cmpSort = 'delta'">Biggest change</button>
+                <button :class="{active: cmpSort === 'order'}" @click="cmpSort = 'order'">Build order</button>
+              </div>
+            </div>
+            <div class="modtable cmptable">
+              <table>
+                <thead><tr><th>Module</th><th class="num" x-text="'Run ' + cmp.A.job.id"></th><th class="num" x-text="'Run ' + cmp.B.job.id"></th><th class="num">Change</th></tr></thead>
+                <tbody>
+                  <template x-for="r in cmpRows()" :key="r.key">
+                    <tr :class="{changed: r.changed}">
+                      <td :title="r.key" x-text="r.name"></td>
+                      <td class="num">
+                        <span class="status" x-show="r.a && r.a.status !== 'succeeded'" :class="r.a?.status" x-text="r.a?.status"></span>
+                        <span x-text="r.a ? (r.a.ms ? fmtMs(r.a.ms) : '') : '—'"></span>
+                      </td>
+                      <td class="num">
+                        <span class="status" x-show="r.b && r.b.status !== 'succeeded'" :class="r.b?.status" x-text="r.b?.status"></span>
+                        <span x-text="r.b ? (r.b.ms ? fmtMs(r.b.ms) : '') : '—'"></span>
+                      </td>
+                      <td class="num" :class="{slower: r.delta > 500, faster: r.delta < -500}" x-text="r.delta === null ? '' : (r.delta > 0 ? '+' : '') + fmtMs(r.delta)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </template>
     </section>
