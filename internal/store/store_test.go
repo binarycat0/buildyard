@@ -94,7 +94,7 @@ func TestLastJobIsJoined(t *testing.T) {
 func TestJDKSyncAndSettings(t *testing.T) {
 	ctx := context.Background()
 	s, _ := openTemp(t)
-	j21 := jdk.Info{Home: "/jdk/21", Version: "21.0.8", Major: 21, Vendor: "Temurin", Source: "sdkman"}
+	j21 := jdk.Info{Home: "/jdk/21", FoundAt: "/opt/jdk21", Label: "openjdk@21 21.0.8 (Homebrew)", Version: "21.0.8", Major: 21, Vendor: "Temurin", Source: "sdkman"}
 	j17 := jdk.Info{Home: "/jdk/17", Version: "17.0.12", Major: 17, Source: "macos"}
 	exists := func(string) bool { return true }
 
@@ -111,6 +111,9 @@ func TestJDKSyncAndSettings(t *testing.T) {
 	}
 
 	list, _ := s.ListJDKs(ctx)
+	if list[0].Label != "openjdk@21 21.0.8 (Homebrew)" || list[0].FoundAt != "/opt/jdk21" {
+		t.Fatalf("label/foundAt not stored: %+v", list[0])
+	}
 	renamed, _ := s.RenameJDK(ctx, list[0].ID, "main")
 
 	// 17 disappeared; manual one still exists on disk; 21 still there keeps its label.

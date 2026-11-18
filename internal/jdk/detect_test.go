@@ -41,7 +41,7 @@ func TestDetectDarwinAndSdkman(t *testing.T) {
 	// JAVA_HOME without a release file still counts.
 	noRelease := fakeJDK(t, filepath.Join(h, "custom-jdk"), "", "")
 
-	got := Detector{Home: h, GOOS: "darwin", JavaHome: noRelease}.Detect()
+	got := isolated(Detector{Home: h, GOOS: "darwin", JavaHome: noRelease}, t).Detect()
 	type row struct {
 		ver, src string
 	}
@@ -69,4 +69,13 @@ func TestInspectAcceptsBundlePath(t *testing.T) {
 	if _, err := Inspect(t.TempDir()); err != ErrNotJDK {
 		t.Fatalf("empty dir: %v", err)
 	}
+}
+
+// isolated keeps a detector away from the real machine: no commands, env, brew or system dirs.
+func isolated(d Detector, t *testing.T) Detector {
+	d.Run = func(string, ...string) ([]byte, error) { return nil, os.ErrNotExist }
+	d.Getenv = func(string) string { return "" }
+	d.LookPath = func(string) string { return "" }
+	d.SystemRoot = t.TempDir()
+	return d
 }
