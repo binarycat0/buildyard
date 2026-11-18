@@ -48,7 +48,7 @@ type preview struct {
 	Env      map[string]string `json:"env"`      // project variables added to the daemon's environment
 	// MavenOpts is MAVEN_OPTS as the run gets it, when the memory setting changed it.
 	MavenOpts string `json:"mavenOpts,omitempty"`
-	Error    string            `json:"error,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // presetsFor returns the default skip presets with the project's own applied.

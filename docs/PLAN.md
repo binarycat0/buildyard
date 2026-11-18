@@ -77,7 +77,7 @@ Stack: Go, a single binary with an embedded UI and SQLite without cgo. The only 
 | Stopping processes | `os/exec` + `SysProcAttr{Setpgid: true}`; cancel = SIGTERM (SIGINT for the mvnd client) to the whole group, SIGKILL after 10 s | Works on macOS and Linux, kills surefire, node and other children |
 | Command | Always a `[]string` argv, never a shell | No quoting or injection problems |
 | CLI and config | Subcommands on stdlib `flag` (`buildyard serve`, later `buildyard run`); config in `~/.buildyard/config.toml` (`BurntSushi/toml`) for daemon settings; UI-editable settings in the DB | Minimal dependencies |
-| Building Buildyard | `Makefile`: first the extension jar (Maven, `--release 11`), then `go build`; releases later via goreleaser | JDK and Maven are on the machine anyway |
+| Building Buildyard | `Makefile`: first the extension jar (Maven, `--release 11`), then `go build`; releases by `.github/workflows/release.yml` (darwin/linux, amd64/arm64, checksums) and `install.sh` | JDK and Maven are on the machine anyway |
 | Security | None beyond binding to `127.0.0.1`: no token, login or Host/Origin checks (user decision, 2026-11-17) | Personal tool on the user's own machine |
 
 ## Architecture
@@ -92,7 +92,7 @@ Repository layout:
 
 ```text
 buildyard/
-  cmd/buildyard/main.go     # serve, open; later run, install-service
+  cmd/buildyard/main.go     # serve, open, service; later run
   internal/
     config/                # config.toml, ~/.buildyard paths
     lock/                  # flock on daemon.lock
@@ -508,7 +508,7 @@ flags = ["-ntp"]
 - No CORS.
 - Arbitrary commands run only by the id of a saved `shell_command`, never as raw text in a run request. `extraArgs` in a RunSpec are passed to Maven as arguments, without a shell.
 
-**Autostart (phase 7).** `buildyard install-service` writes a launchd plist to `~/Library/LaunchAgents/` on macOS or a systemd user unit to `~/.config/systemd/user/` on Linux. The daemon inherits the service environment, not the shell's. That is why mvn/mvnd are also looked up in Homebrew/sdkman dirs and JDKs are chosen from the settings list rather than taken from `JAVA_HOME`.
+**Autostart** (pulled forward from phase 7, done 2026-11-18). `buildyard service install` writes a launchd plist to `~/Library/LaunchAgents/` on macOS or a systemd user unit to `~/.config/systemd/user/` on Linux. `service start|stop|restart|status|uninstall` manage it; the service runs `serve --service`, which logs to stderr only, and the service manager appends that to `daemon.log`. The service gets `PATH`, `USER`, `JAVA_HOME` and `BUILDYARD_HOME` from the shell that installed it; otherwise the daemon inherits the service environment, not the shell's. That is why mvn/mvnd are also looked up in Homebrew/sdkman dirs and JDKs are chosen from the settings list rather than taken from `JAVA_HOME`.
 
 ## Phases
 
@@ -550,7 +550,7 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
 6. **"Build changed"**
    - **Done when:** on a branch with edits in two modules exactly those two modules are offered; "since the last successful run" works; a root pom change gives "build everything".
 7. **Polish (v2)**
-   - Autostart, system notifications on completion, log cleanup, CLI `buildyard run <profile>`, opening files in the IDE, Gradle adapter, selective `target/` cleanup for failed modules, rebuilding FAILURE+SKIPPED instead of `-rf` (see SPIKE.md).
+   - Autostart (done early), system notifications on completion, log cleanup, CLI `buildyard run <profile>`, opening files in the IDE, Gradle adapter, selective `target/` cleanup for failed modules, rebuilding FAILURE+SKIPPED instead of `-rf` (see SPIKE.md).
 
 ## Testing, risks, open questions
 

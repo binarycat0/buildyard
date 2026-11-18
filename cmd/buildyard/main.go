@@ -33,6 +33,8 @@ const usage = `Usage: buildyard <command> [flags]
 Commands:
   serve     start the daemon on 127.0.0.1 and print the UI address
   open      print the UI address and open it in the browser
+  service install|uninstall|start|stop|restart|status
+            run the daemon in the background (launchd on macOS, systemd --user on Linux)
   version   print the version
 
 Data lives in ~/.buildyard (override with BUILDYARD_HOME).
@@ -49,6 +51,8 @@ func main() {
 		err = serve(os.Args[2:])
 	case "open":
 		err = open(os.Args[2:])
+	case "service":
+		err = cmdService(os.Args[2:])
 	case "version", "--version", "-v":
 		fmt.Println("buildyard", version)
 	case "help", "-h", "--help":
@@ -91,6 +95,7 @@ func link(e env) string {
 func serve(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	port := fs.Int("port", 0, "port to listen on (default from config.toml, 7777)")
+	asService := fs.Bool("service", false, "log to stderr only; the service manager appends it to daemon.log")
 	fs.Parse(args)
 
 	e, err := setup()
@@ -110,12 +115,19 @@ func serve(args []string) error {
 	}
 	defer l.Release()
 
-	logFile, err := os.OpenFile(e.paths.Log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-	if err != nil {
-		return err
+	// In the foreground the log goes to the terminal and daemon.log. Under a
+	// service manager stderr is already redirected to daemon.log, so writing
+	// the file too would log every line twice.
+	var logOut io.Writer = os.Stderr
+	if !*asService {
+		logFile, err := os.OpenFile(e.paths.Log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err != nil {
+			return err
+		}
+		defer logFile.Close()
+		logOut = io.MultiWriter(os.Stderr, logFile)
 	}
-	defer logFile.Close()
-	log := slog.New(slog.NewTextHandler(io.MultiWriter(os.Stderr, logFile), nil))
+	log := slog.New(slog.NewTextHandler(logOut, nil))
 	slog.SetDefault(log)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -152,7 +164,9 @@ func serve(args []string) error {
 		log.Warn("build tool detection not started", "err", err)
 	}
 	log.Info("buildyard started", "version", version, "addr", fmt.Sprintf("127.0.0.1:%d", e.cfg.Port), "dataDir", e.paths.Dir)
-	fmt.Fprintf(os.Stderr, "\nOpen Buildyard: %s\n\n", link(e))
+	if !*asService {
+		fmt.Fprintf(os.Stderr, "\nOpen Buildyard: %s\n\n", link(e))
+	}
 
 	err = httpapi.ListenAndServe(ctx, e.cfg.Port, srv.Handler())
 	shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
