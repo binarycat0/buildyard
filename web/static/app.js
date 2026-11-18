@@ -378,7 +378,24 @@ document.addEventListener('alpine:init', () => {
 
     // ---------- runs ----------
     spec() {
-      return formToSpec(this.rform);
+      const spec = formToSpec(this.rform);
+      // Every module ticked (e.g. the root of the tree) is the same as building all of them,
+      // without a -pl list of hundreds of modules.
+      if (spec.modules.mode === 'selected' && this.modules.length && this.allSelected()) {
+        spec.modules = { mode: 'all', list: [], alsoMake: false, alsoMakeDependents: false };
+      }
+      return spec;
+    },
+
+    allSelected() {
+      const sel = new Set(this.selectedKeys());
+      return this.modules.every((m) => sel.has(m.key));
+    },
+
+    // Notes of the ticked skip presets, e.g. why skipping test compilation can break a build.
+    skipNotes() {
+      return this.skipPresets.filter((sp) => sp.note && this.rform.skips.includes(sp.id) && sp.id !== 'tests')
+        .map((sp) => `${sp.label}: ${sp.note}`);
     },
 
     specSummary(spec) {

@@ -130,3 +130,4 @@ pre.error { white-space: pre-wrap; margin: 0; max-height: 200px; overflow: auto;
 a.modname { color: inherit; text-decoration: none; }
 a.modname:hover { text-decoration: underline; }
 .stack.tight > p { margin: 0; }
+.warn { color: #9a6700; margin: 4px 0 0; }
