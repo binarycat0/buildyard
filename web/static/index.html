@@ -21,6 +21,8 @@
 
   <main>
     <p class="error" x-show="error" x-text="error"></p>
+    <p class="notice row" x-show="uiStale" x-cloak>Buildyard was restarted, and this page still runs the previous UI.
+      <button @click="location.reload()">Reload</button></p>
 
     <!-- ===================== Projects ===================== -->
     <section x-show="view === 'projects'">
@@ -516,6 +518,10 @@
               </h1>
               <span class="status big" :class="job.status" x-text="job.status"></span>
               <span class="muted" x-text="duration(job)"></span>
+              <template x-if="failReason()">
+                <button type="button" class="link fail-reason" @click="failReason().line && goToLine(failReason().line)"
+                  :title="failReason().line ? 'Go to log line ' + failReason().line : ''" x-text="failReason().text"></button>
+              </template>
             </div>
             <div class="row">
               <span class="muted small" x-show="job.status === 'running' && job.stopRequestedAt"

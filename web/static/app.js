@@ -357,6 +357,7 @@ document.addEventListener('alpine:init', () => {
   window.Alpine.data('app', () => ({
     view: 'projects',
     health: null,
+    uiStale: false,
     error: '',
     busy: false,
     saved: false,
@@ -459,9 +460,22 @@ document.addEventListener('alpine:init', () => {
       // Background tasks are cheap to list (in memory); poll faster while the page is open.
       const poll = async () => {
         await this.loadActivity().catch(() => {});
+        await this.checkRestart();
         setTimeout(poll, this.view === 'activity' ? 2000 : 10000);
       };
       setTimeout(poll, 2000);
+    },
+
+    // A page left open across a daemon restart keeps running the old UI code against the
+    // new API: it can hide things the new daemon sends (a new problem kind, a new field).
+    async checkRestart() {
+      if (!this.health || this.uiStale) return;
+      try {
+        const h = await api('GET', '/health');
+        if (h.startedAt !== this.health.startedAt || h.version !== this.health.version) this.uiStale = true;
+      } catch {
+        // the daemon is down or restarting: check again on the next poll
+      }
     },
 
     async route() {
@@ -1338,6 +1352,16 @@ document.addEventListener('alpine:init', () => {
 
     modsWith(...st) {
       return this.jobMods.filter((m) => st.includes(m.status));
+    },
+
+    // Why a failed job failed, in one line: the first problem, a crash first (it has no
+    // [ERROR] line, so nothing else on the page is red).
+    failReason() {
+      if (!this.job || this.job.status !== 'failed') return null;
+      const p = this.jobProblems.find((x) => x.kind === 'crash') || this.jobProblems[0];
+      if (!p) return this.job.exitCode != null ? { text: `Exited with code ${this.job.exitCode}`, line: 0 } : null;
+      const what = { crash: 'Build tool crashed', compile: 'Compile error', test: 'Test failed', goal: 'Goal failed', dependency: 'Dependency problem' }[p.kind] || 'Failed';
+      return { text: `${what}: ${p.module ? p.module + ': ' : ''}${p.message}`, line: p.logLine };
     },
 
     modsSummary() {

@@ -29,6 +29,7 @@ export class LineClassifier {
   constructor() {
     this.prev = 'info'; // a line without a level continues the previous error/warning (stack traces, javac details)
     this.inSummary = false;
+    this.crashed = false; // a build-tool crash was seen: its later stack lines are errors
   }
 
   classify(text) {
@@ -42,6 +43,10 @@ export class LineClassifier {
     } else if (crashRe.some((re) => re.test(text))) {
       level = 'error';
       this.prev = level; // the stack trace below continues it
+      this.crashed = true;
+    } else if (this.crashed && /^(?:\s+at |\s*\.\.\. \d+ more|Caused by: )/.test(text)) {
+      level = 'error'; // the crash's stack trace, also after mvnd's daemon-log dump between
+      this.prev = level;
     } else if (/^-{5,} .+ -{5,}$/.test(text.trim())) {
       level = 'plain'; // a banner (mvnd's daemon log tail) ends a stack trace
       this.prev = level;
