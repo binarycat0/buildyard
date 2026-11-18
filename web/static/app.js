@@ -335,6 +335,7 @@ document.addEventListener('alpine:init', () => {
     moduleFilter: '',
     moduleInfo: null,
     openState: {},
+    filterOpen: null, // open/closed folders while filtering: { q, map }
     modScroll: 0,
     modHeight: 360,
     rtab: loadPref('runTab', 'modules'),
@@ -726,19 +727,24 @@ document.addEventListener('alpine:init', () => {
       };
     },
 
-    // Rows to render: the aggregator tree (top level open by default), or a flat list
-    // when filtering or when discovery had no folder information. Cached: the list is
-    // asked for by every visible row.
+    // Rows to render: the aggregator tree (top level open by default), or a flat list when
+    // discovery had no folder information. With a filter, the tree keeps only the matching
+    // modules and the folders above them (shown as context rows, open by default); a matching
+    // folder with no matching children stays collapsed and opens to all of its children.
+    // Cached: the list is asked for by every visible row.
     shownRows() {
       const mods = Alpine.raw(this.modules);
       const open = Alpine.raw(this.openState);
       const q = this.moduleFilter.trim().toLowerCase();
+      const fo = Alpine.raw(this.filterOpen);
       const c = rowsCache;
-      if (c && c.mods === mods && c.open === open && c.q === q) return c.rows;
+      if (c && c.mods === mods && c.open === open && c.q === q && c.fo === fo) return c.rows;
       const g = this.graph();
       let rows;
-      if (q || !g.hasTree) {
+      if (!g.hasTree) {
         rows = this.filteredModules().map((m) => ({ m, depth: 0, kids: 0, open: false, flat: true }));
+      } else if (q) {
+        rows = this.filteredTree(g, q, fo && fo.q === q ? fo.map : {});
       } else {
         rows = [];
         const stack = g.roots.map((m) => [m, 0]).reverse();
@@ -750,7 +756,34 @@ document.addEventListener('alpine:init', () => {
           if (isOpen) for (let i = kids.length - 1; i >= 0; i--) stack.push([kids[i], depth + 1]);
         }
       }
-      rowsCache = { mods, open, q, rows };
+      rowsCache = { mods, open, q, fo, rows };
+      return rows;
+    },
+
+    filteredTree(g, q, open) {
+      const match = new Set(this.filteredModules().map((m) => m.key));
+      // hits: the matching keys in each subtree (only for subtrees with at least one).
+      const hits = new Map();
+      for (const k of match) {
+        for (let a = k; a; a = g.parent(a)) {
+          if (!hits.has(a)) hits.set(a, []);
+          hits.get(a).push(k);
+        }
+      }
+      const rows = [];
+      const stack = g.roots.filter((m) => hits.has(m.key)).map((m) => [m, 0, false]).reverse();
+      while (stack.length) {
+        const [m, depth, inside] = stack.pop();
+        const all = g.kids.get(m.key) || [];
+        const hitKids = inside ? all : all.filter((k) => hits.has(k.key));
+        // A matching folder without matching children shows all of them when opened.
+        const showAll = inside || (match.has(m.key) && !hitKids.length);
+        const kids = showAll ? all : hitKids;
+        const isOpen = m.key in open ? open[m.key] : !showAll;
+        const ctx = !inside && !match.has(m.key);
+        rows.push({ m, depth, kids: kids.length, open: isOpen, size: g.sub.get(m.key)?.length || 1, ctx, hits: ctx ? hits.get(m.key) : null });
+        if (isOpen) for (let i = kids.length - 1; i >= 0; i--) stack.push([kids[i], depth + 1, showAll]);
+      }
       return rows;
     },
 
@@ -777,14 +810,30 @@ document.addEventListener('alpine:init', () => {
       this.modScroll = e.target.scrollTop;
     },
 
+    // focus: the module whose dependencies are shown; ctx: a folder shown only for the
+    // matches under it; hit: a module that matches the filter.
+    rowClass(r) {
+      const hit = !r.flat && !r.ctx && this.moduleFilter.trim() !== '';
+      return [this.moduleInfo === r.m.key && 'focus', r.ctx && 'ctx', hit && 'hit'].filter(Boolean).join(' ');
+    },
+
     toggleOpen(r) {
+      const q = this.moduleFilter.trim().toLowerCase();
+      if (q && this.hasTree()) {
+        const fo = Alpine.raw(this.filterOpen);
+        const map = fo && fo.q === q ? fo.map : {};
+        this.filterOpen = { q, map: { ...map, [r.m.key]: !r.open } };
+        return;
+      }
       this.openState = { ...Alpine.raw(this.openState), [r.m.key]: !r.open };
     },
 
     setAllOpen(open) {
       const st = {};
       for (const k of this.graph().kids.keys()) st[k] = open;
-      this.openState = st;
+      const q = this.moduleFilter.trim().toLowerCase();
+      if (q) this.filterOpen = { q, map: st };
+      else this.openState = st;
     },
 
     filteredModules() {
@@ -797,6 +846,10 @@ document.addEventListener('alpine:init', () => {
     // all | some | none for a row: a parent counts its whole subtree.
     checkState(r) {
       const sel = this.selection();
+      if (r.hits) {
+        const n = r.hits.filter((k) => sel.keys.has(k)).length;
+        return n === 0 ? 'none' : n === r.hits.length ? 'all' : 'some';
+      }
       if (!r.kids || r.flat) return sel.keys.has(r.m.key) ? 'all' : 'none';
       const n = sel.under.get(r.m.key) || 0;
       return n === 0 ? 'none' : n === r.size ? 'all' : 'some';
@@ -805,7 +858,9 @@ document.addEventListener('alpine:init', () => {
     // Ticking a tree parent ticks everything under it.
     toggleModule(r) {
       const g = this.graph();
-      const keys = r.kids && !r.flat ? this.subtreeKeys(r.m.key) : [r.m.key];
+      // A context row (a folder shown only because something under it matches the
+      // filter) stands for its matching modules.
+      const keys = r.hits ? r.hits : r.kids && !r.flat ? this.subtreeKeys(r.m.key) : [r.m.key];
       const on = this.checkState(r) !== 'all';
       const drop = new Set(keys.map((k) => g.ref.get(k) ?? k));
       const sel = Alpine.raw(this.rform.selected).filter((x) => !drop.has(x) && !drop.has(g.ref.get(g.keyOf.get(x))));
@@ -816,7 +871,7 @@ document.addEventListener('alpine:init', () => {
 
     selectShown() {
       const have = new Set(Alpine.raw(this.rform.selected));
-      const add = this.shownRows().map((r) => this.moduleRef(r.m)).filter((x) => !have.has(x));
+      const add = this.filteredModules().map((m) => this.moduleRef(m)).filter((x) => !have.has(x));
       this.rform.selected = [...this.rform.selected, ...add];
       this.refreshPreview();
     },
