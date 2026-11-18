@@ -259,8 +259,10 @@ function specToForm(spec) {
     cpu, cpuCustom, heap, heapCustom, forks, forksCustom,
     goals: (spec.goals || []).join(' '),
     args: (spec.extraArgs || []).map(shellQuote).join(' '),
-    modulesMode: m.mode === 'selected' ? 'selected' : 'all',
-    selected: [...(m.list || [])],
+    // A list of only "!" exclusions is "all modules except" (also how a rerun without
+    // failed modules is saved).
+    modulesMode: m.mode !== 'selected' ? 'all' : (m.list || []).length && m.list.every((r) => r.startsWith('!')) ? 'exclude' : 'selected',
+    selected: m.mode === 'selected' && (m.list || []).length && m.list.every((r) => r.startsWith('!')) ? m.list.map((r) => r.slice(1)) : [...(m.list || [])],
     alsoMake: m.mode === 'selected' ? !!m.alsoMake : true,
     alsoMakeDependents: !!m.alsoMakeDependents,
     skips: [...(spec.skips || [])],
@@ -593,6 +595,19 @@ document.addEventListener('alpine:init', () => {
       return `Project default (${v ? resLabel(kind, v) : none})`;
     },
 
+    // The Build / Skip switch over the ticked modules. Flipping it keeps the same modules
+    // built: the ticks are inverted.
+    setPickMode(mode) {
+      if (this.rform.modulesMode === mode) return;
+      if (this.rform.selected.length && this.modules.length) {
+        const sel = this.selection().keys;
+        const g = this.graph();
+        this.rform.selected = this.modules.filter((m) => !sel.has(m.key)).map((m) => g.ref.get(m.key));
+      }
+      this.rform.modulesMode = mode;
+      this.refreshPreview();
+    },
+
     // ---------- runs ----------
     spec() {
       const spec = formToSpec(this.rform);
@@ -602,6 +617,10 @@ document.addEventListener('alpine:init', () => {
         spec.modules = { mode: 'all', list: [], alsoMake: false, alsoMakeDependents: false };
       } else if (spec.modules.mode === 'selected' && this.modules.length) {
         spec.modules.list = this.moduleArgs();
+      } else if (spec.modules.mode === 'exclude') {
+        const list = this.excludeArgs();
+        spec.modules = list.length ? { mode: 'selected', list, alsoMake: false, alsoMakeDependents: false }
+          : { mode: 'all', list: [], alsoMake: false, alsoMakeDependents: false };
       }
       return spec;
     },
@@ -624,6 +643,17 @@ document.addEventListener('alpine:init', () => {
         ...unticked.filter(tickedAbove).map((k) => '!' + ref(k))];
       const negative = unticked.filter((k) => !(g.sub.get(k) || [k]).some((x) => sel.has(x))).map((k) => '!' + ref(k));
       return negative.length && negative.length < positive.length ? negative : positive;
+    },
+
+    // "All modules except": the ticked modules as "!" exclusions. A folder is excluded
+    // only when everything under it is (Maven 3 would still build its children; Maven 4
+    // would drop the ones still wanted).
+    excludeArgs() {
+      const sel = this.selection().keys;
+      if (!this.modules.length) return Alpine.raw(this.rform.selected).map((r) => '!' + r.replace(/^!/, ''));
+      const g = this.graph();
+      return this.modules.filter((m) => sel.has(m.key) && (g.sub.get(m.key) || [m.key]).every((k) => sel.has(k)))
+        .map((m) => '!' + g.ref.get(m.key));
     },
 
     // A saved list may hold "!" exclusions (see moduleArgs, or a rerun without failed
@@ -666,7 +696,9 @@ document.addEventListener('alpine:init', () => {
       const s = spec || {};
       const tags = (s.goals || []).map((g) => ({ text: g, cls: 'goal' }));
       const m = s.modules || {};
-      if (m.mode === 'selected' && m.list?.length) {
+      if (m.mode === 'selected' && m.list?.length && m.list.every((r) => r.startsWith('!'))) {
+        tags.push({ text: `all except ${m.list.length}`, title: m.list.join('\n') });
+      } else if (m.mode === 'selected' && m.list?.length) {
         const list = m.list;
         const text = list.length <= 2 ? list.map((r) => r.replace(/^:/, '')).join(', ') : `${list.length} modules`;
         const extra = [m.alsoMake && '-am', m.alsoMakeDependents && '-amd'].filter(Boolean).join(' ');
@@ -860,7 +892,8 @@ document.addEventListener('alpine:init', () => {
     // matches under it; hit: a module that matches the filter.
     rowClass(r) {
       const hit = !r.flat && !r.ctx && this.moduleFilter.trim() !== '';
-      return [this.moduleInfo === r.m.key && 'focus', r.ctx && 'ctx', hit && 'hit'].filter(Boolean).join(' ');
+      const skip = this.rform.modulesMode === 'exclude' && this.checkState(r) === 'all';
+      return [this.moduleInfo === r.m.key && 'focus', r.ctx && 'ctx', hit && 'hit', skip && 'skip'].filter(Boolean).join(' ');
     },
 
     toggleOpen(r) {
@@ -911,7 +944,7 @@ document.addEventListener('alpine:init', () => {
       const drop = new Set(keys.map((k) => g.ref.get(k) ?? k));
       const sel = Alpine.raw(this.rform.selected).filter((x) => !drop.has(x) && !drop.has(g.ref.get(g.keyOf.get(x))));
       this.rform.selected = on ? [...sel, ...drop] : sel;
-      if (this.rform.selected.length) this.rform.modulesMode = 'selected';
+      if (this.rform.selected.length && this.rform.modulesMode === 'all') this.rform.modulesMode = 'selected';
       this.refreshPreview();
     },
 
@@ -1039,7 +1072,7 @@ document.addEventListener('alpine:init', () => {
         if (a === '-pl' && i + 1 < argv.length) {
           const list = argv[++i].split(',');
           out.push(list.length > 3
-            ? { text: `-pl ${list.length} modules`, title: list.join('\n') }
+            ? { text: list.every((x) => x.startsWith('!')) ? `-pl all except ${list.length}` : `-pl ${list.length} modules`, title: list.join('\n') }
             : { text: '-pl ' + list.join(',') });
           continue;
         }
@@ -1110,7 +1143,7 @@ document.addEventListener('alpine:init', () => {
       const props = f.props.split('\n').filter((l) => l.trim()).length;
       const profiles = f.profiles.split(/[\s,]+/).filter(Boolean).length;
       return [
-        { id: 'modules', label: 'Modules', count: f.modulesMode === 'selected' ? n(f.selected.length) : '' },
+        { id: 'modules', label: 'Modules', count: f.modulesMode === 'selected' ? n(f.selected.length) : f.modulesMode === 'exclude' ? (f.selected.length ? '−' + f.selected.length : '') : '' },
         { id: 'skip', label: 'Skip', count: n(f.skips.length) },
         { id: 'options', label: 'Options', count: n([f.offline, f.nsu, f.errors, f.failMode, f.logLevel !== 'default'].filter(Boolean).length) },
         { id: 'resources', label: 'Resources', count: n([f.cpu, f.heap, f.forks].filter(Boolean).length) },
