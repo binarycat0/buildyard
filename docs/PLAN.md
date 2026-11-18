@@ -409,7 +409,7 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | --- | --- | --- |
 | GET | `/api/projects` | Projects with their last job |
 | POST | `/api/projects` | Add `{name, rootPath}`: detect the build system |
-| GET / PATCH / DELETE | `/api/projects/{id}` | A project and its settings (`executable`, `jdkId`, `env`, `skipPresets`) |
+| GET / PATCH / DELETE | `/api/projects/{id}` | A project and its settings (`executable`, `jdkId`, `toolJdkId`, `env`, `skipPresets`) |
 | GET | `/api/projects/{id}/runtime` | Which executable and JDK a run will use and why; whether `./mvnw` exists |
 | GET | `/api/projects/{id}/modules` | Module tree |
 | POST | `/api/projects/{id}/modules/refresh` | Rediscover modules (background task) |
@@ -419,14 +419,14 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | GET / POST | `/api/projects/{id}/profiles` | The project's run profiles |
 | PUT / DELETE | `/api/profiles/{id}` | Update or delete a profile |
 | GET / POST | `/api/projects/{id}/commands` | Arbitrary project commands |
-| POST | `/api/projects/{id}/preview` | RunSpec → `{argv, display}` without running |
-| POST | `/api/projects/{id}/jobs` | Run: `{spec}` or `{profileId}` |
-| GET | `/api/jobs?projectId=&status=&limit=` | Job history |
-| GET | `/api/jobs/{id}` | A job, its modules and problems |
+| POST | `/api/projects/{id}/preview` | `{spec}` → `{argv, dir, javaHome, env, error}` without running |
+| GET | `/api/projects/{id}/jobs?limit=` | The project's job history, newest first |
+| POST | `/api/projects/{id}/jobs` | Run: `{spec}` (later also `{profileId}`) → `201 job` |
+| GET | `/api/jobs/{id}` | A job (with `liveLines` while running); later its modules and problems |
 | POST | `/api/jobs/{id}/cancel` | Cancel |
 | POST | `/api/jobs/{id}/rerun` | Rerun with the same RunSpec snapshot |
-| GET | `/api/jobs/{id}/log?from=&limit=&levels=` | A batch of log lines |
-| GET | `/api/jobs/{id}/stream` | SSE: log, modules, status |
+| GET | `/api/jobs/{id}/log?from=&limit=` | A batch of log lines `{from, lines, total}` (`levels=` later) |
+| GET | `/api/jobs/{id}/stream?from=` | SSE: log, status (modules later) |
 | GET | `/api/events` | SSE: status of all jobs for the global job bar |
 | GET / PUT | `/api/settings` | Global settings: `{tools: {maven: {executable, jdkId}}}` |
 | GET | `/api/tools` | mvn and mvnd with versions (from the last detection), project wrappers and their Maven versions, the daemon's `JAVA_HOME` |
@@ -440,10 +440,11 @@ All functionality is available through the JSON API under `/api`. The UI and the
 
 Events in `/api/jobs/{id}/stream` (`event:` → `data:`):
 
-- `log` — `{n, text, level}`; the event `id:` is the line number `n`, which enables catch-up via `Last-Event-ID`;
-- `module` — `{key, ord, total, status, ms}`;
-- `problem` — `{kind, module, file, line, message, logLine}`;
-- `status` — `{status, exitCode}`, the last event; the server closes the stream after it.
+- `log` — `{n, text}` (`level` later); the event `id:` is the line number `n`, which enables catch-up via `Last-Event-ID`. Without it (or `?from=N`) the stream starts with the last 2000 lines; the UI loads earlier ones through `/log`;
+- `status` — `{status}` whenever it changes;
+- `module` — `{key, ord, total, status, ms}` (phase 4);
+- `problem` — `{kind, module, file, line, message, logLine}` (phase 4);
+- `end` — the finished job; the last event. The client closes the stream after it (a reconnect would only get `end` again).
 
 Every 15 seconds the server sends a `: ping` comment so the connection does not time out.
 
@@ -521,10 +522,11 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
    - Projects CRUD, embedded UI with the projects screen.
    - Global settings (JDK list, per-build-tool defaults), project settings (project JDK, Maven executable and JDK, environment), background task queue.
    - **Done when:** `buildyard serve` starts the daemon; a project can be added and survives a restart; a second instance does not start.
-2. **Job runner**
-   - Queue and per-project lock, running saved shell commands, log to file.
+2. **Job runner** — **done 2026-11-18**
+   - Queue and per-project lock, log to file. Divergence: instead of saved shell commands the runner starts with a minimal Maven RunSpec (`goals` + free-form `args`), so real builds can run before phase 3; arbitrary shell commands move to phase 7.
    - SSE with `Last-Event-ID` catch-up, process group cancel, `interrupted` status after restart.
-   - Job screen with a plain log, history.
+   - Job screen with a plain log, history. The project screen gets Run / History / Settings tabs.
+   - Checked by `internal/runner` and `internal/httpapi` tests: cancel kills a parent and children that ignore SIGTERM; a subscriber that joins mid-run gets every line exactly once; two jobs of one project run one after another while another project runs in parallel.
    - **Done when:** a test script that spawns a child process is cancelled with no processes left (automated test); a browser opened mid-job receives the whole log; two jobs of one project run sequentially.
 3. **Maven adapter and profiles**
    - Module discovery through Maven (background task), tree with checkboxes.

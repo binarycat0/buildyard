@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"testing/fstest"
 
 	"github.com/binarycat0/buildyard/internal/jdk"
+	"github.com/binarycat0/buildyard/internal/runner"
 	"github.com/binarycat0/buildyard/internal/store"
 	"github.com/binarycat0/buildyard/internal/tasks"
 )
@@ -43,6 +45,8 @@ func newServerHome(t *testing.T, userHome string) (http.Handler, string) {
 		Run:      func(string, ...string) ([]byte, error) { return nil, os.ErrNotExist },
 		Getenv:   func(string) string { return "" },
 		LookPath: func(string) string { return "" }}, Home: userHome, DataDir: "/tmp/x", UI: ui}
+	s.Runner = runner.New(st, t.TempDir(), 1, 0, slog.New(slog.DiscardHandler))
+	t.Cleanup(func() { s.Runner.Shutdown(context.Background()) })
 	return s.Handler(), dbPath
 }
 

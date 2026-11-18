@@ -8,11 +8,11 @@
   <script type="module" src="/app.js"></script>
   <script defer src="/vendor/alpine-3.14.9.min.js"></script>
 </head>
-<body x-data="app" x-init="init()">
+<body x-data="app">
   <header class="top">
     <a href="#/" class="brand">Buildyard</a>
     <nav>
-      <a href="#/" :class="{active: view === 'projects' || view === 'project'}">Projects</a>
+      <a href="#/" :class="{active: view === 'projects' || view === 'project' || view === 'job'}">Projects</a>
       <a href="#/settings" :class="{active: view === 'settings'}">Settings</a>
     </nav>
     <span class="muted grow-right" x-text="health ? 'v' + health.version : ''"></span>
@@ -54,9 +54,15 @@
               <span class="badge" x-text="p.buildTool"></span>
             </div>
             <code class="path" x-text="p.rootPath"></code>
-            <p class="muted" x-text="lastJobText(p)"></p>
+            <p class="muted">
+              <template x-if="p.lastJob"><a :href="'#/jobs/' + p.lastJob.id" class="status-link">
+                <span class="status" :class="p.lastJob.status" x-text="p.lastJob.status"></span></a></template>
+              <span x-text="lastJobText(p)"></span>
+            </p>
             <div class="row">
-              <a class="button" :href="'#/projects/' + p.id">Settings</a>
+              <a class="button primary" :href="'#/projects/' + p.id">Run</a>
+              <a class="button" :href="'#/projects/' + p.id + '/history'">History</a>
+              <a class="button" :href="'#/projects/' + p.id + '/settings'">Settings</a>
               <button class="danger" @click="remove(p)">Remove</button>
             </div>
           </article>
@@ -72,7 +78,56 @@
             <h1 x-text="proj.name"></h1>
             <code class="path" x-text="proj.rootPath"></code>
           </div>
+          <nav class="tabs page-tabs">
+            <a :href="'#/projects/' + proj.id" :class="{active: pview === 'run'}">Run</a>
+            <a :href="'#/projects/' + proj.id + '/history'" :class="{active: pview === 'history'}">History</a>
+            <a :href="'#/projects/' + proj.id + '/settings'" :class="{active: pview === 'settings'}">Settings</a>
+          </nav>
 
+          <!-- Run -->
+          <form class="card" x-show="pview === 'run'" @submit.prevent="runJob()">
+            <label>Goals</label>
+            <div class="row wrap">
+              <template x-for="g in commonGoals" :key="g">
+                <button type="button" class="chip" :class="{active: hasGoal(g)}" @click="toggleGoal(g)" x-text="g"></button>
+              </template>
+            </div>
+            <input x-model="rform.goals" placeholder="clean install" @input.debounce.250ms="refreshPreview()" aria-label="Goals">
+            <label>Arguments <span class="muted">(options and properties, e.g. -DskipTests -pl :core -am -T 1C)</span>
+              <input x-model="rform.args" placeholder="-DskipTests" @input.debounce.250ms="refreshPreview()">
+            </label>
+            <div class="preview" x-show="rpreview">
+              <div class="muted small">Command <span x-show="rpreview?.javaHome" x-text="'· JAVA_HOME=' + rpreview?.javaHome"></span></div>
+              <pre class="cmd" x-text="rpreview ? shellJoin(rpreview.argv) : ''"></pre>
+            </div>
+            <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
+            <div class="row">
+              <button class="primary" type="submit" :disabled="busy || !!rpreview?.error">Run</button>
+              <span class="muted small">One job per project runs at a time; more wait in the queue.</span>
+            </div>
+          </form>
+
+          <!-- History -->
+          <div class="card" x-show="pview === 'history'">
+            <p class="muted" x-show="!pjobs.length">No runs yet.</p>
+            <table class="list" x-show="pjobs.length">
+              <thead><tr><th>#</th><th>Status</th><th>Command</th><th>Started</th><th>Duration</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="j in pjobs" :key="j.id">
+                  <tr class="clickable" @click="location.hash = '#/jobs/' + j.id">
+                    <td><a :href="'#/jobs/' + j.id" x-text="j.id"></a></td>
+                    <td><span class="status" :class="j.status" x-text="j.status"></span></td>
+                    <td><code x-text="specText(j)"></code></td>
+                    <td class="small" x-text="when(j.startedAt || j.queuedAt)"></td>
+                    <td class="small" x-text="duration(j)"></td>
+                    <td><button class="small" @click.stop="rerun(j)">Rerun</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="stack" x-show="pview === 'settings'">
           <div class="card">
             <h2>What a run will use</h2>
             <template x-if="runtime">
@@ -154,6 +209,41 @@
               <span class="muted" x-show="saved">Saved</span>
             </div>
           </form>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===================== Job ===================== -->
+    <section x-show="view === 'job'" x-cloak>
+      <template x-if="job">
+        <div class="stack">
+          <div class="toolbar">
+            <div class="row">
+              <h1>
+                <a :href="'#/projects/' + job.projectId + '/history'" x-text="jobProject?.name"></a>
+                <span class="muted" x-text="'· job ' + job.id"></span>
+              </h1>
+              <span class="status big" :class="job.status" x-text="job.status"></span>
+              <span class="muted" x-text="duration(job)"></span>
+            </div>
+            <div class="row">
+              <button class="danger" x-show="job.status === 'running' || job.status === 'queued'" @click="cancelJob()">Cancel</button>
+              <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="rerun(job)">Rerun</button>
+            </div>
+          </div>
+          <pre class="cmd" x-text="shellJoin(job.argv)"></pre>
+          <div class="muted small">
+            <span x-text="'Queued ' + when(job.queuedAt)"></span>
+            <span x-show="job.gitHead" x-text="'· commit ' + (job.gitHead || '').slice(0, 10)"></span>
+            <span x-show="job.exitCode !== null && job.exitCode !== undefined" x-text="'· exit code ' + job.exitCode"></span>
+            <span x-text="'· ' + logCount + ' lines'"></span>
+          </div>
+          <div class="logwrap">
+            <button class="small earlier" x-show="firstLine > 1" @click="loadEarlier()" x-text="'Load ' + (firstLine - 1) + ' earlier lines'"></button>
+            <div class="log" x-ref="log" @scroll="onLogScroll($event)"></div>
+          </div>
+          <p class="muted small" x-show="job.status === 'queued'">Waiting for another job of this project, or for a free slot.</p>
         </div>
       </template>
     </section>

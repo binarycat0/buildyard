@@ -1,4 +1,4 @@
-// Thin JSON client for the Buildyard API. The browser adds Origin, which the daemon checks on writes.
+// Thin JSON client for the Buildyard API.
 export class ApiError extends Error {
   constructor(status, code, message) {
     super(message || code);
