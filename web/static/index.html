@@ -192,17 +192,23 @@
               </nav>
               <div class="stack tabbody" x-show="rtab === 'modules'">
                 <div class="row wrap">
-                  <label class="radio"><input type="radio" value="all" x-model="rform.modulesMode" @change="refreshPreview()"> All modules</label>
-                  <label class="radio"><input type="radio" value="selected" x-model="rform.modulesMode" @change="refreshPreview()">
-                    Selected <span class="muted" x-text="'(' + rform.selected.length + ')'"></span></label>
+                  <label class="radio"><input type="radio" value="all" :checked="rform.modulesMode === 'all'" @change="rform.modulesMode = 'all'; refreshPreview()"> All modules</label>
+                  <label class="radio"><input type="radio" value="selected" :checked="rform.modulesMode !== 'all'"
+                    @change="rform.modulesMode = 'selected'; refreshPreview()">
+                    Pick modules <span class="muted" x-text="'(' + rform.selected.length + ')'"></span></label>
+                  <div class="seg small" x-show="rform.modulesMode !== 'all'" title="What the ticked modules mean">
+                    <button type="button" :class="{active: rform.modulesMode === 'selected'}" @click="setPickMode('selected')">Build ticked</button>
+                    <button type="button" :class="{active: rform.modulesMode === 'exclude'}" @click="setPickMode('exclude')">Skip ticked</button>
+                  </div>
                   <span class="grow"></span>
                   <span class="muted small" x-text="moduleStatus()"></span>
                   <button type="button" class="small" @click="discover()" :disabled="discoverTask" x-text="discoverTask ? 'Discovering…' : (modules.length ? 'Rediscover' : 'Discover modules')"
                     title="Lists the reactor with mvn help:active-profiles, using the profiles, skips and properties below"></button>
                 </div>
                 <pre class="error small" x-show="discoverError" x-text="discoverError"></pre>
-                <div x-show="rform.modulesMode === 'selected'" class="stack tight">
-                  <div class="row wrap">
+                <div x-show="rform.modulesMode !== 'all'" class="stack tight">
+                  <p class="small muted" x-show="rform.modulesMode === 'exclude'">Everything is built except the ticked modules (<code>-pl !…</code>). A folder is left out only when everything under it is ticked.</p>
+                  <div class="row wrap" x-show="rform.modulesMode === 'selected'">
                     <label class="radio"><input type="checkbox" x-model="rform.alsoMake" @change="refreshPreview()"> also make dependencies <code>-am</code></label>
                     <label class="radio"><input type="checkbox" x-model="rform.alsoMakeDependents" @change="refreshPreview()"> also make dependents <code>-amd</code></label>
                   </div>
@@ -213,8 +219,8 @@
                     <button type="button" class="small" x-show="moduleFilter" @click="selectShown()">Select shown</button>
                     <button type="button" class="small" @click="rform.selected = []; refreshPreview()">Clear</button>
                   </div>
-                  <p class="small muted" x-show="rform.selected.length && hasTree() && !allSelected()" x-text="impactText()"></p>
-                  <p class="small muted" x-show="rform.selected.length && allSelected()">Every module is selected, so the run builds all modules without <code>-pl</code>.</p>
+                  <p class="small muted" x-show="rform.modulesMode === 'selected' && rform.selected.length && hasTree() && !allSelected()" x-text="impactText()"></p>
+                  <p class="small muted" x-show="rform.modulesMode === 'selected' && rform.selected.length && allSelected()">Every module is selected, so the run builds all modules without <code>-pl</code>.</p>
                   <div class="modules" x-ref="modlist" @scroll="onModScroll($event)" :style="'height:' + modHeight + 'px'"
                     x-effect="[rtab, pview, view, rform.modulesMode, moduleInfo, rpreview, rform.selected.length, editingTask, saveAsNew, modules.length]; $nextTick(() => fitModules())"
                     @resize.window.debounce.100ms="fitModules()">
