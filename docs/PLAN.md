@@ -54,7 +54,7 @@ The MVP is phases 1–4: projects, runs with chosen modules and flags, profiles,
 | F11 | Per-module timings, n/m progress, comparing two runs, problems panel | 4 |
 | F12 | Package scanner: per-module tree and a combined tree | 5 |
 | F13 | "Build changed" from git diff | 6 |
-| F14 | Completion notifications, daemon autostart, CLI client, old log cleanup | 7 |
+| F14 | Completion notifications, daemon autostart (done), CLI client (done), old log cleanup | 7 |
 | F15 | Global settings: list of available JDKs (auto-detected + manual) and per-build-tool defaults (Maven: executable and JDK); per-project JDK, build-tool overrides (executable, JDK for the tool) and environment | 1 (done) |
 
 ## Key decisions
@@ -76,7 +76,7 @@ Stack: Go, a single binary with an embedded UI and SQLite without cgo. The only 
 | Background tasks | JDK detection, module and package scans are queued in `internal/tasks`: the API returns the task at once (`202`), the UI polls `GET /api/tasks/{id}`. One active task per key | Long operations never hold an HTTP request |
 | Stopping processes | `os/exec` + `SysProcAttr{Setpgid: true}`; cancel = SIGTERM (SIGINT for the mvnd client) to the whole group, SIGKILL after 10 s | Works on macOS and Linux, kills surefire, node and other children |
 | Command | Always a `[]string` argv, never a shell | No quoting or injection problems |
-| CLI and config | Subcommands on stdlib `flag` (`buildyard serve`, later `buildyard run`); config in `~/.buildyard/config.toml` (`BurntSushi/toml`) for daemon settings; UI-editable settings in the DB | Minimal dependencies |
+| CLI and config | Subcommands on stdlib `flag` (`buildyard serve`, `service`, and CLI client commands such as `run`, `jobs`, `logs`); config in `~/.buildyard/config.toml` (`BurntSushi/toml`) for daemon settings; UI-editable settings in the DB | Minimal dependencies |
 | Building Buildyard | `Makefile`: first the extension jar (Maven, `--release 11`), then `go build`; releases by `.github/workflows/release.yml` (darwin/linux, amd64/arm64, checksums) and `install.sh` | JDK and Maven are on the machine anyway |
 | Security | None beyond binding to `127.0.0.1`: no token, login or Host/Origin checks (user decision, 2026-11-17) | Personal tool on the user's own machine |
 
@@ -92,7 +92,7 @@ Repository layout:
 
 ```text
 buildyard/
-  cmd/buildyard/main.go     # serve, open, service; later run
+  cmd/buildyard/main.go     # serve, open, service; CLI client: status, run, jobs, logs, cancel
   internal/
     config/                # config.toml, ~/.buildyard paths
     lock/                  # flock on daemon.lock
@@ -404,7 +404,7 @@ The `-am` and `-amd` toggles stay with the user. Without `-am` the build assumes
 
 ## HTTP API and events
 
-All functionality is available through the JSON API under `/api`. The UI and the future CLI use the same API. Errors come back as `{"error": "<code>", "message": "..."}` with the matching HTTP status. Long operations return `202` with a background task.
+All functionality is available through the JSON API under `/api`. The UI and the CLI (`internal/client`) use the same API. Errors come back as `{"error": "<code>", "message": "..."}` with the matching HTTP status. Long operations return `202` with a background task.
 
 | Method | Path | What it does |
 | --- | --- | --- |
@@ -550,7 +550,7 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
 6. **"Build changed"**
    - **Done when:** on a branch with edits in two modules exactly those two modules are offered; "since the last successful run" works; a root pom change gives "build everything".
 7. **Polish (v2)**
-   - Autostart (done early), system notifications on completion, log cleanup, CLI `buildyard run <profile>`, opening files in the IDE, Gradle adapter, selective `target/` cleanup for failed modules, rebuilding FAILURE+SKIPPED instead of `-rf` (see SPIKE.md).
+   - Autostart and CLI `buildyard run <task>` (both done early, 2026-11-18), system notifications on completion, log cleanup, opening files in the IDE, Gradle adapter, selective `target/` cleanup for failed modules, rebuilding FAILURE+SKIPPED instead of `-rf` (see SPIKE.md).
 
 ## Testing, risks, open questions
 

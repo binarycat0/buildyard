@@ -18,6 +18,21 @@ The service runs `buildyard serve --service` with the `PATH`, `JAVA_HOME` and `B
 
 To uninstall: `make uninstall`, or `buildyard service uninstall` and then delete `~/.local/bin/buildyard` and `~/.buildyard`.
 
+## Command line
+
+With the daemon running, the CLI drives it (see `buildyard help`):
+
+```sh
+buildyard status                 # daemon and projects with their last job
+buildyard run "Quick build"      # run a saved task of the project you are in, follow its log
+buildyard run -d -p dremio Full  # queue it and print the job id
+buildyard jobs                   # recent jobs
+buildyard logs -f 42             # follow a job's log
+buildyard cancel 42
+```
+
+`run` exits non-zero unless the build succeeded, so it works in scripts and git hooks. Ctrl-C stops following; the build keeps running.
+
 ## Build and run
 
 Requires Go 1.26+.

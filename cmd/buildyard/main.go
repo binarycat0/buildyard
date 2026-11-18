@@ -12,9 +12,12 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/binarycat0/buildyard/internal/client"
 	"github.com/binarycat0/buildyard/internal/config"
 	"github.com/binarycat0/buildyard/internal/ext"
 	"github.com/binarycat0/buildyard/internal/httpapi"
@@ -37,6 +40,22 @@ Commands:
             run the daemon in the background (launchd on macOS, systemd --user on Linux)
   version   print the version
 
+Talking to the running daemon:
+  status                 daemon version and projects with their last job
+  projects               list projects
+  tasks [-p project]     list a project's saved tasks
+  run [-p project] [-d] <task>
+                         run a saved task and follow its log; exits non-zero
+                         unless the build succeeds (-d: queue and print the job id)
+  run [-d] -rerun <job>  run a job again with the same settings
+  jobs [-p project] [-n N]
+                         recent jobs
+  logs [-f] <job>        print a job's log (-f: follow until it ends)
+  cancel <job>           stop a queued or running job
+
+-p takes a project id or name; without it the project is the one whose
+folder contains the current directory.
+
 Data lives in ~/.buildyard (override with BUILDYARD_HOME).
 `
 
@@ -53,6 +72,20 @@ func main() {
 		err = open(os.Args[2:])
 	case "service":
 		err = cmdService(os.Args[2:])
+	case "status":
+		err = cmdStatus(os.Args[2:])
+	case "projects":
+		err = cmdProjects(os.Args[2:])
+	case "tasks":
+		err = cmdTasks(os.Args[2:])
+	case "run":
+		err = cmdRun(os.Args[2:])
+	case "jobs":
+		err = cmdJobs(os.Args[2:])
+	case "logs":
+		err = cmdLogs(os.Args[2:])
+	case "cancel":
+		err = cmdCancel(os.Args[2:])
 	case "version", "--version", "-v":
 		fmt.Println("buildyard", version)
 	case "help", "-h", "--help":
@@ -63,6 +96,9 @@ func main() {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "buildyard:", err)
+		if errors.Is(err, client.ErrDaemonDown) {
+			fmt.Fprintln(os.Stderr, "start it with `buildyard service start` or `buildyard serve`")
+		}
 		os.Exit(1)
 	}
 }
@@ -89,7 +125,18 @@ func setup() (env, error) {
 }
 
 func link(e env) string {
-	return fmt.Sprintf("http://127.0.0.1:%d/", e.cfg.Port)
+	return fmt.Sprintf("http://127.0.0.1:%d/", daemonPort(e))
+}
+
+// daemonPort is the port the running daemon listens on: the one it wrote to
+// daemon.port (it may have been started with --port), else config.toml's.
+func daemonPort(e env) int {
+	if b, err := os.ReadFile(e.paths.Port); err == nil {
+		if p, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && p > 0 {
+			return p
+		}
+	}
+	return e.cfg.Port
 }
 
 func serve(args []string) error {
@@ -114,6 +161,10 @@ func serve(args []string) error {
 		return err
 	}
 	defer l.Release()
+	if err := os.WriteFile(e.paths.Port, []byte(strconv.Itoa(e.cfg.Port)+"\n"), 0o600); err != nil {
+		return err
+	}
+	defer os.Remove(e.paths.Port)
 
 	// In the foreground the log goes to the terminal and daemon.log. Under a
 	// service manager stderr is already redirected to daemon.log, so writing
