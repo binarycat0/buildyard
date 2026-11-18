@@ -14,6 +14,7 @@
     <nav>
       <a href="#/" :class="{active: view === 'projects' || view === 'project' || view === 'job'}">Projects</a>
       <a href="#/settings" :class="{active: view === 'settings'}">Settings</a>
+      <a href="#/activity" :class="{active: view === 'activity'}" title="Background work: JDK and tool detection, module discovery">Activity<span class="nav-dot" :class="activityDot()" x-show="activityDot()"></span></a>
     </nav>
     <span class="muted grow-right" x-text="health ? 'v' + health.version : ''"></span>
   </header>
@@ -585,6 +586,36 @@
           <p class="muted small" x-show="job.status === 'queued'">Waiting for another job of this project, or for a free slot.</p>
         </div>
       </template>
+    </section>
+
+    <!-- ===================== Activity (background tasks) ===================== -->
+    <section x-show="view === 'activity'" x-cloak class="stack">
+      <h1>Activity</h1>
+      <div class="card">
+        <p class="muted small">Background work the daemon does besides builds. Kept in memory until the daemon restarts.</p>
+        <p class="muted" x-show="!btasks.length">Nothing has run since the daemon started.</p>
+        <table class="list" x-show="btasks.length">
+          <thead><tr><th>#</th><th>Task</th><th>Status</th><th>Started</th><th>Duration</th><th>Result</th></tr></thead>
+          <tbody>
+            <template x-for="t in btasks" :key="t.id">
+              <tr>
+                <td x-text="t.id"></td>
+                <td class="nowrap" x-text="taskLabel(t)"></td>
+                <td><span class="status" :class="t.status" x-text="t.status"></span></td>
+                <td class="small nowrap" x-text="when(t.startedAt || t.queuedAt)"></td>
+                <td class="small" x-text="duration(t)"></td>
+                <td class="small">
+                  <span x-show="!t.error" x-text="taskResult(t)"></span>
+                  <details x-show="t.error" class="task-error">
+                    <summary class="error" x-text="errorSummary(t.error)"></summary>
+                    <pre x-text="t.error"></pre>
+                  </details>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <!-- ===================== Global settings ===================== -->
