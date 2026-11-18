@@ -85,7 +85,7 @@ func TestJDKDetectSettingsAndRuntime(t *testing.T) {
 		Installed []struct{ ID string } `json:"installed"`
 	}
 	decodeInto(call("GET", "/api/tools", ""), &tools)
-	if len(tools.Installed) != 2 || tools.Installed[1].ID != "mvnd" {
+	if len(tools.Installed) != 5 || tools.Installed[1].ID != "mvnd" || tools.Installed[2].ID != "gradle" {
 		t.Fatalf("tools: %+v", tools)
 	}
 

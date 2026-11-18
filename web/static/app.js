@@ -312,6 +312,47 @@ function textToEnv(text) {
   return env;
 }
 
+const SETTINGS_TABS = [
+  { id: 'general', name: 'General' },
+  { id: 'jdk', name: 'JDK' },
+  { id: 'maven', name: 'Maven' },
+  { id: 'mvnd', name: 'mvnd' },
+  { id: 'gradle', name: 'Gradle' },
+  { id: 'bazel', name: 'Bazel' },
+];
+
+// key=value / key: value / key value; comments (# or !) do not match.
+const PROP_LINE = /^\s*([^#!\s=:][^\s=:]*)\s*[=:\s]\s*(.*?)\s*$/;
+
+// Common keys offered as fields above a properties file editor.
+const CFG_KEYS = {
+  'mvnd.properties': [
+    { key: 'mvnd.maxHeapSize', placeholder: '2g', help: 'Daemon max heap (-Xmx). Raise it when daemons die with OutOfMemoryError.' },
+    { key: 'mvnd.minHeapSize', placeholder: '128m', help: 'Daemon initial heap (-Xms).' },
+    { key: 'mvnd.threadStackSize', placeholder: '1m', help: 'Thread stack size (-Xss).' },
+    { key: 'mvnd.jvmArgs', placeholder: '-XX:+UseG1GC', help: 'Extra JVM arguments for the daemon (mvnd ignores MAVEN_OPTS).' },
+    { key: 'mvnd.threads', placeholder: 'cores - 1', help: 'Build threads (like -T).' },
+    { key: 'mvnd.keepAlive', placeholder: '100ms', help: 'How often the daemon tells the client it is alive.' },
+    { key: 'mvnd.maxLostKeepAlive', placeholder: '30', help: 'Missed keep-alives before the client gives up on a busy daemon (raise it for long GC pauses).' },
+    { key: 'mvnd.idleTimeout', placeholder: '3h', help: 'An idle daemon exits after this.' },
+    { key: 'java.home', placeholder: '$JAVA_HOME', help: 'JDK the daemons run on.' },
+  ],
+  'gradle.properties': [
+    { key: 'org.gradle.jvmargs', placeholder: '-Xmx512m', help: 'Gradle daemon JVM arguments (heap, GC, ...).' },
+    { key: 'org.gradle.daemon', placeholder: 'true', help: 'Use the Gradle daemon.' },
+    { key: 'org.gradle.parallel', placeholder: 'false', help: 'Build decoupled projects in parallel.' },
+    { key: 'org.gradle.workers.max', placeholder: 'cores', help: 'Max worker processes.' },
+    { key: 'org.gradle.caching', placeholder: 'false', help: 'Build cache.' },
+    { key: 'org.gradle.configuration-cache', placeholder: 'false', help: 'Configuration cache.' },
+    { key: 'org.gradle.daemon.idletimeout', placeholder: '10800000', help: 'An idle daemon exits after this many ms.' },
+    { key: 'org.gradle.java.home', placeholder: '$JAVA_HOME', help: 'JDK the Gradle daemon runs on.' },
+  ],
+  'bazel.bazeliskrc': [
+    { key: 'USE_BAZEL_VERSION', placeholder: 'latest', help: 'Bazel version when a project has no .bazelversion.' },
+    { key: 'BAZELISK_HOME', placeholder: '~/.cache/bazelisk', help: 'Where bazelisk keeps downloaded Bazel binaries.' },
+  ],
+};
+
 document.addEventListener('alpine:init', () => {
   window.Alpine.data('app', () => ({
     view: 'projects',
@@ -393,10 +434,18 @@ document.addEventListener('alpine:init', () => {
     btasks: [],
     cform: null,
     cfgSaved: false,
+    stab: 'maven', // Settings tab
+    settingsTabs: SETTINGS_TABS,
+    cfgs: [], // config files of the build tools, with editor state
+    mvndTask: null,
+    mvndOut: '',
     seenTasksAt: loadPref('seenTasksAt', ''), // queuedAt of the newest task shown on the Activity page
 
     async init() {
       window.addEventListener('hashchange', () => this.route());
+      window.addEventListener('beforeunload', (e) => {
+        if (this.cfgs.some((f) => this.cfgDirty(f))) e.preventDefault();
+      });
       try {
         this.health = await api('GET', '/health');
       } catch (e) {
@@ -441,9 +490,12 @@ document.addEventListener('alpine:init', () => {
         } else if (h === '/activity') {
           this.view = 'activity';
           await this.loadActivity();
-        } else if (h === '/settings') {
+        } else if ((m = h.match(/^\/settings(?:\/(\w+))?$/))) {
+          const tab = SETTINGS_TABS.some((t) => t.id === m[1]) ? m[1] : 'maven';
+          const same = this.view === 'settings';
           this.view = 'settings';
-          await this.loadSettings();
+          this.stab = tab;
+          if (!same) await this.loadSettings();
         } else {
           this.view = 'projects';
           await this.loadProjects();
@@ -1630,7 +1682,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     taskLabel(t) {
-      const names = { 'jdk.detect': 'JDK detection', 'tools.detect': 'Build tool detection', 'modules.discover': 'Module discovery' };
+      const names = { 'jdk.detect': 'JDK detection', 'tools.detect': 'Build tool detection', 'mvnd.daemons': 'mvnd daemons', 'modules.discover': 'Module discovery' };
       let label = names[t.kind] ?? t.kind;
       const pid = Number(t.key.split(':')[1]);
       if (pid) label += ' · ' + (this.projects.find((p) => p.id === pid)?.name ?? 'project ' + pid);
@@ -1715,6 +1767,172 @@ document.addEventListener('alpine:init', () => {
       this.cfgSaved = false;
       const mv = settings.tools?.maven ?? {};
       this.sform = { maven: { executable: mv.executable || 'auto', jdkId: mv.jdkId ?? 0 } };
+      await this.loadCfgs();
+    },
+
+    // ---------- build tool config files ----------
+    // Loads every known file; files with unsaved edits keep them.
+    async loadCfgs() {
+      const list = await api('GET', '/tool-configs');
+      const prev = Object.fromEntries(this.cfgs.map((f) => [f.id, f]));
+      this.cfgs = list.map((f) => {
+        const p = prev[f.id];
+        if (p && this.cfgDirty(p)) return p;
+        return { ...f, content: '', orig: '', sha: '', backups: [], loaded: false, busy: false, error: '', msg: '' };
+      });
+      await Promise.all(this.cfgs.filter((f) => !f.loaded).map((f) => this.reloadCfg(f)));
+    },
+
+    async reloadCfg(f) {
+      if (this.cfgDirty(f) && !confirm(`Drop unsaved changes to ${f.name}?`)) return;
+      f.busy = true;
+      f.error = '';
+      try {
+        const [c, backups] = await Promise.all([api('GET', `/tool-configs/${f.id}`), api('GET', `/tool-configs/${f.id}/backups`)]);
+        Object.assign(f, c, { orig: c.content, backups, loaded: true, msg: '' });
+      } catch (e) {
+        f.error = e.message;
+      } finally {
+        f.busy = false;
+      }
+    },
+
+    async saveCfg(f) {
+      if (!this.cfgDirty(f) || f.busy) return;
+      f.busy = true;
+      f.error = '';
+      f.msg = '';
+      try {
+        const res = await api('PUT', `/tool-configs/${f.id}`, { content: f.content, baseSha: f.sha });
+        Object.assign(f, res.file, { orig: res.file.content });
+        f.backups = await api('GET', `/tool-configs/${f.id}/backups`);
+        f.msg = res.backup ? `Saved. The previous version is backed up as ${res.backup}.` : 'Saved.';
+      } catch (e) {
+        f.error = e.message;
+      } finally {
+        f.busy = false;
+      }
+    },
+
+    async restoreBackup(f, name) {
+      if (!name) return;
+      try {
+        const b = await api('GET', `/tool-configs/${f.id}/backups/${encodeURIComponent(name)}`);
+        f.content = b.content;
+        f.msg = `Loaded backup ${name} into the editor. Save to restore it.`;
+      } catch (e) {
+        f.error = e.message;
+      }
+    },
+
+    async generateToolchains(f) {
+      try {
+        const g = await api('GET', '/toolchains/generate');
+        if (f.content.trim() && !confirm('Replace the editor content with a generated toolchains.xml? Nothing is written until you Save.')) return;
+        f.content = g.content;
+        f.msg = `Generated ${g.jdks} toolchain${g.jdks === 1 ? '' : 's'} from the detected JDKs. Review, then Save.`;
+      } catch (e) {
+        f.error = e.message;
+      }
+    },
+
+    cfgDirty(f) {
+      return f.loaded && f.content !== f.orig;
+    },
+
+    cfgFiles() {
+      return this.cfgs.filter((f) => f.tool === this.stab);
+    },
+
+    tabDirty(tab) {
+      return this.cfgs.some((f) => f.tool === tab && this.cfgDirty(f));
+    },
+
+    cfgRows(f) {
+      return Math.min(30, Math.max(8, (f.content.match(/\n/g)?.length ?? 0) + 2));
+    },
+
+    cfgKeys(f) {
+      return f.format === 'properties' ? (CFG_KEYS[f.id] ?? []) : [];
+    },
+
+    propValue(text, key) {
+      let val = '';
+      for (const line of text.split('\n')) {
+        const m = line.match(PROP_LINE);
+        if (m && m[1] === key) val = m[2];
+      }
+      return val;
+    },
+
+    // Sets key=value in a properties text: rewrites the last line with the key (dropping
+    // earlier duplicates), appends it when absent, or removes it when value is empty.
+    setProp(text, key, value) {
+      value = value.trim();
+      const lines = text.split('\n');
+      let last = -1;
+      lines.forEach((line, i) => {
+        const m = line.match(PROP_LINE);
+        if (m && m[1] === key) last = i;
+      });
+      const out = [];
+      lines.forEach((line, i) => {
+        const m = line.match(PROP_LINE);
+        if (m && m[1] === key) {
+          if (i === last && value) out.push(`${key}=${value}`);
+          return;
+        }
+        out.push(line);
+      });
+      if (last < 0 && value) {
+        if (out.length && out[out.length - 1] === '') out.pop();
+        out.push(`${key}=${value}`, '');
+      }
+      return out.join('\n');
+    },
+
+    backupLabel(b) {
+      const m = b.name.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+      return m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]} · ${b.size} B` : b.name;
+    },
+
+    toolTab() {
+      return ['maven', 'mvnd', 'gradle', 'bazel'].includes(this.stab);
+    },
+
+    toolRows() {
+      const ids = { maven: ['mvn'], mvnd: ['mvnd'], gradle: ['gradle'], bazel: ['bazel', 'bazelisk'] }[this.stab] ?? [];
+      return (this.tools.installed || []).filter((t) => ids.includes(t.id));
+    },
+
+    // Tool versions pinned by registered projects, for the current tab.
+    projectPins() {
+      switch (this.stab) {
+        case 'maven':
+          return { title: 'Project wrappers', file: '.mvn/wrapper/maven-wrapper.properties',
+            rows: (this.tools.wrappers || []).map((w) => ({ ...w, version: w.mavenVersion ? 'Maven ' + w.mavenVersion : 'unknown' })) };
+        case 'gradle':
+          return { title: 'Project wrappers', file: 'gradle/wrapper/gradle-wrapper.properties', rows: this.tools.gradleWrappers || [] };
+        case 'bazel':
+          return { title: 'Project versions', file: '.bazelversion', rows: this.tools.bazelVersions || [] };
+      }
+      return { rows: [] };
+    },
+
+    async mvndAction(action) {
+      if (action === 'stop' && !confirm('Stop all mvnd daemons? mvnd builds running now will fail.')) return;
+      this.mvndOut = '';
+      try {
+        const task = await api('POST', `/tools/mvnd/${action}`);
+        this.mvndTask = { ...task, action };
+        const t = await waitTask(task.id);
+        if (t.status === 'failed') this.mvndOut = 'Failed: ' + t.error;
+        else this.mvndOut = [t.result?.output, t.result?.error && 'Exit: ' + t.result.error].filter(Boolean).join('\n') || '(no output)';
+      } catch (e) {
+        this.mvndOut = e.message;
+      } finally {
+        this.mvndTask = null;
+      }
     },
 
     async saveSettings() {

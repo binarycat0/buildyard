@@ -11,6 +11,7 @@ import (
 	"github.com/binarycat0/buildyard/internal/jdk"
 	"github.com/binarycat0/buildyard/internal/store"
 	"github.com/binarycat0/buildyard/internal/tasks"
+	"github.com/binarycat0/buildyard/internal/toolconfig"
 )
 
 // TaskJDKDetect is the background task kind that rescans installed JDKs.
@@ -46,6 +47,9 @@ func DetectJDKs(ctx context.Context, st *store.Store, d jdk.Detector) (store.Syn
 func (s *Server) SubmitToolsDetect() (tasks.Task, error) {
 	return s.Tasks.Submit(TaskToolsDetect, TaskToolsDetect, func(ctx context.Context) (any, error) {
 		tools := maven.DetectTools(s.Home)
+		for _, t := range toolconfig.DetectTools(s.Home) {
+			tools = append(tools, maven.InstalledTool(t))
+		}
 		return tools, s.Store.PutJSON(ctx, keyBuildTools, tools)
 	})
 }
@@ -111,6 +115,13 @@ type projectWrapper struct {
 	MavenVersion string `json:"mavenVersion"`
 }
 
+// projectPin is a tool version a project pins: Gradle in ./gradlew, Bazel in .bazelversion.
+type projectPin struct {
+	ProjectID int64  `json:"projectId"`
+	Project   string `json:"project"`
+	Version   string `json:"version"` // "?" when the file is there but unreadable
+}
+
 // getTools returns the launchers found on PATH (live), their versions (from the last
 // tools.detect task) and the Maven wrappers of registered projects.
 func (s *Server) getTools(w http.ResponseWriter, r *http.Request) {
@@ -126,19 +137,28 @@ func (s *Server) getTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wrappers := []projectWrapper{}
+	gradle, bazel := []projectPin{}, []projectPin{}
 	for _, p := range projects {
 		if wr := maven.FindWrapper(p.RootPath); wr != nil {
 			wrappers = append(wrappers, projectWrapper{ProjectID: p.ID, Project: p.Name, MavenVersion: wr.MavenVersion})
+		}
+		if v := toolconfig.GradleWrapperVersion(p.RootPath); v != "" {
+			gradle = append(gradle, projectPin{ProjectID: p.ID, Project: p.Name, Version: v})
+		}
+		if v := toolconfig.BazelVersion(p.RootPath); v != "" {
+			bazel = append(bazel, projectPin{ProjectID: p.ID, Project: p.Name, Version: v})
 		}
 	}
 	if installed == nil {
 		installed = []maven.InstalledTool{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"tools":     maven.FindTools(s.Home),
-		"installed": installed,
-		"wrappers":  wrappers,
-		"javaHome":  os.Getenv("JAVA_HOME"),
+		"tools":          maven.FindTools(s.Home),
+		"installed":      installed,
+		"wrappers":       wrappers,
+		"gradleWrappers": gradle,
+		"bazelVersions":  bazel,
+		"javaHome":       os.Getenv("JAVA_HOME"),
 	})
 }
 

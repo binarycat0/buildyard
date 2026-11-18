@@ -31,9 +31,10 @@ type Server struct {
 	JDKs    jdk.Detector // where to look for JDKs
 	Home    string       // user home, for finding mvn/mvnd outside PATH
 	DataDir string
-	Config  *config.Live // daemon settings from config.toml; nil in tests that don't need them
-	ExtJar  string       // installed Maven extension; "" disables it
-	UI      fs.FS        // static files; index.html at the root
+	Config  *config.Live        // daemon settings from config.toml; nil in tests that don't need them
+	ExtJar  string              // installed Maven extension; "" disables it
+	UI      fs.FS               // static files; index.html at the root
+	Getenv  func(string) string // env lookup for config file locations; nil = os.Getenv
 	Log     *slog.Logger
 	started time.Time
 }
@@ -76,6 +77,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/tools", s.getTools)
 	mux.HandleFunc("POST /api/tools/detect", s.detectTools)
+	mux.HandleFunc("POST /api/tools/mvnd/{action}", s.mvndCommand)
+	mux.HandleFunc("GET /api/tool-configs", s.listToolConfigs)
+	mux.HandleFunc("GET /api/tool-configs/{id}", s.getToolConfig)
+	mux.HandleFunc("PUT /api/tool-configs/{id}", s.putToolConfig)
+	mux.HandleFunc("GET /api/tool-configs/{id}/backups", s.listToolConfigBackups)
+	mux.HandleFunc("GET /api/tool-configs/{id}/backups/{name}", s.getToolConfigBackup)
+	mux.HandleFunc("GET /api/toolchains/generate", s.generateToolchains)
 	mux.HandleFunc("GET /api/jdk-managers", s.listJDKManagers)
 	mux.HandleFunc("GET /api/jdks", s.listJDKs)
 	mux.HandleFunc("POST /api/jdks", s.addJDK)
