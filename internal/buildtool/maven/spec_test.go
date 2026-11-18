@@ -172,3 +172,18 @@ func TestResources(t *testing.T) {
 		t.Error("bad testForks in a run should be invalid")
 	}
 }
+
+func TestWithout(t *testing.T) {
+	presets := DefaultSkipPresets()
+	all := RunSpec{Goals: []string{"install"}}.Normalize().Without([]string{":a", "g:b"})
+	if got := strings.Join(all.Argv("mvn", presets), " "); got != "mvn -B -pl !:a,!g:b install" {
+		t.Errorf("all modules: %s", got)
+	}
+	sel := RunSpec{Goals: []string{"install"}, Modules: Modules{Mode: "selected", List: []string{":a", ":c", "!:d"}, AlsoMake: true}}.Normalize()
+	if got := strings.Join(sel.Without([]string{":a", ":d"}).Argv("mvn", presets), " "); got != "mvn -B -pl :c,!:a,!:d -am install" {
+		t.Errorf("selected: %s", got)
+	}
+	if err := all.Normalize().Validate(presets); err != nil {
+		t.Errorf("validate: %v", err)
+	}
+}

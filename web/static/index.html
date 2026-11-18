@@ -521,6 +521,8 @@
                 title="Ends the build and all its processes at once (SIGKILL)">Kill</button>
               <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="compareWithPrevious(job)" title="Compare with the previous finished run of this project">Compare</button>
               <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="rerun(job)">Rerun</button>
+              <button x-show="job.status === 'failed' && failedMods().length" @click="rerun(job, true)"
+                :title="'Run again without ' + failedMods().map((m) => m.name).join(', ') + ' and the modules that depend on them'">Rerun without failed</button>
             </div>
           </div>
           <div class="preview row wrap">
