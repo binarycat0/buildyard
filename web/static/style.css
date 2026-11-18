@@ -162,3 +162,12 @@ a.modname:hover { text-decoration: underline; }
 .modtable td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .status.skipped, .status.pending { background: var(--border); color: var(--muted); }
 .modprog .seg { align-self: flex-start; }
+
+/* Short command: one token per flag; the full command opens in a dialog */
+.preview { gap: 6px; align-items: center; }
+code.tok { padding: 1px 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); font-size: .85em; white-space: nowrap; }
+code.tok.exe { font-weight: 600; }
+code.tok.goal { border-color: var(--accent); color: var(--accent); }
+dialog.modal { border: 1px solid var(--border); border-radius: 10px; padding: 16px; width: min(900px, calc(100vw - 32px)); background: var(--card); color: var(--fg); }
+dialog.modal::backdrop { background: rgba(0, 0, 0, .4); }
+pre.cmd.full { max-height: 60vh; overflow: auto; }
