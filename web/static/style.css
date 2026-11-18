@@ -34,6 +34,9 @@ button:disabled { opacity: .6; cursor: default; }
 .top nav { display: flex; gap: 14px; }
 .top nav a { color: var(--muted); text-decoration: none; }
 .top nav a.active { color: var(--fg); font-weight: 600; }
+.nav-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 4px; vertical-align: super; }
+.nav-dot.running { background: #3b74d6; }
+.nav-dot.failed { background: #c43c3c; }
 .grow-right { margin-left: auto; }
 .grow { flex: 1; }
 a { color: var(--accent); }
@@ -243,3 +246,5 @@ td.slower { color: var(--danger); }
 td.faster { color: #3a9a5b; }
 @media (prefers-color-scheme: dark) { code.tok.added, .problem.added .msg { color: #8fd8a5; } }
 @media (max-width: 640px) { .cmpgrid { grid-template-columns: 1fr; } }
+.task-error summary { cursor: pointer; overflow-wrap: anywhere; }
+.task-error pre { max-height: 320px; overflow: auto; white-space: pre-wrap; font-size: .85em; margin: 6px 0 0; }
