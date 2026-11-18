@@ -167,7 +167,10 @@ func mergeSession(root string, mods []maven.Module, sess *maven.Session) ([]stor
 	for i, m := range mods {
 		sm := store.Module{GroupID: m.GroupID, ArtifactID: m.ArtifactID, Name: m.Name, Packaging: m.Packaging, Profiles: m.Profiles}
 		if sp, ok := byKey[m.Key()]; ok {
-			if rel, err := filepath.Rel(root, sp.Dir); err == nil && !strings.HasPrefix(rel, "..") {
+			// The project root is stored with symlinks resolved (/var -> /private/var on
+			// macOS); the build may report the directory it was started from.
+			dir := resolveExisting(sp.Dir)
+			if rel, err := filepath.Rel(root, dir); err == nil && !strings.HasPrefix(rel, "..") {
 				if rel == "." {
 					rel = ""
 				}
@@ -304,5 +307,21 @@ func (s *Server) respondProfile(w http.ResponseWriter, p store.RunProfile, err e
 		s.internal(w, err)
 	default:
 		writeJSON(w, status, p)
+	}
+}
+
+// resolveExisting resolves symlinks in the longest existing prefix of path.
+func resolveExisting(path string) string {
+	rest := ""
+	for p := filepath.Clean(path); ; {
+		if resolved, err := filepath.EvalSymlinks(p); err == nil {
+			return filepath.Join(resolved, rest)
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return path
+		}
+		rest = filepath.Join(filepath.Base(p), rest)
+		p = parent
 	}
 }
