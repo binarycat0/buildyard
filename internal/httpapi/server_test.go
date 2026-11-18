@@ -50,7 +50,7 @@ func newTestServer(t *testing.T, userHome string) (*Server, string) {
 	s := &Server{Store: st, Tasks: bg, JDKs: jdk.Detector{Home: userHome, GOOS: "darwin", SystemRoot: t.TempDir(),
 		Run:      func(string, ...string) ([]byte, error) { return nil, os.ErrNotExist },
 		Getenv:   func(string) string { return "" },
-		LookPath: func(string) string { return "" }}, Home: userHome, DataDir: "/tmp/x", UI: ui}
+		LookPath: func(string) string { return "" }}, Home: userHome, DataDir: t.TempDir(), UI: ui, Getenv: func(string) string { return "" }}
 	s.Runner = runner.New(st, t.TempDir(), 1, 0, slog.New(slog.DiscardHandler))
 	t.Cleanup(func() { s.Runner.Shutdown(context.Background()) })
 	return s, dbPath
