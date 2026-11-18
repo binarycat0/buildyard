@@ -760,33 +760,16 @@
     <!-- ===================== Global settings ===================== -->
     <section x-show="view === 'settings'" x-cloak class="stack">
       <h1>Settings</h1>
+      <nav class="tabs page-tabs">
+        <template x-for="t in settingsTabs" :key="t.id">
+          <a :href="'#/settings/' + t.id" :class="{active: stab === t.id}">
+            <span x-text="t.name"></span>
+            <span class="tab-dot" x-show="tabDirty(t.id)" title="Unsaved changes">●</span>
+          </a>
+        </template>
+      </nav>
 
-      <form class="card" @submit.prevent="saveSettings()">
-        <h2>Maven defaults</h2>
-        <p class="muted small">Used by Maven projects unless the project overrides them in its Maven tab or sets a project JDK.</p>
-        <label>Executable
-          <select x-model="sform.maven.executable">
-            <option value="auto">Auto: ./mvnw if present, else mvnd, else mvn</option>
-            <option value="wrapper">Always the project wrapper ./mvnw</option>
-            <option value="mvnd" x-text="'mvnd' + (tools.tools?.mvnd ? ' — ' + tools.tools.mvnd : ' — not found')"></option>
-            <option value="mvn" x-text="'mvn' + (tools.tools?.mvn ? ' — ' + tools.tools.mvn : ' — not found')"></option>
-          </select>
-        </label>
-        <label>JDK for Maven
-          <select x-model.number="sform.maven.jdkId">
-            <option value="0" x-text="'Daemon JAVA_HOME' + (tools.javaHome ? ' (' + tools.javaHome + ')' : ' (not set)')"></option>
-            <template x-for="j in jdks" :key="j.id">
-              <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === sform.maven.jdkId"></option>
-            </template>
-          </select>
-        </label>
-        <div class="row">
-          <button class="primary" type="submit" :disabled="busy">Save</button>
-          <span class="muted" x-show="saved">Saved</span>
-        </div>
-      </form>
-
-      <template x-if="cform">
+      <template x-if="cform && stab === 'general'">
         <form class="card" @submit.prevent="saveConfig()">
           <h2>Daemon</h2>
           <p class="muted small">Saved to <code x-text="cform.path"></code> and applied at once, no restart.</p>
@@ -806,49 +789,11 @@
         </form>
       </template>
 
-      <div class="card">
-        <div class="row spread">
-          <h2>Build tools</h2>
-          <button @click="detectTools()" :disabled="toolsTask">
-            <span x-text="toolsTask ? 'Detecting…' : 'Detect again'"></span>
-          </button>
-        </div>
-        <p class="muted small">Projects with <code>./mvnw</code> use the Maven version their wrapper pins; a global <code>mvn</code> is only used for projects without a wrapper. <code>mvnd</code> is installed globally and bundles its own Maven.</p>
-        <table class="list">
-          <thead><tr><th>Tool</th><th>Version</th><th>Path</th></tr></thead>
-          <tbody>
-            <template x-for="t in tools.installed || []" :key="t.id">
-              <tr :class="{missing: !t.installed}">
-                <td><strong x-text="t.name"></strong></td>
-                <td>
-                  <template x-if="t.installed">
-                    <span><span x-text="t.version || 'unknown'"></span>
-                      <span class="muted small" x-show="t.id === 'mvnd' && t.mavenVersion" x-text="'(Maven ' + t.mavenVersion + ')'"></span></span>
-                  </template>
-                  <span class="muted" x-show="!t.installed">not installed</span>
-                </td>
-                <td>
-                  <code class="path" x-show="t.installed" x-text="t.resolvedPath"></code>
-                  <div class="muted small" x-show="t.installed && t.path !== t.resolvedPath">found at <code x-text="t.path"></code></div>
-                  <span class="muted small" x-show="!t.installed" x-text="t.installHint"></span>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-          <tbody x-show="(tools.wrappers || []).length">
-            <tr class="group"><td colspan="3">Project wrappers <span class="muted small">(./mvnw)</span></td></tr>
-            <template x-for="w in tools.wrappers || []" :key="w.projectId">
-              <tr>
-                <td><a :href="'#/projects/' + w.projectId" x-text="w.project"></a></td>
-                <td x-text="w.mavenVersion ? 'Maven ' + w.mavenVersion : 'unknown'"></td>
-                <td class="muted small">pinned in .mvn/wrapper/maven-wrapper.properties</td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="card">
+      <template x-if="stab === 'jdk'">
+        <p class="muted small">JDKs found on this machine. Pick the one each build tool uses on its tab; Maven toolchains can be generated from this list on the Maven tab.
+          Daemon <code>JAVA_HOME</code>: <code x-text="tools.javaHome || 'not set'"></code></p>
+      </template>
+      <div class="card" x-show="stab === 'jdk'">
         <div class="row spread">
           <h2>Available JDKs</h2>
           <button @click="detect()" :disabled="detectTask">
@@ -906,6 +851,146 @@
         </form>
         <p class="error" x-show="jdkError" x-text="jdkError"></p>
       </div>
+
+      <form class="card" x-show="stab === 'maven'" @submit.prevent="saveSettings()">
+        <h2>Maven defaults</h2>
+        <p class="muted small">Used by Maven projects unless the project overrides them in its Maven tab or sets a project JDK.</p>
+        <div class="row">
+          <label>Executable
+            <select x-model="sform.maven.executable">
+              <option value="auto">Auto: ./mvnw if present, else mvnd, else mvn</option>
+              <option value="wrapper">Always the project wrapper ./mvnw</option>
+              <option value="mvnd" x-text="'mvnd' + (tools.tools?.mvnd ? ' — ' + tools.tools.mvnd : ' — not found')"></option>
+              <option value="mvn" x-text="'mvn' + (tools.tools?.mvn ? ' — ' + tools.tools.mvn : ' — not found')"></option>
+            </select>
+          </label>
+          <label>JDK for Maven
+            <select x-model.number="sform.maven.jdkId">
+              <option value="0" x-text="'Daemon JAVA_HOME' + (tools.javaHome ? ' (' + tools.javaHome + ')' : ' (not set)')"></option>
+              <template x-for="j in jdks" :key="j.id">
+                <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === sform.maven.jdkId"></option>
+              </template>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <button class="primary" type="submit" :disabled="busy">Save</button>
+          <span class="muted" x-show="saved">Saved</span>
+        </div>
+      </form>
+
+      <div class="card" x-show="toolTab()">
+        <div class="row spread">
+          <h2>Installed</h2>
+          <button class="small" @click="detectTools()" :disabled="toolsTask" title="Scan PATH, Homebrew and sdkman again">
+            <span x-text="toolsTask ? 'Detecting…' : '↻ Detect again'"></span>
+          </button>
+        </div>
+        <p class="muted small" x-show="stab === 'maven'">Projects with <code>./mvnw</code> use the Maven version their wrapper pins; a global <code>mvn</code> is only used for projects without a wrapper.</p>
+        <p class="muted small" x-show="stab === 'mvnd'"><code>mvnd</code> bundles its own Maven and runs builds in long-lived daemons. It reads <code>settings.xml</code> but not <code>MAVEN_OPTS</code> or <code>.mavenrc</code>: daemon heap and JVM options go in <code>mvnd.properties</code> below.</p>
+        <p class="muted small" x-show="stab === 'gradle'">Projects with <code>./gradlew</code> use the Gradle version their wrapper pins.</p>
+        <p class="muted small" x-show="stab === 'bazel'">Usually <code>bazel</code> is a bazelisk launcher that downloads the version a project pins in <code>.bazelversion</code>.</p>
+        <table class="list">
+          <thead><tr><th>Tool</th><th>Version</th><th>Path</th></tr></thead>
+          <tbody>
+            <template x-for="t in toolRows()" :key="t.id">
+              <tr :class="{missing: !t.installed}">
+                <td><strong x-text="t.name"></strong></td>
+                <td>
+                  <template x-if="t.installed">
+                    <span><span x-text="t.version || 'unknown'"></span>
+                      <span class="muted small" x-show="t.id === 'mvnd' && t.mavenVersion" x-text="'(Maven ' + t.mavenVersion + ')'"></span></span>
+                  </template>
+                  <span class="muted" x-show="!t.installed">not installed</span>
+                </td>
+                <td>
+                  <code class="path" x-show="t.installed" x-text="t.resolvedPath"></code>
+                  <div class="muted small" x-show="t.installed && t.path !== t.resolvedPath">found at <code x-text="t.path"></code></div>
+                  <span class="muted small" x-show="!t.installed" x-text="t.installHint"></span>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="!toolRows().length"><td colspan="3" class="muted small">Not detected yet. Press Detect again.</td></tr>
+          </tbody>
+          <tbody x-show="projectPins().rows.length">
+            <tr class="group"><td colspan="3"><span x-text="projectPins().title"></span> <span class="muted small" x-text="'(' + projectPins().file + ')'"></span></td></tr>
+            <template x-for="w in projectPins().rows" :key="w.projectId">
+              <tr>
+                <td><a :href="'#/projects/' + w.projectId" x-text="w.project"></a></td>
+                <td x-text="w.version"></td>
+                <td class="muted small" x-text="'pinned in ' + projectPins().file"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" x-show="stab === 'mvnd'">
+        <div class="row spread">
+          <h2>Daemons</h2>
+          <div class="row">
+            <button class="small" @click="mvndAction('status')" :disabled="mvndTask || !tools.tools?.mvnd">Status</button>
+            <button class="small danger" @click="mvndAction('stop')" :disabled="mvndTask || !tools.tools?.mvnd"
+              title="Stops all mvnd daemons; running mvnd builds fail">Stop all</button>
+          </div>
+        </div>
+        <p class="muted small">Changes to <code>mvnd.properties</code> apply to daemons started afterwards. Stop the running ones (when no mvnd build runs) to apply them now.</p>
+        <p class="muted small" x-show="mvndTask">Running <code x-text="'mvnd --' + mvndTask?.action"></code>…</p>
+        <pre class="cmd" x-show="mvndOut" x-text="mvndOut"></pre>
+      </div>
+
+      <template x-for="f in cfgFiles()" :key="f.id">
+        <div class="card cfg">
+          <div class="row spread">
+            <div class="cfg-title">
+              <h2 x-text="f.name"></h2>
+              <code class="path" x-text="f.path"></code>
+              <span class="muted small" x-show="f.pathFrom !== 'default'" x-text="'(from $' + f.pathFrom + ')'"></span>
+              <span class="badge small" x-show="!f.exists">not created</span>
+              <span class="badge small warn" x-show="cfgDirty(f)">unsaved</span>
+            </div>
+            <div class="row">
+              <select class="small" x-show="f.backups?.length" @change="restoreBackup(f, $event.target.value); $event.target.value = ''" title="Load a backup into the editor (saving it backs up the current file first)">
+                <option value="">Backups…</option>
+                <template x-for="b in f.backups || []" :key="b.name">
+                  <option :value="b.name" x-text="backupLabel(b)"></option>
+                </template>
+              </select>
+              <button class="small" type="button" @click="reloadCfg(f)" :disabled="f.busy" title="Reload from disk, dropping unsaved changes">↻</button>
+              <button class="small primary" type="button" @click="saveCfg(f)" :disabled="f.busy || !cfgDirty(f)">Save</button>
+            </div>
+          </div>
+          <p class="muted small" x-text="f.description"></p>
+
+          <template x-if="cfgKeys(f).length">
+            <details class="cfg-keys" :open="!f.exists">
+              <summary class="small">Common settings</summary>
+              <div class="kv">
+                <template x-for="k in cfgKeys(f)" :key="k.key">
+                  <label class="kv-row" :title="k.help">
+                    <code x-text="k.key"></code>
+                    <input class="inline" :value="propValue(f.content, k.key)" :placeholder="k.placeholder"
+                      @change="f.content = setProp(f.content, k.key, $event.target.value)">
+                    <span class="muted small" x-text="k.help"></span>
+                  </label>
+                </template>
+              </div>
+              <p class="muted small">Editing a field rewrites its line below; an empty field removes it.</p>
+            </details>
+          </template>
+
+          <div class="row" x-show="(!f.content && f.template) || f.id === 'maven.toolchains'">
+            <button class="small" type="button" x-show="!f.content && f.template" @click="f.content = f.template">Insert template</button>
+            <button class="small" type="button" x-show="f.id === 'maven.toolchains'" @click="generateToolchains(f)"
+              title="Replace the editor content with one jdk toolchain per detected JDK (review, then Save)">Generate from JDKs</button>
+          </div>
+          <textarea class="cfg-text" spellcheck="false" :rows="cfgRows(f)" x-model="f.content"
+            :placeholder="f.exists ? '(empty file)' : 'The file does not exist yet; saving creates it.'"
+            @keydown.ctrl.s.prevent="saveCfg(f)" @keydown.meta.s.prevent="saveCfg(f)"></textarea>
+          <p class="error" x-show="f.error" x-text="f.error"></p>
+          <p class="muted small" x-show="f.msg" x-text="f.msg"></p>
+        </div>
+      </template>
     </section>
   </main>
 
