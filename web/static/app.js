@@ -106,9 +106,75 @@ const logView = {
   },
 };
 
-// Module graphs per module list, kept outside Alpine so building them does not
-// write reactive state during rendering.
-const graphCache = new WeakMap();
+// Module indexes, kept outside Alpine: they are plain objects built once per module
+// list (or selection) and never become reactive proxies. Projects can have 1000+
+// modules, so every per-row question must be answered in O(1).
+const graphCache = new WeakMap(); // modules array -> graph
+const selCache = new WeakMap(); // selected refs array -> selection index
+let rowsCache = null; // the last tree rows, keyed by what they were built from
+
+const ROW_H = 26; // px, the fixed height of a module row (virtual scrolling)
+const VIEW_ROWS = 14; // rows visible in the module list
+
+function buildGraph(modules) {
+  const byKey = new Map(modules.map((m) => [m.key, m]));
+  const kids = new Map();
+  const users = new Map();
+  const perArtifact = new Map();
+  for (const m of modules) perArtifact.set(m.artifactId, (perArtifact.get(m.artifactId) || 0) + 1);
+  const ref = new Map(); // key -> ":artifactId" when unique, else "groupId:artifactId"
+  const keyOf = new Map(); // ref -> key
+  for (const m of modules) {
+    const r = perArtifact.get(m.artifactId) > 1 ? m.key : ':' + m.artifactId;
+    ref.set(m.key, r);
+    keyOf.set(r, m.key);
+    keyOf.set(m.key, m.key);
+    if (m.aggregator && byKey.has(m.aggregator)) {
+      if (!kids.has(m.aggregator)) kids.set(m.aggregator, []);
+      kids.get(m.aggregator).push(m);
+    }
+    for (const d of m.deps || []) {
+      if (!users.has(d)) users.set(d, []);
+      users.get(d).push(m.key);
+    }
+  }
+  const roots = modules.filter((m) => !m.aggregator || !byKey.has(m.aggregator));
+  const parent = (k) => {
+    const a = byKey.get(k)?.aggregator;
+    return a && byKey.has(a) ? a : null;
+  };
+  // Subtree key lists, filled bottom-up once (iteratively: trees can be deep).
+  const sub = new Map();
+  const order = [];
+  const stack = [...roots];
+  while (stack.length) {
+    const m = stack.pop();
+    order.push(m);
+    for (const c of kids.get(m.key) || []) stack.push(c);
+  }
+  for (let i = order.length - 1; i >= 0; i--) {
+    const m = order[i];
+    const keys = [m.key];
+    for (const c of kids.get(m.key) || []) for (const k of sub.get(c.key)) keys.push(k);
+    sub.set(m.key, keys);
+  }
+  const hasTree = modules.some((m) => m.aggregator);
+  return { byKey, kids, users, roots, ref, keyOf, parent, sub, hasTree };
+}
+
+// For a selection: the selected keys, and how many are selected under each aggregator.
+function buildSelection(g, refs) {
+  const keys = new Set();
+  const under = new Map();
+  for (const r of refs) {
+    const k = g.keyOf.get(r) ?? r;
+    if (keys.has(k)) continue;
+    keys.add(k);
+    if (!g.byKey.has(k)) continue;
+    for (let a = k; a; a = g.parent(a)) under.set(a, (under.get(a) || 0) + 1);
+  }
+  return { keys, under };
+}
 
 let stream = null;
 let ticker = 0;
@@ -232,6 +298,7 @@ document.addEventListener('alpine:init', () => {
     moduleFilter: '',
     moduleInfo: null,
     openState: {},
+    modScroll: 0,
     discoverTask: null,
     discoverError: '',
     profiles: [],
@@ -374,6 +441,7 @@ document.addEventListener('alpine:init', () => {
       this.moduleFilter = '';
       this.moduleInfo = null;
       this.openState = {};
+      this.modScroll = 0;
       this.refreshPreview();
       // First visit: list the modules in the background.
       if (!this.modules.length && !this.discoverTask) this.discover();
@@ -431,8 +499,18 @@ document.addEventListener('alpine:init', () => {
     },
 
     allSelected() {
-      const sel = new Set(this.selectedKeys());
-      return this.modules.every((m) => sel.has(m.key));
+      const sel = this.selection().keys;
+      return this.modules.length > 0 && this.modules.every((m) => sel.has(m.key));
+    },
+
+    selection() {
+      const refs = Alpine.raw(this.rform.selected);
+      let s = selCache.get(refs);
+      if (!s) {
+        s = buildSelection(this.graph(), refs);
+        selCache.set(refs, s);
+      }
+      return s;
     },
 
     // Notes of the ticked skip presets, e.g. why skipping test compilation can break a build.
@@ -467,34 +545,21 @@ document.addEventListener('alpine:init', () => {
 
     // ":artifactId" when unique, else "groupId:artifactId".
     moduleRef(m) {
-      const dup = this.modules.filter((x) => x.artifactId === m.artifactId).length > 1;
-      return dup ? m.key : ':' + m.artifactId;
+      return this.graph().ref.get(m.key) ?? m.key;
     },
 
     hasTree() {
-      return this.modules.some((m) => m.aggregator);
+      return this.graph().hasTree;
     },
 
     // Rebuilt when modules change: lookups and the aggregator / dependency graphs.
     graph() {
-      const cached = graphCache.get(this.modules);
-      if (cached) return cached;
-      const byKey = new Map(this.modules.map((m) => [m.key, m]));
-      const kids = new Map();
-      const users = new Map();
-      for (const m of this.modules) {
-        if (m.aggregator && byKey.has(m.aggregator)) {
-          if (!kids.has(m.aggregator)) kids.set(m.aggregator, []);
-          kids.get(m.aggregator).push(m);
-        }
-        for (const d of m.deps || []) {
-          if (!users.has(d)) users.set(d, []);
-          users.get(d).push(m.key);
-        }
+      const mods = Alpine.raw(this.modules);
+      let g = graphCache.get(mods);
+      if (!g) {
+        g = buildGraph(mods);
+        graphCache.set(mods, g);
       }
-      const roots = this.modules.filter((m) => !m.aggregator || !byKey.has(m.aggregator));
-      const g = { byKey, kids, users, roots };
-      graphCache.set(this.modules, g);
       return g;
     },
 
@@ -517,24 +582,12 @@ document.addEventListener('alpine:init', () => {
       return seen;
     },
 
-    subtree(m) {
-      const g = this.graph();
-      const out = [];
-      const walk = (x) => {
-        out.push(x);
-        for (const c of g.kids.get(x.key) || []) walk(c);
-      };
-      walk(m);
-      return out;
-    },
-
-    refToKey(ref) {
-      if (!ref.startsWith(':')) return ref;
-      return this.modules.find((m) => m.artifactId === ref.slice(1))?.key ?? ref;
+    subtreeKeys(key) {
+      return this.graph().sub.get(key) || [key];
     },
 
     selectedKeys() {
-      return this.rform.selected.map((r) => this.refToKey(r));
+      return [...this.selection().keys];
     },
 
     impactText() {
@@ -564,31 +617,47 @@ document.addEventListener('alpine:init', () => {
     },
 
     // Rows to render: the aggregator tree (top level open by default), or a flat list
-    // when filtering or when discovery had no folder information.
+    // when filtering or when discovery had no folder information. Cached: the list is
+    // asked for by every visible row.
     shownRows() {
+      const mods = Alpine.raw(this.modules);
+      const open = Alpine.raw(this.openState);
       const q = this.moduleFilter.trim().toLowerCase();
-      if (q || !this.hasTree()) {
-        return this.filteredModules().slice(0, 300).map((m) => ({ m, depth: 0, kids: 0, open: false, flat: true }));
-      }
+      const c = rowsCache;
+      if (c && c.mods === mods && c.open === open && c.q === q) return c.rows;
       const g = this.graph();
-      const rows = [];
-      const walk = (m, depth) => {
-        const kids = g.kids.get(m.key) || [];
-        const open = this.isOpen(m.key, depth);
-        rows.push({ m, depth, kids: kids.length, open });
-        if (open) for (const c of kids) walk(c, depth + 1);
-      };
-      for (const r of g.roots) walk(r, 0);
+      let rows;
+      if (q || !g.hasTree) {
+        rows = this.filteredModules().map((m) => ({ m, depth: 0, kids: 0, open: false, flat: true }));
+      } else {
+        rows = [];
+        const stack = g.roots.map((m) => [m, 0]).reverse();
+        while (stack.length) {
+          const [m, depth] = stack.pop();
+          const kids = g.kids.get(m.key) || [];
+          const isOpen = m.key in open ? open[m.key] : depth === 0;
+          rows.push({ m, depth, kids: kids.length, open: isOpen, size: g.sub.get(m.key)?.length || 1 });
+          if (isOpen) for (let i = kids.length - 1; i >= 0; i--) stack.push([kids[i], depth + 1]);
+        }
+      }
+      rowsCache = { mods, open, q, rows };
       return rows;
     },
 
-    isOpen(key, depth) {
-      return key in this.openState ? this.openState[key] : depth === 0;
+    // The rows in view, plus a few around them; the rest is empty space of the same height.
+    visibleRows() {
+      const rows = this.shownRows();
+      const from = Math.max(0, Math.floor(this.modScroll / ROW_H) - 10);
+      const to = Math.min(rows.length, from + VIEW_ROWS + 20);
+      return { rows: rows.slice(from, to), top: from * ROW_H, bottom: (rows.length - to) * ROW_H };
     },
 
-    toggleOpen(key) {
-      const depth = this.shownRows().find((r) => r.m.key === key)?.depth ?? 1;
-      this.openState = { ...this.openState, [key]: !this.isOpen(key, depth) };
+    onModScroll(e) {
+      this.modScroll = e.target.scrollTop;
+    },
+
+    toggleOpen(r) {
+      this.openState = { ...Alpine.raw(this.openState), [r.m.key]: !r.open };
     },
 
     setAllOpen(open) {
@@ -599,39 +668,41 @@ document.addEventListener('alpine:init', () => {
 
     filteredModules() {
       const q = this.moduleFilter.trim().toLowerCase();
-      if (!q) return this.modules;
-      return this.modules.filter((m) => m.name.toLowerCase().includes(q) || m.key.toLowerCase().includes(q) || (m.relPath || '').toLowerCase().includes(q));
-    },
-
-    moreModules() {
-      const q = this.moduleFilter.trim();
-      if (!q && this.hasTree()) return 0;
-      return Math.max(0, this.filteredModules().length - 300);
+      const mods = Alpine.raw(this.modules);
+      if (!q) return mods;
+      return mods.filter((m) => m.name.toLowerCase().includes(q) || m.key.toLowerCase().includes(q) || (m.relPath || '').toLowerCase().includes(q));
     },
 
     // all | some | none for a row: a parent counts its whole subtree.
     checkState(r) {
-      const sel = new Set(this.selectedKeys());
-      const keys = r.kids && !r.flat ? this.subtree(r.m).map((m) => m.key) : [r.m.key];
-      const n = keys.filter((k) => sel.has(k)).length;
-      return n === 0 ? 'none' : n === keys.length ? 'all' : 'some';
+      const sel = this.selection();
+      if (!r.kids || r.flat) return sel.keys.has(r.m.key) ? 'all' : 'none';
+      const n = sel.under.get(r.m.key) || 0;
+      return n === 0 ? 'none' : n === r.size ? 'all' : 'some';
     },
 
     // Ticking a tree parent ticks everything under it.
     toggleModule(r) {
-      const group = r.kids && !r.flat ? this.subtree(r.m) : [r.m];
-      const refs = group.map((m) => this.moduleRef(m));
+      const g = this.graph();
+      const keys = r.kids && !r.flat ? this.subtreeKeys(r.m.key) : [r.m.key];
       const on = this.checkState(r) !== 'all';
-      const sel = this.rform.selected.filter((x) => !refs.includes(x));
-      this.rform.selected = on ? [...sel, ...refs] : sel;
+      const drop = new Set(keys.map((k) => g.ref.get(k) ?? k));
+      const sel = Alpine.raw(this.rform.selected).filter((x) => !drop.has(x) && !drop.has(g.ref.get(g.keyOf.get(x))));
+      this.rform.selected = on ? [...sel, ...drop] : sel;
       if (this.rform.selected.length) this.rform.modulesMode = 'selected';
       this.refreshPreview();
     },
 
     selectShown() {
-      const add = this.shownRows().map((r) => this.moduleRef(r.m)).filter((x) => !this.rform.selected.includes(x));
+      const have = new Set(Alpine.raw(this.rform.selected));
+      const add = this.shownRows().map((r) => this.moduleRef(r.m)).filter((x) => !have.has(x));
       this.rform.selected = [...this.rform.selected, ...add];
       this.refreshPreview();
+    },
+
+    selectedText() {
+      const sel = this.rform.selected;
+      return sel.length > 30 ? sel.slice(0, 30).join(', ') + ` and ${sel.length - 30} more` : sel.join(', ');
     },
 
     toggleSkip(id) {
