@@ -46,6 +46,7 @@ type Paths struct {
 	Dir    string
 	Config string
 	Lock   string
+	Port   string // the running daemon's port, for the CLI
 	Log    string
 	DB     string
 	Logs   string
@@ -72,6 +73,7 @@ func PathsIn(dir string) Paths {
 		Dir:    dir,
 		Config: filepath.Join(dir, "config.toml"),
 		Lock:   filepath.Join(dir, "daemon.lock"),
+		Port:   filepath.Join(dir, "daemon.port"),
 		Log:    filepath.Join(dir, "daemon.log"),
 		DB:     filepath.Join(dir, "buildyard.db"),
 		Logs:   filepath.Join(dir, "logs"),

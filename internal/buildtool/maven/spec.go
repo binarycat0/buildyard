@@ -18,7 +18,7 @@ type RunSpec struct {
 	Skips      []string          `json:"skips"`      // skip preset ids
 	Properties map[string]string `json:"properties"` // -Dkey=value; empty value gives -Dkey
 	Flags      Flags             `json:"flags"`
-	LogLevel   string            `json:"logLevel"`  // default | warn | quiet | debug
+	LogLevel   string            `json:"logLevel"` // default | warn | quiet | debug
 	Resources  Resources         `json:"resources"`
 	ExtraArgs  []string          `json:"extraArgs"` // appended as is
 }
