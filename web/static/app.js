@@ -306,6 +306,7 @@ document.addEventListener('alpine:init', () => {
     saveAsNew: false,
     taskName: '',
     copied: false,
+    cmdShown: null,
     rpreview: null,
     runError: '',
 
@@ -700,11 +701,6 @@ document.addEventListener('alpine:init', () => {
       this.refreshPreview();
     },
 
-    selectedText() {
-      const sel = this.rform.selected;
-      return sel.length > 30 ? sel.slice(0, 30).join(', ') + ` and ${sel.length - 30} more` : sel.join(', ');
-    },
-
     toggleSkip(id) {
       const s = this.rform.skips;
       this.rform.skips = s.includes(id) ? s.filter((x) => x !== id) : [...s, id];
@@ -805,9 +801,40 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    async copyCommand() {
+    // The command as short tokens: the executable's name, then the flags; a long -pl list
+    // becomes a module count (the full command is one click away).
+    shortArgs(argv) {
+      if (!argv?.length) return [];
+      const out = [{ text: argv[0].split('/').pop(), cls: 'exe', title: argv[0] }];
+      for (let i = 1; i < argv.length; i++) {
+        const a = argv[i];
+        if (a === '-B') continue;
+        if (a === '-pl' && i + 1 < argv.length) {
+          const list = argv[++i].split(',');
+          out.push(list.length > 3
+            ? { text: `-pl ${list.length} modules`, title: list.join('\n') }
+            : { text: '-pl ' + list.join(',') });
+          continue;
+        }
+        if ((a === '-P' || a === '-T') && i + 1 < argv.length) {
+          out.push({ text: a + ' ' + argv[++i] });
+          continue;
+        }
+        const goal = !a.startsWith('-');
+        out.push({ text: shellQuote(a), cls: goal ? 'goal' : '' });
+      }
+      return out;
+    },
+
+    showCommand(c) {
+      this.cmdShown = { argv: c.argv, javaHome: c.javaHome, dir: c.dir };
+      this.copied = false;
+      this.$refs.cmdDialog.showModal();
+    },
+
+    async copyCommand(argv) {
       try {
-        await navigator.clipboard.writeText(this.shellJoin(this.rpreview.argv));
+        await navigator.clipboard.writeText(this.shellJoin(argv));
         this.copied = true;
         setTimeout(() => { this.copied = false; }, 1500);
       } catch (e) {
