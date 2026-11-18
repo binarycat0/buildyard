@@ -96,7 +96,11 @@
                     <a href="javascript:void 0" class="grow" @click="editTask(t)" x-text="t.name" title="Load into the form"></a>
                     <button type="button" class="small primary" @click="runTask(t)" :disabled="busy">Run</button>
                   </div>
-                  <code class="small muted" x-text="specSummary(t.spec)"></code>
+                  <div class="tags">
+                    <template x-for="(g, i) in taskTags(t.spec)" :key="i">
+                      <span class="tag" :class="g.cls" :title="g.title || ''" x-text="g.text"></span>
+                    </template>
+                  </div>
                   <div class="row small" x-show="t.lastJob">
                     <a :href="'#/jobs/' + t.lastJob?.id"><span class="status" :class="t.lastJob?.status" x-text="t.lastJob?.status"></span></a>
                     <span class="muted" x-text="t.lastJob && when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt)"></span>
