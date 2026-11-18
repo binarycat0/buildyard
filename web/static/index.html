@@ -46,27 +46,32 @@
         No projects yet. Add a folder with a pom.xml.
       </p>
 
-      <div class="grid">
-        <template x-for="p in projects" :key="p.id">
-          <article class="card">
-            <div class="row spread">
-              <h2><a :href="'#/projects/' + p.id" x-text="p.name"></a></h2>
-              <span class="badge" x-text="p.buildTool"></span>
-            </div>
-            <code class="path" x-text="p.rootPath"></code>
-            <p class="muted">
-              <template x-if="p.lastJob"><a :href="'#/jobs/' + p.lastJob.id" class="status-link">
-                <span class="status" :class="p.lastJob.status" x-text="p.lastJob.status"></span></a></template>
-              <span x-text="lastJobText(p)"></span>
-            </p>
-            <div class="row">
-              <a class="button primary" :href="'#/projects/' + p.id">Run</a>
-              <a class="button" :href="'#/projects/' + p.id + '/history'">History</a>
-              <a class="button" :href="'#/projects/' + p.id + '/settings'">Settings</a>
-              <button class="danger" @click="remove(p)">Remove</button>
-            </div>
-          </article>
-        </template>
+      <div class="card flush" x-show="projects.length">
+        <table class="list projects">
+          <thead>
+            <tr><th>Name</th><th>Path</th><th>Tool</th><th>Last run</th><th></th></tr>
+          </thead>
+          <tbody>
+            <template x-for="p in projects" :key="p.id">
+              <tr>
+                <td><a class="pname" :href="'#/projects/' + p.id" x-text="p.name"></a></td>
+                <td><code class="path" :title="p.rootPath" x-text="p.rootPath"></code></td>
+                <td><span class="badge" x-text="p.buildTool"></span></td>
+                <td class="nowrap">
+                  <template x-if="p.lastJob"><a :href="'#/jobs/' + p.lastJob.id" class="status-link">
+                    <span class="status" :class="p.lastJob.status" x-text="p.lastJob.status"></span></a></template>
+                  <span class="muted small" x-text="lastJobText(p)"></span>
+                </td>
+                <td class="actions">
+                  <a class="button small primary" :href="'#/projects/' + p.id">Run</a>
+                  <a class="button small" :href="'#/projects/' + p.id + '/history'">History</a>
+                  <a class="button small" :href="'#/projects/' + p.id + '/settings'">Settings</a>
+                  <button class="small danger" @click="remove(p)">Remove</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
       </div>
     </section>
 
