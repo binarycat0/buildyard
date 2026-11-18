@@ -1,10 +1,10 @@
 import { api } from './api.js';
 
 const statusText = {
-  queued: 'в очереди', running: 'идёт', succeeded: 'успешно', failed: 'ошибка',
-  cancelled: 'отменена', interrupted: 'прервана',
+  queued: 'queued', running: 'running', succeeded: 'succeeded', failed: 'failed',
+  cancelled: 'cancelled', interrupted: 'interrupted',
 };
-const execNames = { auto: 'авто', wrapper: './mvnw', mvnd: 'mvnd', mvn: 'mvn' };
+const execNames = { auto: 'auto', wrapper: './mvnw', mvnd: 'mvnd', mvn: 'mvn' };
 
 // Polls a background task until it finishes.
 async function waitTask(id, { interval = 300, timeout = 120000 } = {}) {
@@ -12,7 +12,7 @@ async function waitTask(id, { interval = 300, timeout = 120000 } = {}) {
   for (;;) {
     const t = await api('GET', `/tasks/${id}`);
     if (t.status === 'succeeded' || t.status === 'failed') return t;
-    if (Date.now() > until) throw new Error('задача не завершилась вовремя');
+    if (Date.now() > until) throw new Error('the task did not finish in time');
     await new Promise((r) => setTimeout(r, interval));
   }
 }
@@ -27,7 +27,7 @@ function textToEnv(text) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const i = line.indexOf('=');
-    if (i <= 0) throw new Error(`Строка без KEY=VALUE: ${line}`);
+    if (i <= 0) throw new Error(`Not a KEY=VALUE line: ${line}`);
     env[line.slice(0, i).trim()] = line.slice(i + 1);
   }
   return env;
@@ -123,7 +123,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     async remove(p) {
-      if (!confirm(`Удалить проект «${p.name}» из Buildyard? Файлы проекта не трогаются.`)) return;
+      if (!confirm(`Remove project "${p.name}" from Buildyard? Project files are not touched.`)) return;
       try {
         await api('DELETE', `/projects/${p.id}`);
         this.projects = this.projects.filter((x) => x.id !== p.id);
@@ -133,9 +133,9 @@ document.addEventListener('alpine:init', () => {
     },
 
     lastJobText(p) {
-      if (!p.lastJob) return 'Запусков ещё не было';
+      if (!p.lastJob) return 'No runs yet';
       const j = p.lastJob;
-      let s = 'Последний запуск: ' + (statusText[j.status] ?? j.status);
+      let s = 'Last run: ' + (statusText[j.status] ?? j.status);
       if (j.startedAt && j.finishedAt) {
         const sec = Math.round((new Date(j.finishedAt) - new Date(j.startedAt)) / 1000);
         s += `, ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
@@ -169,7 +169,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const f = this.pform;
         const executable = f.execChoice === 'custom' ? f.customPath.trim() : f.execChoice;
-        if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Укажите абсолютный путь к исполняемому файлу');
+        if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Enter an absolute path to the executable');
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
           name: f.name, executable, jdkId: Number(f.jdkId) || 0, env: textToEnv(f.envText),
         });
@@ -189,12 +189,12 @@ document.addEventListener('alpine:init', () => {
 
     defaultJdkText() {
       const j = this.jdks.find((x) => x.id === this.settings.defaultJdkId);
-      return j ? this.jdkLabel(j) : 'JAVA_HOME демона';
+      return j ? this.jdkLabel(j) : 'daemon JAVA_HOME';
     },
 
     jdkLabel(j) {
       const name = j.name || j.vendor || '';
-      return `${j.version || '?'}${name ? ' · ' + name : ''}${j.arch ? ' · ' + j.arch : ''}${j.missing ? ' (не найден)' : ''}`;
+      return `${j.version || '?'}${name ? ' · ' + name : ''}${j.arch ? ' · ' + j.arch : ''}${j.missing ? ' (not found)' : ''}`;
     },
 
     // ---------- global settings ----------
@@ -234,10 +234,10 @@ document.addEventListener('alpine:init', () => {
       try {
         const t = await waitTask(task.id);
         if (t.status === 'failed') {
-          this.jdkError = 'Поиск JDK не удался: ' + t.error;
+          this.jdkError = 'JDK detection failed: ' + t.error;
         } else {
           const r = t.result || {};
-          this.detectResult = `Найдено ${r.found ?? 0}, новых ${r.added ?? 0}, пропало ${r.missing ?? 0}.`;
+          this.detectResult = `Found ${r.found ?? 0}, new ${r.added ?? 0}, missing ${r.missing ?? 0}.`;
         }
         this.jdks = await api('GET', '/jdks');
       } catch (e) {
@@ -267,7 +267,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     async deleteJdk(j) {
-      if (!confirm(`Убрать JDK ${j.version} из списка? Сам JDK не удаляется; повторный поиск может найти его снова.`)) return;
+      if (!confirm(`Remove JDK ${j.version} from the list? The JDK itself is not deleted; the next detection may find it again.`)) return;
       try {
         await api('DELETE', `/jdks/${j.id}`);
         this.jdks = this.jdks.filter((x) => x.id !== j.id);

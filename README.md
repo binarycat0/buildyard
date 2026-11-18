@@ -1,22 +1,22 @@
 # buildyard
 
-Личный менеджер сборок Maven-проектов: локальный демон с веб-интерфейсом. Техзадание — [docs/PLAN.md](docs/PLAN.md), итоги спайка — [docs/SPIKE.md](docs/SPIKE.md).
+A personal build manager for Maven projects: a local daemon with a web UI. Specification: [docs/PLAN.md](docs/PLAN.md); phase 0 spike results: [docs/SPIKE.md](docs/SPIKE.md).
 
-## Сборка и запуск
+## Build and run
 
-Нужен Go 1.26+.
+Requires Go 1.26+.
 
 ```sh
-make build          # bin/buildyard (CGO не нужен)
+make build              # bin/buildyard (no cgo needed)
 make test
-./bin/buildyard serve   # слушает 127.0.0.1:7777, открыть http://127.0.0.1:7777/
-./bin/buildyard open    # открыть UI в браузере
+./bin/buildyard serve   # listens on 127.0.0.1:7777, open http://127.0.0.1:7777/
+./bin/buildyard open    # open the UI in the browser
 ```
 
-Данные лежат в `~/.buildyard` (`BUILDYARD_HOME` переопределяет): `config.toml`, `buildyard.db`, `daemon.log`.
+Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db`, `daemon.log`.
 
-## Статус
+## Status
 
-Фаза 1 (каркас): конфиг, lock-файл, SQLite с миграциями, CRUD проектов и экран проектов.
+Phase 1 (skeleton): config, lock file, SQLite with migrations, projects CRUD and the projects screen.
 
-Настройки: список JDK (автопоиск фоновой задачей и ручное добавление), сборщик и JDK по умолчанию; в проекте — выбор ./mvnw, mvnd, mvn или своего пути, JDK и переменных окружения.
+Settings: a JDK list (auto-detected as a background task, plus manual entries), default executable and JDK; per project — `./mvnw`, mvnd, mvn or a custom path, a JDK and environment variables.

@@ -117,11 +117,11 @@ func Resolve(mode, root string, tools Tools) (Resolved, error) {
 	case ModeAuto:
 		switch {
 		case w != nil:
-			r.Kind, r.Path, r.Reason = ModeWrapper, w.Path, "в проекте есть ./mvnw"
+			r.Kind, r.Path, r.Reason = ModeWrapper, w.Path, "the project has ./mvnw"
 		case tools.Mvnd != "":
-			r.Kind, r.Path, r.Reason = ModeMvnd, tools.Mvnd, "нет ./mvnw, найден mvnd"
+			r.Kind, r.Path, r.Reason = ModeMvnd, tools.Mvnd, "no ./mvnw, mvnd found"
 		case tools.Mvn != "":
-			r.Kind, r.Path, r.Reason = ModeMvn, tools.Mvn, "нет ./mvnw и mvnd, найден mvn"
+			r.Kind, r.Path, r.Reason = ModeMvn, tools.Mvn, "no ./mvnw or mvnd, mvn found"
 		default:
 			return r, fmt.Errorf("%w: no ./mvnw in the project and neither mvnd nor mvn found", ErrNotAvailable)
 		}
@@ -129,17 +129,17 @@ func Resolve(mode, root string, tools Tools) (Resolved, error) {
 		if w == nil {
 			return r, fmt.Errorf("%w: the project has no ./mvnw", ErrNotAvailable)
 		}
-		r.Kind, r.Path, r.Reason = ModeWrapper, w.Path, "выбран враппер проекта"
+		r.Kind, r.Path, r.Reason = ModeWrapper, w.Path, "project wrapper selected"
 	case ModeMvnd:
 		if tools.Mvnd == "" {
 			return r, fmt.Errorf("%w: mvnd not found (brew install mvnd)", ErrNotAvailable)
 		}
-		r.Kind, r.Path, r.Reason = ModeMvnd, tools.Mvnd, "выбран mvnd"
+		r.Kind, r.Path, r.Reason = ModeMvnd, tools.Mvnd, "mvnd selected"
 	case ModeMvn:
 		if tools.Mvn == "" {
 			return r, fmt.Errorf("%w: mvn not found", ErrNotAvailable)
 		}
-		r.Kind, r.Path, r.Reason = ModeMvn, tools.Mvn, "выбран mvn"
+		r.Kind, r.Path, r.Reason = ModeMvn, tools.Mvn, "mvn selected"
 	default:
 		if !filepath.IsAbs(mode) {
 			return r, fmt.Errorf("unknown executable %q", mode)
@@ -147,7 +147,7 @@ func Resolve(mode, root string, tools Tools) (Resolved, error) {
 		if !isExecutable(mode) {
 			return r, fmt.Errorf("%w: %s is not an executable file", ErrNotAvailable, mode)
 		}
-		r.Kind, r.Path, r.Reason = "custom", mode, "свой путь"
+		r.Kind, r.Path, r.Reason = "custom", mode, "custom path"
 	}
 	return r, nil
 }
