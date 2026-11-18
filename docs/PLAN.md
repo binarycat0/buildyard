@@ -427,7 +427,7 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | POST | `/api/jobs/{id}/stop` | Graceful stop (`SIGINT`, like Ctrl+C); the job shows `stopRequestedAt` until it ends |
 | POST | `/api/jobs/{id}/kill` | Kill the process group at once (`SIGKILL`) |
 | POST | `/api/jobs/{id}/cancel` | `SIGTERM`, then `SIGKILL` after 10 s |
-| POST | `/api/jobs/{id}/rerun` | Rerun with the same RunSpec snapshot |
+| POST | `/api/jobs/{id}/rerun` | Rerun with the same RunSpec snapshot; `?without=failed` leaves out the failed modules and the modules that depend on them (`-pl !…`) |
 | GET | `/api/jobs/{id}/modules` | Per-module progress: live for an active job, from `job_module` otherwise |
 | GET | `/api/jobs/{id}/log?from=&limit=` | A batch of log lines `{from, lines, total}` (`levels=` later) |
 | GET | `/api/jobs/{id}/stream?from=` | SSE: log, status (modules later) |

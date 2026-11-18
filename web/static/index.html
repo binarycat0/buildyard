@@ -192,17 +192,23 @@
               </nav>
               <div class="stack tabbody" x-show="rtab === 'modules'">
                 <div class="row wrap">
-                  <label class="radio"><input type="radio" value="all" x-model="rform.modulesMode" @change="refreshPreview()"> All modules</label>
-                  <label class="radio"><input type="radio" value="selected" x-model="rform.modulesMode" @change="refreshPreview()">
-                    Selected <span class="muted" x-text="'(' + rform.selected.length + ')'"></span></label>
+                  <label class="radio"><input type="radio" value="all" :checked="rform.modulesMode === 'all'" @change="rform.modulesMode = 'all'; refreshPreview()"> All modules</label>
+                  <label class="radio"><input type="radio" value="selected" :checked="rform.modulesMode !== 'all'"
+                    @change="rform.modulesMode = 'selected'; refreshPreview()">
+                    Pick modules <span class="muted" x-text="'(' + rform.selected.length + ')'"></span></label>
+                  <div class="seg small" x-show="rform.modulesMode !== 'all'" title="What the ticked modules mean">
+                    <button type="button" :class="{active: rform.modulesMode === 'selected'}" @click="setPickMode('selected')">Build ticked</button>
+                    <button type="button" :class="{active: rform.modulesMode === 'exclude'}" @click="setPickMode('exclude')">Skip ticked</button>
+                  </div>
                   <span class="grow"></span>
                   <span class="muted small" x-text="moduleStatus()"></span>
                   <button type="button" class="small" @click="discover()" :disabled="discoverTask" x-text="discoverTask ? 'Discovering…' : (modules.length ? 'Rediscover' : 'Discover modules')"
                     title="Lists the reactor with mvn help:active-profiles, using the profiles, skips and properties below"></button>
                 </div>
                 <pre class="error small" x-show="discoverError" x-text="discoverError"></pre>
-                <div x-show="rform.modulesMode === 'selected'" class="stack tight">
-                  <div class="row wrap">
+                <div x-show="rform.modulesMode !== 'all'" class="stack tight">
+                  <p class="small muted" x-show="rform.modulesMode === 'exclude'">Everything is built except the ticked modules (<code>-pl !…</code>). A folder is left out only when everything under it is ticked.</p>
+                  <div class="row wrap" x-show="rform.modulesMode === 'selected'">
                     <label class="radio"><input type="checkbox" x-model="rform.alsoMake" @change="refreshPreview()"> also make dependencies <code>-am</code></label>
                     <label class="radio"><input type="checkbox" x-model="rform.alsoMakeDependents" @change="refreshPreview()"> also make dependents <code>-amd</code></label>
                   </div>
@@ -213,8 +219,8 @@
                     <button type="button" class="small" x-show="moduleFilter" @click="selectShown()">Select shown</button>
                     <button type="button" class="small" @click="rform.selected = []; refreshPreview()">Clear</button>
                   </div>
-                  <p class="small muted" x-show="rform.selected.length && hasTree() && !allSelected()" x-text="impactText()"></p>
-                  <p class="small muted" x-show="rform.selected.length && allSelected()">Every module is selected, so the run builds all modules without <code>-pl</code>.</p>
+                  <p class="small muted" x-show="rform.modulesMode === 'selected' && rform.selected.length && hasTree() && !allSelected()" x-text="impactText()"></p>
+                  <p class="small muted" x-show="rform.modulesMode === 'selected' && rform.selected.length && allSelected()">Every module is selected, so the run builds all modules without <code>-pl</code>.</p>
                   <div class="modules" x-ref="modlist" @scroll="onModScroll($event)" :style="'height:' + modHeight + 'px'"
                     x-effect="[rtab, pview, view, rform.modulesMode, moduleInfo, rpreview, rform.selected.length, editingTask, saveAsNew, modules.length]; $nextTick(() => fitModules())"
                     @resize.window.debounce.100ms="fitModules()">
@@ -521,6 +527,8 @@
                 title="Ends the build and all its processes at once (SIGKILL)">Kill</button>
               <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="compareWithPrevious(job)" title="Compare with the previous finished run of this project">Compare</button>
               <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="rerun(job)">Rerun</button>
+              <button x-show="job.status === 'failed' && failedMods().length" @click="rerun(job, true)"
+                :title="'Run again without ' + failedMods().map((m) => m.name).join(', ') + ' and the modules that depend on them'">Rerun without failed</button>
             </div>
           </div>
           <div class="preview row wrap">
@@ -538,16 +546,10 @@
           </div>
           <div class="card modprog" x-show="jobMods.length">
             <div class="row spread">
-              <strong x-text="modsSummary()"></strong>
+              <strong x-text="modsSummary()" :title="modsWith('running').map((m) => m.name + ' · ' + modTime(m)).join('\n')"></strong>
               <button class="small" @click="modsOpen = !modsOpen" x-text="modsOpen ? 'Hide modules' : 'All modules'"></button>
             </div>
             <div class="bar"><div :style="'width:' + modsPercent() + '%'" :class="{bad: modsWith('failed').length}"></div></div>
-            <div class="row wrap small" x-show="modsWith('running').length">
-              <span class="muted">Building</span>
-              <template x-for="m in modsWith('running')" :key="m.key">
-                <span class="chip running" :title="m.key" x-text="m.name + ' · ' + modTime(m)"></span>
-              </template>
-            </div>
             <div class="row wrap small" x-show="modsWith('failed').length">
               <span class="muted">Failed</span>
               <template x-for="m in modsWith('failed')" :key="m.key">
@@ -557,10 +559,30 @@
             <template x-if="modsOpen">
               <div class="stack">
                 <div class="seg small">
-                  <button :class="{active: modsSort === 'reactor'}" @click="modsSort = 'reactor'">Build order</button>
+                  <button x-show="jobTreeRows()" :class="{active: modsSort === 'tree'}" @click="modsSort = 'tree'">Tree</button>
+                  <button :class="{active: modsSort === 'reactor' || (modsSort === 'tree' && !jobTreeRows())}" @click="modsSort = 'reactor'">Build order</button>
                   <button :class="{active: modsSort === 'slowest'}" @click="modsSort = 'slowest'">Slowest first</button>
                 </div>
-                <div class="modtable">
+                <div class="modtable modtree" x-show="modsSort === 'tree' && jobTreeRows()" @scroll="jobModScroll = $event.target.scrollTop">
+                  <div x-data="{ v: { rows: [], top: 0, bottom: 0 } }" x-effect="v = jobTreeVisible()">
+                    <div :style="'height:' + v.top + 'px'"></div>
+                    <template x-for="r in v.rows" :key="r.key + treeStatus(r).cls">
+                      <div class="trow" :style="'padding-left:' + (8 + r.depth * 18) + 'px'">
+                        <button type="button" class="caret" x-show="r.kids" @click="toggleJobOpen(r)" x-text="r.open ? '▾' : '▸'"
+                          :title="r.open ? 'Collapse' : 'Expand'"></button>
+                        <span class="caret" x-show="!r.kids"></span>
+                        <span class="status" :class="treeStatus(r).cls" x-text="treeStatus(r).text"></span>
+                        <a href="javascript:void 0" class="modname" x-show="r.a.jm" @click="findModule(r.a.jm)" :title="'Find ' + r.key + ' in the log'" x-text="r.name"></a>
+                        <span class="modname" x-show="!r.a.jm" :title="r.key" x-text="r.name"></span>
+                        <span class="muted small" x-show="r.kids" x-text="'(' + r.a.n + ')'"></span>
+                        <span class="grow"></span>
+                        <span class="num muted" x-text="treeTime(r)" :title="r.kids ? 'Total time of the modules under it (they may run in parallel)' : ''"></span>
+                      </div>
+                    </template>
+                    <div :style="'height:' + v.bottom + 'px'"></div>
+                  </div>
+                </div>
+                <div class="modtable" x-show="modsSort !== 'tree' || !jobTreeRows()">
                   <table>
                     <tbody>
                       <template x-for="m in modsTable()" :key="m.key">

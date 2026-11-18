@@ -372,3 +372,30 @@ func uniq(in []string) []string {
 	}
 	return out
 }
+
+// Without returns the spec with the given modules (":artifactId" or "groupId:artifactId")
+// left out of the build: dropped from a selected list and excluded with "!" entries, so
+// "all modules" becomes "-pl !a,!b".
+func (s RunSpec) Without(refs []string) RunSpec {
+	if len(refs) == 0 {
+		return s
+	}
+	out := map[string]bool{}
+	for _, r := range refs {
+		out[r] = true
+	}
+	var list []string
+	if s.Modules.Mode == "selected" {
+		for _, m := range s.Modules.List {
+			if !out[m] && !out["!"+m] && !out[strings.TrimPrefix(m, "!")] {
+				list = append(list, m)
+			}
+		}
+	}
+	for _, r := range refs {
+		list = append(list, "!"+r)
+	}
+	s.Modules.Mode = "selected"
+	s.Modules.List = list
+	return s
+}
