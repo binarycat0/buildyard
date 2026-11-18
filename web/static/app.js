@@ -1114,9 +1114,14 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    async rerun(j) {
+    // The modules that failed in the open job (from its per-module progress).
+    failedMods() {
+      return (this.jobMods || []).filter((m) => m.status === 'failed');
+    },
+
+    async rerun(j, withoutFailed = false) {
       try {
-        const n = await api('POST', `/jobs/${j.id}/rerun`);
+        const n = await api('POST', `/jobs/${j.id}/rerun` + (withoutFailed ? '?without=failed' : ''));
         location.hash = `#/jobs/${n.id}`;
       } catch (e) {
         this.error = e.message;
