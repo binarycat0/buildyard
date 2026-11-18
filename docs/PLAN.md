@@ -54,7 +54,7 @@ The MVP is phases 1–4: projects, runs with chosen modules and flags, profiles,
 | F11 | Per-module timings, n/m progress, comparing two runs, problems panel | 4 |
 | F12 | Package scanner: per-module tree and a combined tree | 5 |
 | F13 | "Build changed" from git diff | 6 |
-| F14 | Completion notifications, daemon autostart, CLI client, old log cleanup | 7 |
+| F14 | Completion notifications, daemon autostart (done), CLI client (done), old log cleanup | 7 |
 | F15 | Global settings: list of available JDKs (auto-detected + manual) and per-build-tool defaults (Maven: executable and JDK); per-project JDK, build-tool overrides (executable, JDK for the tool) and environment | 1 (done) |
 
 ## Key decisions
@@ -76,8 +76,8 @@ Stack: Go, a single binary with an embedded UI and SQLite without cgo. The only 
 | Background tasks | JDK detection, module and package scans are queued in `internal/tasks`: the API returns the task at once (`202`), the UI polls `GET /api/tasks/{id}`. One active task per key | Long operations never hold an HTTP request |
 | Stopping processes | `os/exec` + `SysProcAttr{Setpgid: true}`; cancel = SIGTERM (SIGINT for the mvnd client) to the whole group, SIGKILL after 10 s | Works on macOS and Linux, kills surefire, node and other children |
 | Command | Always a `[]string` argv, never a shell | No quoting or injection problems |
-| CLI and config | Subcommands on stdlib `flag` (`buildyard serve`, later `buildyard run`); config in `~/.buildyard/config.toml` (`BurntSushi/toml`) for daemon settings; UI-editable settings in the DB | Minimal dependencies |
-| Building Buildyard | `Makefile`: first the extension jar (Maven, `--release 11`), then `go build`; releases later via goreleaser | JDK and Maven are on the machine anyway |
+| CLI and config | Subcommands on stdlib `flag` (`buildyard serve`, `service`, and CLI client commands such as `run`, `jobs`, `logs`); config in `~/.buildyard/config.toml` (`BurntSushi/toml`) for daemon settings; UI-editable settings in the DB | Minimal dependencies |
+| Building Buildyard | `Makefile`: first the extension jar (Maven, `--release 11`), then `go build`; releases by `.github/workflows/release.yml` (darwin/linux, amd64/arm64, checksums) and `install.sh` | JDK and Maven are on the machine anyway |
 | Security | None beyond binding to `127.0.0.1`: no token, login or Host/Origin checks (user decision, 2026-11-17) | Personal tool on the user's own machine |
 
 ## Architecture
@@ -92,7 +92,7 @@ Repository layout:
 
 ```text
 buildyard/
-  cmd/buildyard/main.go     # serve, open; later run, install-service
+  cmd/buildyard/main.go     # serve, open, service; CLI client: status, run, jobs, logs, cancel
   internal/
     config/                # config.toml, ~/.buildyard paths
     lock/                  # flock on daemon.lock
@@ -404,7 +404,7 @@ The `-am` and `-amd` toggles stay with the user. Without `-am` the build assumes
 
 ## HTTP API and events
 
-All functionality is available through the JSON API under `/api`. The UI and the future CLI use the same API. Errors come back as `{"error": "<code>", "message": "..."}` with the matching HTTP status. Long operations return `202` with a background task.
+All functionality is available through the JSON API under `/api`. The UI and the CLI (`internal/client`) use the same API. Errors come back as `{"error": "<code>", "message": "..."}` with the matching HTTP status. Long operations return `202` with a background task.
 
 | Method | Path | What it does |
 | --- | --- | --- |
@@ -466,6 +466,7 @@ The UI has a job bar at the top, visible everywhere, and these screens. The main
   - *Packages.* A tree with a "per module / combined" switch, search and a generated toggle.
   - *Settings* (done). A "what a run will use" summary and tabs: *General* (name, environment variables), *JDK* (project JDK), *Maven* (executable: global default, auto, `./mvnw`, mvnd, mvn, custom path; JDK for Maven, defaulting to the project JDK). A future build tool gets its own tab. Later: skip preset editor, arbitrary commands.
 - **Settings** (done) — Maven defaults (executable, JDK for Maven); build tools (mvn, mvnd with versions read from their install files, project wrappers with the Maven version they pin); JDKs grouped by the manager they came from, with "Detect again", manual add, rename and remove, and the managers not found on the machine.
+- **Activity** (done 2026-11-18) — background tasks (JDK and build tool detection, module discovery) with status, duration, a short result and the first error line (full output on click). The nav link gets a red dot for a failure not seen yet and a blue one while something runs.
 - **Job** — header (status, command, time, Cancel / Rerun), n/m progress bar, horizontal per-module timing bars (current module highlighted), log viewer and problems panel.
 
 The log is rendered as a virtual list: only visible lines are in the DOM, otherwise the browser chokes on a large log. Hotkeys: `r` — rerun the current job, `/` — search the log, `e` — next error.
@@ -502,13 +503,15 @@ maxLogBytes = "2GB"
 flags = ["-ntp"]
 ```
 
+**Changing config without a restart** (done 2026-11-18). Settings → Daemon edits `maxConcurrentJobs` and `retention.jobsPerProject` through `GET/PUT /api/config`; they are written to `config.toml` (as a generic table, so unknown keys survive; comments do not) and applied to the runner at once. SIGHUP reloads the file. `port` needs a restart. `retention.maxLogBytes` and `defaults.flags` are not used by the code yet.
+
 **Security:**
 
 - Bind to `127.0.0.1` only; listening on `0.0.0.0` is not possible even through the config.
 - No CORS.
 - Arbitrary commands run only by the id of a saved `shell_command`, never as raw text in a run request. `extraArgs` in a RunSpec are passed to Maven as arguments, without a shell.
 
-**Autostart (phase 7).** `buildyard install-service` writes a launchd plist to `~/Library/LaunchAgents/` on macOS or a systemd user unit to `~/.config/systemd/user/` on Linux. The daemon inherits the service environment, not the shell's. That is why mvn/mvnd are also looked up in Homebrew/sdkman dirs and JDKs are chosen from the settings list rather than taken from `JAVA_HOME`.
+**Autostart** (pulled forward from phase 7, done 2026-11-18). `buildyard service install` writes a launchd plist to `~/Library/LaunchAgents/` on macOS or a systemd user unit to `~/.config/systemd/user/` on Linux. `service start|stop|restart|status|uninstall` manage it; the service runs `serve --service`, which logs to stderr only, and the service manager appends that to `daemon.log`. The service gets `PATH`, `USER`, `JAVA_HOME` and `BUILDYARD_HOME` from the shell that installed it; otherwise the daemon inherits the service environment, not the shell's. That is why mvn/mvnd are also looked up in Homebrew/sdkman dirs and JDKs are chosen from the settings list rather than taken from `JAVA_HOME`.
 
 ## Phases
 
@@ -550,7 +553,7 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
 6. **"Build changed"**
    - **Done when:** on a branch with edits in two modules exactly those two modules are offered; "since the last successful run" works; a root pom change gives "build everything".
 7. **Polish (v2)**
-   - Autostart, system notifications on completion, log cleanup, CLI `buildyard run <profile>`, opening files in the IDE, Gradle adapter, selective `target/` cleanup for failed modules, rebuilding FAILURE+SKIPPED instead of `-rf` (see SPIKE.md).
+   - Autostart and CLI `buildyard run <task>` (both done early, 2026-11-18), system notifications on completion, log cleanup, opening files in the IDE, Gradle adapter, selective `target/` cleanup for failed modules, rebuilding FAILURE+SKIPPED instead of `-rf` (see SPIKE.md).
 
 ## Testing, risks, open questions
 

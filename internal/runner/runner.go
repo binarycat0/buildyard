@@ -66,6 +66,17 @@ func New(st *store.Store, logsDir string, maxConcurrent, keepJobs int, log *slog
 		KillGrace: 10 * time.Second, runs: map[int64]*run{}, busy: map[int64]bool{}}
 }
 
+// SetLimits changes the limits of New while the runner works. A higher
+// maxConcurrent starts queued jobs at once; a lower one lets running jobs
+// finish and starts no new ones until the count drops below it.
+func (r *Runner) SetLimits(maxConcurrent, keepJobs int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.maxConcurrent = max(1, maxConcurrent)
+	r.keepJobs = keepJobs
+	r.dispatchLocked()
+}
+
 // ErrClosed is returned by Enqueue after Shutdown started.
 var ErrClosed = errors.New("runner is shutting down")
 
@@ -271,10 +282,11 @@ func (r *Runner) execute(rn *run) {
 	delete(r.busy, rn.job.ProjectID)
 	r.active--
 	r.dispatchLocked()
+	keep := r.keepJobs
 	r.mu.Unlock()
 
-	if r.keepJobs > 0 {
-		paths, err := r.store.PruneJobs(ctx, rn.job.ProjectID, r.keepJobs)
+	if keep > 0 {
+		paths, err := r.store.PruneJobs(ctx, rn.job.ProjectID, keep)
 		if err != nil {
 			r.log.Warn("prune jobs", "err", err)
 		}

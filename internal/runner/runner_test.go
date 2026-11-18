@@ -322,3 +322,32 @@ sleep 30`
 		t.Fatalf("events file should be removed: %v", err)
 	}
 }
+
+func TestSetLimitsStartsQueuedJobs(t *testing.T) {
+	r, st, pid := setup(t, 1)
+	ctx := context.Background()
+	other, err := st.CreateProject(ctx, store.Project{Name: "q", RootPath: t.TempDir(), BuildTool: "maven"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gate := filepath.Join(t.TempDir(), "gate")
+	first, err := r.Enqueue(ctx, store.Job{ProjectID: pid}, sh(t.TempDir(), `echo started; while [ ! -e `+gate+` ]; do sleep 0.05; done`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitLines(t, r, first.ID, 1)
+	second, err := r.Enqueue(ctx, store.Job{ProjectID: other.ID}, sh(t.TempDir(), `echo second`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if j, _ := st.GetJob(ctx, second.ID); j.Status != store.JobQueued {
+		t.Fatalf("with one slot the second job is %s, want queued", j.Status)
+	}
+	r.SetLimits(2, 0) // a second slot: the queued job starts while the first still runs
+	if j := wait(t, st, second.ID); j.Status != store.JobSucceeded {
+		t.Fatalf("second job %s", j.Status)
+	}
+	os.WriteFile(gate, nil, 0o600)
+	wait(t, st, first.ID)
+}
