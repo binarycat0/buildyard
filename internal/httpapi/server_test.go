@@ -39,7 +39,10 @@ func newServerHome(t *testing.T, userHome string) (http.Handler, string) {
 	}
 	bg := tasks.New(1, nil)
 	t.Cleanup(bg.Close)
-	s := &Server{Store: st, Tasks: bg, JDKs: jdk.Detector{Home: userHome, GOOS: "darwin"}, Home: userHome, DataDir: "/tmp/x", UI: ui}
+	s := &Server{Store: st, Tasks: bg, JDKs: jdk.Detector{Home: userHome, GOOS: "darwin", SystemRoot: t.TempDir(),
+		Run:      func(string, ...string) ([]byte, error) { return nil, os.ErrNotExist },
+		Getenv:   func(string) string { return "" },
+		LookPath: func(string) string { return "" }}, Home: userHome, DataDir: "/tmp/x", UI: ui}
 	return s.Handler(), dbPath
 }
 

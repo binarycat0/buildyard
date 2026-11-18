@@ -57,6 +57,7 @@ document.addEventListener('alpine:init', () => {
     tools: {},
     jdks: [],
     jdkPath: '',
+    editingJdk: null,
     jdkError: '',
     detectTask: null,
     detectResult: '',
@@ -193,7 +194,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     jdkLabel(j) {
-      const name = j.name || j.vendor || '';
+      const name = j.name || j.label || j.vendor || '';
       return `${j.version || '?'}${name ? ' · ' + name : ''}${j.arch ? ' · ' + j.arch : ''}${j.missing ? ' (not found)' : ''}`;
     },
 
@@ -259,6 +260,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     async renameJdk(j, name) {
+      if ((j.name || '') === name.trim()) return;
       try {
         Object.assign(j, await api('PATCH', `/jdks/${j.id}`, { name }));
       } catch (e) {

@@ -12,7 +12,9 @@ import (
 type JDK struct {
 	ID      int64  `json:"id"`
 	Home    string `json:"home"`
-	Name    string `json:"name"`
+	FoundAt string `json:"foundAt"` // where it was found, if that was a symlink to Home
+	Label   string `json:"label"`   // derived from the install location, e.g. "openjdk@21 21.0.8 (Homebrew)"
+	Name    string `json:"name"`    // user label; overrides Label in the UI when set
 	Version string `json:"version"`
 	Major   int    `json:"major"`
 	Vendor  string `json:"vendor"`
@@ -21,11 +23,11 @@ type JDK struct {
 	Missing bool   `json:"missing"`
 }
 
-const jdkCols = `id, home, name, version, major, vendor, arch, source, missing`
+const jdkCols = `id, home, found_at, label, name, version, major, vendor, arch, source, missing`
 
 func scanJDK(r scanner) (JDK, error) {
 	var j JDK
-	err := r.Scan(&j.ID, &j.Home, &j.Name, &j.Version, &j.Major, &j.Vendor, &j.Arch, &j.Source, &j.Missing)
+	err := r.Scan(&j.ID, &j.Home, &j.FoundAt, &j.Label, &j.Name, &j.Version, &j.Major, &j.Vendor, &j.Arch, &j.Source, &j.Missing)
 	return j, err
 }
 
@@ -58,9 +60,9 @@ func (s *Store) GetJDK(ctx context.Context, id int64) (JDK, error) {
 
 // AddJDK inserts a manually added JDK.
 func (s *Store) AddJDK(ctx context.Context, info jdk.Info, name string) (JDK, error) {
-	res, err := s.db.ExecContext(ctx, `INSERT INTO jdk (home, name, version, major, vendor, arch, source, detected_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'manual', ?)`,
-		info.Home, name, info.Version, info.Major, info.Vendor, info.Arch, now())
+	res, err := s.db.ExecContext(ctx, `INSERT INTO jdk (home, found_at, label, name, version, major, vendor, arch, source, detected_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?)`,
+		info.Home, info.FoundAt, info.Label, name, info.Version, info.Major, info.Vendor, info.Arch, now())
 	if err != nil {
 		return JDK{}, mapErr(err)
 	}
@@ -132,11 +134,12 @@ func (s *Store) SyncDetectedJDKs(ctx context.Context, found []jdk.Info, exists f
 		if _, ok := known[f.Home]; !ok {
 			res.Added++
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO jdk (home, version, major, vendor, arch, source, detected_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(home) DO UPDATE SET version = excluded.version, major = excluded.major,
-				vendor = excluded.vendor, arch = excluded.arch, missing = 0, detected_at = excluded.detected_at`,
-			f.Home, f.Version, f.Major, f.Vendor, f.Arch, f.Source, ts); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO jdk (home, found_at, label, version, major, vendor, arch, source, detected_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(home) DO UPDATE SET found_at = excluded.found_at, label = excluded.label,
+				version = excluded.version, major = excluded.major, vendor = excluded.vendor, arch = excluded.arch,
+				missing = 0, detected_at = excluded.detected_at`,
+			f.Home, f.FoundAt, f.Label, f.Version, f.Major, f.Vendor, f.Arch, f.Source, ts); err != nil {
 			return res, err
 		}
 	}

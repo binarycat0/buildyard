@@ -178,9 +178,22 @@
           <tbody>
             <template x-for="j in jdks" :key="j.id">
               <tr :class="{missing: j.missing}">
-                <td><strong x-text="j.version || '?'"></strong> <span class="muted" x-text="j.arch"></span></td>
-                <td><input class="inline" :value="j.name" :placeholder="j.vendor" @change="renameJdk(j, $event.target.value)"></td>
-                <td><code class="path" x-text="j.home"></code> <span class="error" x-show="j.missing">not found</span></td>
+                <td><strong x-text="j.version || '?'"></strong> <span class="muted" x-text="j.arch"></span>
+                  <div class="muted small" x-text="j.vendor"></div></td>
+                <td class="name-cell">
+                  <template x-if="editingJdk !== j.id">
+                    <span><span x-text="j.name || j.label || j.vendor"></span>
+                      <button class="link small" @click="editingJdk = j.id" title="Rename">rename</button></span>
+                  </template>
+                  <template x-if="editingJdk === j.id">
+                    <input class="inline" :value="j.name" :placeholder="j.label || j.vendor" x-init="$el.focus()"
+                      @keydown.enter="renameJdk(j, $event.target.value); editingJdk = null"
+                      @keydown.escape="editingJdk = null" @blur="renameJdk(j, $event.target.value); editingJdk = null"
+                      title="Leave empty to use the detected name">
+                  </template>
+                </td>
+                <td><code class="path" x-text="j.home"></code> <span class="error" x-show="j.missing">not found</span>
+                  <div class="muted small" x-show="j.foundAt">found at <code x-text="j.foundAt"></code></div></td>
                 <td class="muted" x-text="j.source"></td>
                 <td><button class="danger small" @click="deleteJdk(j)">Remove</button></td>
               </tr>
