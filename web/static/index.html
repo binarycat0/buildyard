@@ -540,16 +540,10 @@
           </div>
           <div class="card modprog" x-show="jobMods.length">
             <div class="row spread">
-              <strong x-text="modsSummary()"></strong>
+              <strong x-text="modsSummary()" :title="modsWith('running').map((m) => m.name + ' · ' + modTime(m)).join('\n')"></strong>
               <button class="small" @click="modsOpen = !modsOpen" x-text="modsOpen ? 'Hide modules' : 'All modules'"></button>
             </div>
             <div class="bar"><div :style="'width:' + modsPercent() + '%'" :class="{bad: modsWith('failed').length}"></div></div>
-            <div class="row wrap small" x-show="modsWith('running').length">
-              <span class="muted">Building</span>
-              <template x-for="m in modsWith('running')" :key="m.key">
-                <span class="chip running" :title="m.key" x-text="m.name + ' · ' + modTime(m)"></span>
-              </template>
-            </div>
             <div class="row wrap small" x-show="modsWith('failed').length">
               <span class="muted">Failed</span>
               <template x-for="m in modsWith('failed')" :key="m.key">
