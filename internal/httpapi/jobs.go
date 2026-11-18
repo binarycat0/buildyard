@@ -83,6 +83,9 @@ func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpe
 	}
 	cmd := runner.Command{Argv: pv.Argv, Dir: p.RootPath, Env: buildEnv(os.Environ(), p.Env, pv.JavaHome)}
 	cmd.SignalLeaderOnly = info.Executable != nil && info.Executable.Kind == maven.ModeMvnd
+	if jar := s.ExtJar; jar != "" {
+		cmd.EventArgs = func(path string) []string { return maven.ExtArgs(jar, path) }
+	}
 	return pv, cmd, nil
 }
 
@@ -294,6 +297,26 @@ func (s *Server) rerunJob(w http.ResponseWriter, r *http.Request) {
 	s.start(w, r, p, spec, j.ProfileID)
 }
 
+// jobModules returns per-module progress: live for an active job, stored otherwise.
+func (s *Server) jobModules(w http.ResponseWriter, r *http.Request) {
+	j, ok := s.jobFor(w, r)
+	if !ok {
+		return
+	}
+	if s.Runner != nil {
+		if mods := s.Runner.Modules(j.ID); mods != nil {
+			writeJSON(w, http.StatusOK, mods)
+			return
+		}
+	}
+	mods, err := s.Store.ListJobModules(r.Context(), j.ID)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, mods)
+}
+
 type logPage struct {
 	From  int      `json:"from"`
 	Lines []string `json:"lines"`
@@ -393,6 +416,13 @@ func (s *Server) jobStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	send("status", "", runner.Event{Type: "status", Status: j.Status})
+	if sub != nil {
+		if sub.Modules != nil {
+			send("modules", "", sub.Modules)
+		}
+	} else if mods, err := s.Store.ListJobModules(r.Context(), j.ID); err == nil && len(mods) > 0 {
+		send("modules", "", mods)
+	}
 	flusher.Flush()
 
 	if sub != nil {
@@ -412,9 +442,14 @@ func (s *Server) jobStream(w http.ResponseWriter, r *http.Request) {
 					}
 					goto end
 				}
-				if ev.Type == "line" {
+				switch ev.Type {
+				case "line":
 					send("log", strconv.Itoa(ev.N), ev)
-				} else {
+				case "modules":
+					send("modules", "", ev.Modules)
+				case "module":
+					send("module", "", ev.Module)
+				default:
 					send("status", "", ev)
 				}
 				if len(sub.C) == 0 {

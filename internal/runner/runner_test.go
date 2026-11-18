@@ -251,3 +251,74 @@ func TestStopAndKill(t *testing.T) {
 		t.Fatalf("kill: %s", got.Status)
 	}
 }
+
+// evCmd runs script with $1 = the events file path the runner chose.
+func evCmd(dir, script string) Command {
+	return Command{Argv: []string{"/bin/sh"}, Dir: dir, Env: os.Environ(),
+		EventArgs: func(path string) []string { return []string{"-c", script, "sh", path} }}
+}
+
+func TestModuleProgress(t *testing.T) {
+	r, st, pid := setup(t, 1)
+	ctx := context.Background()
+	script := `
+f="$1"
+printf '%s\n' '{"t":"session","projects":[{"key":"g:a","name":"A"},{"key":"g:b","name":"B"},{"key":"g:c","name":"C"}]}' >> "$f"
+printf '%s\n' '{"t":"project_start","key":"g:a","ts":1700000000000}' >> "$f"
+printf '%s' '{"t":"project_end","key":"g:a","status":"succeeded",' >> "$f"
+sleep 0.4
+printf '%s\n' '"ms":1200,"ts":1700000001200}' >> "$f"
+printf '%s\n' '{"t":"project_start","key":"g:b","ts":1700000001300}' >> "$f"
+echo started-b
+sleep 30`
+	job, err := r.Enqueue(ctx, store.Job{ProjectID: pid}, evCmd(t.TempDir(), script))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(job.Argv, " ") != "/bin/sh" {
+		t.Fatalf("recorded argv must leave the event args out: %q", job.Argv)
+	}
+	waitLines(t, r, job.ID, 1)
+	sub := r.Subscribe(job.ID)
+	defer sub.Close()
+
+	var mods []store.JobModule
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		mods = r.Modules(job.ID)
+		if len(mods) == 3 && mods[1].Status == "running" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(mods) != 3 || mods[0].Status != "succeeded" || mods[0].DurationMs != 1200 || mods[1].Status != "running" || mods[2].Status != "pending" {
+		t.Fatalf("live modules: %+v", mods)
+	}
+	if err := r.Kill(job.ID); err != nil {
+		t.Fatal(err)
+	}
+	var sawB bool
+	for ev := range sub.C {
+		if ev.Type == "module" && ev.Module.Key == "g:b" && ev.Module.Status == "cancelled" {
+			sawB = true
+		}
+	}
+	if !sawB {
+		t.Fatal("no final module event for the module that was running")
+	}
+	wait(t, st, job.ID)
+	saved, err := st.ListJobModules(ctx, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, m := range saved {
+		got = append(got, m.Name+"="+m.Status)
+	}
+	if strings.Join(got, ",") != "A=succeeded,B=cancelled,C=pending" {
+		t.Fatalf("saved modules: %v", got)
+	}
+	if _, err := os.Stat(filepath.Join(r.logsDir, strconv.FormatInt(job.ID, 10)+".events.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("events file should be removed: %v", err)
+	}
+}

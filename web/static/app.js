@@ -244,6 +244,10 @@ document.addEventListener('alpine:init', () => {
 
     job: null,
     jobProject: null,
+    jobMods: [],
+    modIndex: {},
+    modsOpen: false,
+    modsSort: 'reactor',
     firstLine: 0,
     logCount: 0,
     logFilter: loadPref('logFilter', 'important'),
@@ -830,6 +834,7 @@ document.addEventListener('alpine:init', () => {
       closeStream();
       const job = await api('GET', `/jobs/${id}`);
       this.job = job;
+      this.setMods([]);
       this.firstLine = 0;
       this.logCount = job.liveLines;
       if (this.jobProject?.id !== job.projectId) this.jobProject = await api('GET', `/projects/${job.projectId}`);
@@ -848,6 +853,12 @@ document.addEventListener('alpine:init', () => {
         this.logCount = Math.max(this.logCount, ev.n);
         logView.push(ev.text);
       });
+      es.addEventListener('modules', (e) => this.setMods(JSON.parse(e.data) || []));
+      es.addEventListener('module', (e) => {
+        const m = JSON.parse(e.data);
+        const i = this.modIndex[m.key];
+        if (i !== undefined) this.jobMods[i] = m;
+      });
       es.addEventListener('status', async (e) => {
         const st = JSON.parse(e.data).status;
         if (st !== this.job.status) this.job = await api('GET', `/jobs/${id}`);
@@ -860,6 +871,66 @@ document.addEventListener('alpine:init', () => {
         if (stream === es) stream = null;
         clearInterval(ticker);
       });
+    },
+
+    setMods(mods) {
+      this.jobMods = mods;
+      this.modIndex = Object.fromEntries(mods.map((m, i) => [m.key, i]));
+    },
+
+    modsWith(...st) {
+      return this.jobMods.filter((m) => st.includes(m.status));
+    },
+
+    modsSummary() {
+      const total = this.jobMods.length;
+      const done = this.modsWith('succeeded', 'failed', 'skipped', 'cancelled').length;
+      const parts = [`${done} of ${total} modules`];
+      const failed = this.modsWith('failed').length;
+      if (failed) parts.push(`${failed} failed`);
+      const skipped = this.modsWith('skipped').length;
+      if (skipped) parts.push(`${skipped} skipped`);
+      if (this.job && !['queued', 'running'].includes(this.job.status)) {
+        const notBuilt = this.modsWith('pending').length;
+        if (notBuilt) parts.push(`${notBuilt} not built`);
+      }
+      return parts.join(' · ');
+    },
+
+    modsPercent() {
+      const total = this.jobMods.length;
+      return total ? (100 * this.modsWith('succeeded', 'failed', 'skipped', 'cancelled').length) / total : 0;
+    },
+
+    modsTable() {
+      const rows = [...this.jobMods];
+      if (this.modsSort === 'slowest') rows.sort((a, b) => this.modMs(b) - this.modMs(a));
+      return rows;
+    },
+
+    modMs(m) {
+      if (m.status === 'running' && m.startedAt) return this.now - new Date(m.startedAt);
+      return m.ms || 0;
+    },
+
+    modTime(m) {
+      if (m.status === 'pending') return '';
+      const ms = this.modMs(m);
+      if (ms < 1000) return ms + ' ms';
+      const sec = Math.round(ms / 1000);
+      return sec < 60 ? sec + ' s' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    },
+
+    modStatus(m) {
+      if (m.status === 'pending') return this.job && ['queued', 'running'].includes(this.job.status) ? 'waiting' : 'not built';
+      return m.status;
+    },
+
+    findModule(m) {
+      // The artifactId is in Maven's own messages at every log level ("on project x").
+      this.logQuery = m.key.split(':')[1] || m.name;
+      if (this.logFilter !== 'all') this.setLogFilter('all');
+      logView.search(this.logQuery);
     },
 
     async loadEarlier() {

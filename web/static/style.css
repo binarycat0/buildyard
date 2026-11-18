@@ -146,3 +146,17 @@ a.modname:hover { text-decoration: underline; }
 .log[data-f=warn] > div:not(.lv-error):not(.lv-warn) { display: none; }
 .log[data-f=error] > div:not(.lv-error) { display: none; }
 .log.searching > div.nomatch { display: none; }
+
+/* Per-module progress on the job page */
+.modprog .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.modprog .bar > div { height: 100%; background: #3a9a5b; transition: width .3s; }
+.modprog .bar > div.bad { background: var(--danger); }
+.modprog .chip { border: 1px solid var(--border); background: var(--bg); font-size: .85em; padding: 2px 10px; }
+.modprog .chip.running { border-color: #9db8ec; }
+.modprog button.chip.failed { border-color: var(--danger); color: var(--danger); cursor: pointer; }
+.modtable { max-height: 360px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+.modtable table { width: 100%; border-collapse: collapse; font-size: .9em; }
+.modtable td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--border); }
+.modtable td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.status.skipped, .status.pending { background: var(--border); color: var(--muted); }
+.modprog .seg { align-self: flex-start; }

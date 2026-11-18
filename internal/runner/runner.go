@@ -28,6 +28,10 @@ type Command struct {
 	// SignalLeaderOnly: cancel sends SIGINT to the main process only and never kills the
 	// group. Used for mvnd, whose client must not take the long-lived daemon down with it.
 	SignalLeaderOnly bool
+	// EventArgs, when set, returns the arguments that make the build tool write JSON Lines
+	// events to path (inserted right after the executable). The runner tails that file
+	// for per-module progress. The job's recorded argv leaves them out.
+	EventArgs func(path string) []string
 }
 
 // Runner owns the job queue. Create it with New.
@@ -165,6 +169,20 @@ func (r *Runner) StopRequested(id int64) time.Time {
 	return rn.stopAt
 }
 
+// Modules returns the live per-module progress of an active job (nil when it is not
+// active or reports no modules).
+func (r *Runner) Modules(id int64) []store.JobModule {
+	r.mu.Lock()
+	rn, ok := r.runs[id]
+	r.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+	return rn.prog.snapshot()
+}
+
 // Lines returns the live line count of an active job, or -1.
 func (r *Runner) Lines(id int64) int {
 	r.mu.Lock()
@@ -236,6 +254,11 @@ func (r *Runner) execute(rn *run) {
 	id := rn.job.ID
 	status, exit := r.runProcess(ctx, rn)
 
+	if mods := rn.finishProgress(status); mods != nil {
+		if err := r.store.SaveJobModules(ctx, id, mods); err != nil {
+			r.log.Error("save job modules", "job", id, "err", err)
+		}
+	}
 	lines := rn.closeLog()
 	if err := r.store.FinishJob(ctx, id, status, exit, lines); err != nil {
 		r.log.Error("finish job", "job", id, "err", err)
@@ -278,7 +301,15 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 		rn.writeLine("[buildyard] " + err.Error())
 		return store.JobFailed, nil
 	}
-	cmd := exec.Command(rn.cmd.Argv[0], rn.cmd.Argv[1:]...)
+	argv := rn.cmd.Argv
+	var tail *eventTail
+	if rn.cmd.EventArgs != nil {
+		path := filepath.Join(r.logsDir, strconv.FormatInt(id, 10)+".events.jsonl")
+		os.Remove(path)
+		tail = &eventTail{path: path}
+		argv = append(append([]string{argv[0]}, rn.cmd.EventArgs(path)...), argv[1:]...)
+	}
+	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir, cmd.Env = rn.cmd.Dir, rn.cmd.Env
 	cmd.Stdin = nil
 	cmd.Stdout, cmd.Stderr = pw, pw
@@ -301,6 +332,13 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 		pr.Close()
 		rn.writeLine("[buildyard] cannot start " + rn.cmd.Argv[0] + ": " + err.Error())
 		return store.JobFailed, nil
+	}
+
+	if tail != nil {
+		stopTail := make(chan struct{})
+		tailed := make(chan struct{})
+		go func() { defer close(tailed); tail.follow(rn, stopTail) }()
+		defer func() { close(stopTail); <-tailed; os.Remove(tail.path) }()
 	}
 
 	copied := make(chan struct{})

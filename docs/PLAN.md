@@ -428,6 +428,7 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | POST | `/api/jobs/{id}/kill` | Kill the process group at once (`SIGKILL`) |
 | POST | `/api/jobs/{id}/cancel` | `SIGTERM`, then `SIGKILL` after 10 s |
 | POST | `/api/jobs/{id}/rerun` | Rerun with the same RunSpec snapshot |
+| GET | `/api/jobs/{id}/modules` | Per-module progress: live for an active job, from `job_module` otherwise |
 | GET | `/api/jobs/{id}/log?from=&limit=` | A batch of log lines `{from, lines, total}` (`levels=` later) |
 | GET | `/api/jobs/{id}/stream?from=` | SSE: log, status (modules later) |
 | GET | `/api/events` | SSE: status of all jobs for the global job bar |
@@ -445,7 +446,8 @@ Events in `/api/jobs/{id}/stream` (`event:` → `data:`):
 
 - `log` — `{n, text}` (`level` later); the event `id:` is the line number `n`, which enables catch-up via `Last-Event-ID`. Without it (or `?from=N`) the stream starts with the last 2000 lines; the UI loads earlier ones through `/log`;
 - `status` — `{status}` whenever it changes;
-- `module` — `{key, ord, total, status, ms}` (phase 4);
+- `modules` — the whole module list `[{key, name, ord, status, startedAt, ms}]`, sent after the catch-up and again when the reactor becomes known; statuses are `pending | running | succeeded | failed | skipped | cancelled`;
+- `module` — one changed module, same shape;
 - `problem` — `{kind, module, file, line, message, logLine}` (phase 4);
 - `end` — the finished job; the last event. The client closes the stream after it (a reconnect would only get `end` again).
 
@@ -537,9 +539,10 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
    - The UI calls run profiles **tasks**, because "profile" already means a Maven `-P` profile. Pinned tasks come first. `spec.executable` and `spec.env` overrides are not in the form yet.
    - **Done when:** on a large project (e.g. Dremio) you can pick 2 modules + `-am` + skip tests, see the command, run it, save it as a profile and rerun it in 1 click; table tests for the command builder are green.
 4. **Events, timings, logs** (end of MVP)
-   - The production extension and its embedding — **done 2026-11-18**, pulled forward for the module tree (used by discovery; not yet passed to jobs).
-   - `job_module`, n/m progress, per-module bars.
-   - Level filter, "Important only", problems panel, comparing two runs, fallback parser.
+   - The production extension and its embedding — **done 2026-11-18**, pulled forward for the module tree.
+   - `job_module`, n/m progress, modules being built with elapsed time, failed modules, a module table sorted by build order or duration — **done 2026-11-18**. The runner adds the extension to every Maven job (`-Dmaven.ext.class.path`, `-Dbuildyard.events=logs/<id>.events.jsonl`, left out of the recorded argv), tails the events file every 250 ms, and saves the result to `job_module` when the job ends; modules still running then become `failed` (or `cancelled` after Stop/Kill). Works at any log level, including `-q`.
+   - Level filter and "Important only" — **done 2026-11-18** (client-side classification; `Warnings and errors` log level).
+   - Problems panel, comparing two runs, fallback parser.
    - **Done when:** on the phase 0 fixtures the parser finds all compile errors and failed tests; on a live build progress and timings match the `Reactor Summary`.
 5. **Package scanner**
    - **Done when:** a large project's tree builds within the target time, rescans use mtime, split packages are highlighted.
