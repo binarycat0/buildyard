@@ -114,3 +114,17 @@ func TestParseDuration(t *testing.T) {
 		}
 	}
 }
+
+func TestLogParserDaemonCrash(t *testing.T) {
+	p, probs := parseFixture(t, "11-mvnd-daemon-crash.log")
+	if len(probs) != 1 {
+		t.Fatalf("problems: %+v", probs)
+	}
+	c := probs[0]
+	if c.Kind != "crash" || c.Message != "StaleAddressException: Could not receive a message from the daemon." || c.LogLine != 16 {
+		t.Errorf("crash: %+v", c)
+	}
+	if got := p.Running(); len(got) != 2 {
+		t.Errorf("running at the crash: %v", got)
+	}
+}
