@@ -213,7 +213,11 @@
                     <button type="button" class="small" x-show="moduleFilter" @click="selectShown()">Select shown</button>
                     <button type="button" class="small" @click="rform.selected = []; refreshPreview()">Clear</button>
                   </div>
-                  <div class="modules" x-ref="modlist" @scroll="onModScroll($event)">
+                  <p class="small muted" x-show="rform.selected.length && hasTree() && !allSelected()" x-text="impactText()"></p>
+                  <p class="small muted" x-show="rform.selected.length && allSelected()">Every module is selected, so the run builds all modules without <code>-pl</code>.</p>
+                  <div class="modules" x-ref="modlist" @scroll="onModScroll($event)" :style="'height:' + modHeight + 'px'"
+                    x-effect="[rtab, pview, view, rform.modulesMode, moduleInfo, rpreview, rform.selected.length, editingTask, saveAsNew, modules.length]; $nextTick(() => fitModules())"
+                    @resize.window.debounce.100ms="fitModules()">
                     <div x-data="{ v: { rows: [], top: 0, bottom: 0 } }" x-effect="v = visibleRows()">
                       <div :style="'height:' + v.top + 'px'"></div>
                       <template x-for="r in v.rows" :key="r.m.key">
@@ -256,8 +260,6 @@
                         x-text="'Building it with -am adds ' + plural(i?.upAll, 'module') + ', with -amd ' + plural(i?.downAll, 'module') + '.'"></div>
                     </div>
                   </template>
-                    <p class="small muted" x-show="rform.selected.length && hasTree() && !allSelected()" x-text="impactText()"></p>
-                  <p class="small muted" x-show="rform.selected.length && allSelected()">Every module is selected, so the run builds all modules without <code>-pl</code>.</p>
                 </div>
               </div>
               <div class="stack tabbody" x-show="rtab === 'skip'">

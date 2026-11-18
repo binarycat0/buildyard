@@ -114,7 +114,6 @@ const selCache = new WeakMap(); // selected refs array -> selection index
 let rowsCache = null; // the last tree rows, keyed by what they were built from
 
 const ROW_H = 26; // px, the fixed height of a module row (virtual scrolling)
-const VIEW_ROWS = 14; // rows visible in the module list
 
 function buildGraph(modules) {
   const byKey = new Map(modules.map((m) => [m.key, m]));
@@ -337,6 +336,7 @@ document.addEventListener('alpine:init', () => {
     moduleInfo: null,
     openState: {},
     modScroll: 0,
+    modHeight: 360,
     rtab: loadPref('runTab', 'modules'),
     goalDraft: '',
     discoverTask: null,
@@ -736,8 +736,19 @@ document.addEventListener('alpine:init', () => {
     visibleRows() {
       const rows = this.shownRows();
       const from = Math.max(0, Math.floor(this.modScroll / ROW_H) - 10);
-      const to = Math.min(rows.length, from + VIEW_ROWS + 20);
+      const to = Math.min(rows.length, from + Math.ceil(this.modHeight / ROW_H) + 20);
       return { rows: rows.slice(from, to), top: from * ROW_H, bottom: (rows.length - to) * ROW_H };
+    },
+
+    // The module list reaches down to the bottom of the window (with the page scrolled to
+    // the top), leaving room for the dependency panel under it when that is open.
+    fitModules() {
+      const el = this.$refs.modlist;
+      if (!el || !el.offsetParent) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const info = el.parentElement.querySelector('.modinfo');
+      const below = (info ? info.offsetHeight + 12 : 0) + 36; // card padding and page margin
+      this.modHeight = Math.max(260, Math.round(window.innerHeight - top - below));
     },
 
     onModScroll(e) {
