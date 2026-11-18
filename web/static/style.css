@@ -171,3 +171,11 @@ code.tok.goal { border-color: var(--accent); color: var(--accent); }
 dialog.modal { border: 1px solid var(--border); border-radius: 10px; padding: 16px; width: min(900px, calc(100vw - 32px)); background: var(--card); color: var(--fg); }
 dialog.modal::backdrop { background: rgba(0, 0, 0, .4); }
 pre.cmd.full { max-height: 60vh; overflow: auto; }
+
+/* Saved task summary in the Tasks list */
+.task .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font-size: .78em; padding: 0 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.tag.goal { border-color: var(--accent); color: var(--accent); }
+.tag.prof { border-color: #b08bd9; color: #7d4fb3; }
+.tag.dim { color: var(--muted); }
+@media (prefers-color-scheme: dark) { .tag.prof { color: #c6a6ef; } }

@@ -520,14 +520,26 @@ document.addEventListener('alpine:init', () => {
         .map((sp) => `${sp.label}: ${sp.note}`);
     },
 
-    specSummary(spec) {
+    // A saved task in a few tags: goals, which modules, profiles, skips and notable flags.
+    taskTags(spec) {
       const s = spec || {};
-      const parts = [...(s.goals || [])];
-      if (s.modules?.mode === 'selected') parts.push(`-pl ${(s.modules.list || []).join(',')}${s.modules.alsoMake ? ' -am' : ''}${s.modules.alsoMakeDependents ? ' -amd' : ''}`);
-      if (s.skips?.length) parts.push('skip ' + s.skips.join(','));
-      if (s.profiles?.length) parts.push('-P ' + s.profiles.join(','));
-      if (s.flags?.threads) parts.push('-T ' + s.flags.threads);
-      return parts.join(' · ');
+      const tags = (s.goals || []).map((g) => ({ text: g, cls: 'goal' }));
+      const m = s.modules || {};
+      if (m.mode === 'selected' && m.list?.length) {
+        const list = m.list;
+        const text = list.length <= 2 ? list.map((r) => r.replace(/^:/, '')).join(', ') : `${list.length} modules`;
+        const extra = [m.alsoMake && '-am', m.alsoMakeDependents && '-amd'].filter(Boolean).join(' ');
+        tags.push({ text: extra ? `${text} ${extra}` : text, title: list.join('\n') });
+      } else {
+        tags.push({ text: 'all modules', cls: 'dim' });
+      }
+      if (s.profiles?.length) tags.push({ text: '-P ' + s.profiles.join(','), cls: 'prof' });
+      if (s.skips?.length) tags.push({ text: 'skip ' + s.skips.join(', '), cls: 'dim' });
+      const f = s.flags || {};
+      if (f.threads) tags.push({ text: '-T ' + f.threads });
+      if (f.offline) tags.push({ text: 'offline', cls: 'dim' });
+      if (s.logLevel && s.logLevel !== 'default') tags.push({ text: 'log ' + s.logLevel, cls: 'dim' });
+      return tags;
     },
 
     // ---------- modules ----------
