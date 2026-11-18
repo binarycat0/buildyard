@@ -202,7 +202,7 @@ function savePref(key, value) {
 
 // Resource presets: [value, label]. Anything else is a custom value.
 const RES = {
-  cpu: [['1', '1 thread (no parallel build)'], ['0.5C', 'Half of the CPU cores (0.5C)'], ['1C', '1 thread per CPU core (1C)'],
+  cpu: [['1', '1 thread (sequential build)'], ['0.5C', 'Half of the CPU cores (0.5C)'], ['1C', '1 thread per CPU core (1C)'],
     ['1.5C', '1.5 threads per CPU core (1.5C)'], ['2C', '2 threads per CPU core (2C)']],
   heap: [['2048', '2 GB'], ['4096', '4 GB'], ['8192', '8 GB'], ['12288', '12 GB'], ['16384', '16 GB'], ['24576', '24 GB'], ['32768', '32 GB']],
   forks: [['1', '1 JVM'], ['2', '2 JVMs'], ['0.5C', 'Half of the CPU cores (0.5C)'], ['1C', '1 JVM per CPU core (1C)']],
@@ -545,11 +545,16 @@ document.addEventListener('alpine:init', () => {
       return { cpu, cpuCustom, heap, heapCustom, forks, forksCustom };
     },
 
+    isMvnd() {
+      const e = this.runtime?.executable;
+      return !!e && (e.kind === 'mvnd' || /(^|\/)mvnd$/.test(e.path || ''));
+    },
+
     // "Project default (…)" options in the run form.
     projectDefault(kind) {
       const r = this.proj?.resources || {};
       const v = { cpu: r.threads, heap: r.heapMb, forks: r.testForks }[kind];
-      const none = { cpu: '1 thread', heap: "the JVM's", forks: "the test plugin's" }[kind];
+      const none = { cpu: this.isMvnd() ? 'mvnd: cores − 1, parallel' : 'Maven: 1 thread, sequential', heap: "the JVM's", forks: "the test plugin's" }[kind];
       return `Project default (${v ? resLabel(kind, v) : none})`;
     },
 

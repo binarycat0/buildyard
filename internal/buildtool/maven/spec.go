@@ -274,7 +274,9 @@ func (s RunSpec) Argv(executable string, presets []SkipPreset) []string {
 	if f.NoSnapshotUpdates {
 		argv = append(argv, "-nsu")
 	}
-	if f.Threads != "" && f.Threads != "1" {
+	// "1" is plain Maven's default, so it is left out; mvnd builds in parallel by default
+	// (cores - 1), so it needs -T 1 to build sequentially.
+	if f.Threads != "" && (f.Threads != "1" || filepath.Base(executable) == "mvnd") {
 		argv = append(argv, "-T", f.Threads)
 	}
 	if f.NoTransferProgress {

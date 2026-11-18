@@ -433,7 +433,7 @@
                 <div class="row wrap">
                   <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
                     <select x-model="pform.cpu" >
-                      <option value="">Maven default (1 thread)</option>
+                      <option value="" x-text="isMvnd() ? 'Build tool default (mvnd: cores − 1, parallel)' : 'Build tool default (Maven: 1 thread, sequential)'"></option>
                       <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === pform.cpu"></option></template>
                       <option value="custom">Custom…</option>
                     </select>
