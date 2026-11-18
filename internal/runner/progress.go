@@ -83,10 +83,9 @@ func (p *progress) finish(jobStatus string) []store.JobModule {
 		if m.Status != "running" {
 			continue
 		}
-		m.Status = "failed"
-		if jobStatus == store.JobCancelled || jobStatus == store.JobInterrupted {
-			m.Status = "cancelled"
-		}
+		// A module still building when the build tool exited did not report a failure of
+		// its own: the build stopped under it (fail-fast, a crashed daemon, a cancel).
+		m.Status = "cancelled"
 		if m.StartedAt != nil {
 			m.DurationMs = time.Since(*m.StartedAt).Milliseconds()
 		}
