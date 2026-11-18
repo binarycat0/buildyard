@@ -322,3 +322,64 @@ sleep 30`
 		t.Fatalf("events file should be removed: %v", err)
 	}
 }
+
+// fakeParser: "ERR x" is a problem; "MODS a,b" sets the module list; "RUN a" / "OK a" move one.
+type fakeParser struct{ mods []store.JobModule }
+
+func (f *fakeParser) Line(n int, text string) ([]store.JobProblem, bool) {
+	cmd, arg, _ := strings.Cut(text, " ")
+	switch cmd {
+	case "ERR":
+		return []store.JobProblem{{Kind: "compile", Message: arg, LogLine: n}}, false
+	case "MODS":
+		f.mods = nil
+		for _, k := range strings.Split(arg, ",") {
+			f.mods = append(f.mods, store.JobModule{Key: k, Name: k, Status: "pending"})
+		}
+		return nil, true
+	case "RUN", "OK":
+		for i := range f.mods {
+			if f.mods[i].Key == arg {
+				f.mods[i].Status = map[string]string{"RUN": "running", "OK": "succeeded"}[cmd]
+			}
+		}
+		return nil, true
+	}
+	return nil, false
+}
+
+func (f *fakeParser) Modules() []store.JobModule { return append([]store.JobModule(nil), f.mods...) }
+
+func TestProblemsAndLogFallback(t *testing.T) {
+	r, st, pid := setup(t, 1)
+	ctx := context.Background()
+	cmd := sh(t.TempDir(), `echo MODS a,b; echo RUN a; echo ERR boom; sleep 0.2; echo OK a; echo RUN b; echo OK b`)
+	cmd.Parser = func() OutputParser { return &fakeParser{} }
+	job, err := r.Enqueue(ctx, store.Job{ProjectID: pid}, cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait(t, st, job.ID)
+	probs, _ := st.ListJobProblems(ctx, job.ID)
+	if len(probs) != 1 || probs[0].Message != "boom" || probs[0].LogLine != 3 {
+		t.Fatalf("problems: %+v", probs)
+	}
+	mods, _ := st.ListJobModules(ctx, job.ID)
+	if len(mods) != 2 || mods[0].Status != "succeeded" || mods[1].Status != "succeeded" || mods[0].DurationMs < 150 {
+		t.Fatalf("modules from the log: %+v", mods)
+	}
+
+	// Extension events replace the log's module list.
+	script := `printf '%s\n' '{"t":"session","projects":[{"key":"g:x","name":"X"}]}' >> "$1"; echo MODS a,b; sleep 0.6; printf '%s\n' '{"t":"project_start","key":"g:x","ts":1}' '{"t":"project_end","key":"g:x","status":"succeeded","ms":5,"ts":6}' >> "$1"; echo RUN a; sleep 0.4`
+	cmd = evCmd(t.TempDir(), script)
+	cmd.Parser = func() OutputParser { return &fakeParser{} }
+	job, err = r.Enqueue(ctx, store.Job{ProjectID: pid}, cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait(t, st, job.ID)
+	mods, _ = st.ListJobModules(ctx, job.ID)
+	if len(mods) != 1 || mods[0].Key != "g:x" || mods[0].Status != "succeeded" {
+		t.Fatalf("events must win: %+v", mods)
+	}
+}

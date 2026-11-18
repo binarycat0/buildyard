@@ -215,3 +215,12 @@ button.icon.danger { color: var(--danger); }
 .menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 200px; display: flex; flex-direction: column; padding: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .15); }
 .menu-list button { border: none; background: none; text-align: left; padding: 7px 10px; border-radius: 5px; }
 .menu-list button:hover:not(:disabled) { background: var(--bg); }
+
+/* Problems panel on the job page */
+.problems { gap: 6px; }
+.pgroup { display: flex; flex-direction: column; gap: 2px; }
+button.problem { display: flex; gap: 8px; align-items: baseline; text-align: left; border: none; background: none; padding: 3px 6px; border-radius: 5px; cursor: pointer; font: inherit; color: inherit; }
+button.problem:hover { background: var(--bg); }
+button.problem .where { color: var(--danger); white-space: nowrap; font-size: .85em; }
+button.problem .msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.log > div.hl { background: rgba(255, 200, 0, .25); outline: 1px solid rgba(255, 200, 0, .6); }

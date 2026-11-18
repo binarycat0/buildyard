@@ -568,6 +568,24 @@
               </div>
             </template>
           </div>
+          <div class="card problems" x-show="jobProblems.length">
+            <strong x-text="plural(jobProblems.length, 'problem')"></strong>
+            <template x-for="g in problemGroups()" :key="g.kind">
+              <div class="pgroup">
+                <div class="muted small" x-text="g.title + ' (' + g.items.length + ')'"></div>
+                <template x-for="(p, i) in shownProblems(g)" :key="g.kind + i">
+                  <button type="button" class="problem" @click="goToLine(p.logLine)" :title="(p.file || '') + (p.logLine ? '  (log line ' + p.logLine + ')' : '')">
+                    <code class="where" x-show="problemWhere(p)" x-text="problemWhere(p)"></code>
+                    <span class="badge small" x-show="p.module" x-text="p.module"></span>
+                    <span class="msg" x-text="p.message"></span>
+                  </button>
+                </template>
+                <button type="button" class="link small" x-show="g.items.length > 8"
+                  @click="probOpen = { ...probOpen, [g.kind]: !probOpen[g.kind] }"
+                  x-text="probOpen[g.kind] ? 'Show fewer' : 'Show all ' + g.items.length"></button>
+              </div>
+            </template>
+          </div>
           <div class="row wrap logbar">
             <div class="seg">
               <button :class="{active: logFilter === 'important'}" @click="setLogFilter('important')"

@@ -353,6 +353,8 @@ document.addEventListener('alpine:init', () => {
     job: null,
     jobProject: null,
     jobMods: [],
+    jobProblems: [],
+    probOpen: {},
     modIndex: {},
     modsOpen: false,
     modsSort: 'reactor',
@@ -1069,6 +1071,8 @@ document.addEventListener('alpine:init', () => {
       const job = await api('GET', `/jobs/${id}`);
       this.job = job;
       this.setMods([]);
+      this.jobProblems = [];
+      this.probOpen = {};
       this.firstLine = 0;
       this.logCount = job.liveLines;
       if (this.jobProject?.id !== job.projectId) this.jobProject = await api('GET', `/projects/${job.projectId}`);
@@ -1088,6 +1092,8 @@ document.addEventListener('alpine:init', () => {
         logView.push(ev.text);
       });
       es.addEventListener('modules', (e) => this.setMods(JSON.parse(e.data) || []));
+      es.addEventListener('problems', (e) => { this.jobProblems = JSON.parse(e.data) || []; });
+      es.addEventListener('problem', (e) => { this.jobProblems.push(JSON.parse(e.data)); });
       es.addEventListener('module', (e) => {
         const m = JSON.parse(e.data);
         const i = this.modIndex[m.key];
@@ -1165,6 +1171,48 @@ document.addEventListener('alpine:init', () => {
       this.logQuery = m.key.split(':')[1] || m.name;
       if (this.logFilter !== 'all') this.setLogFilter('all');
       logView.search(this.logQuery);
+    },
+
+    // ---------- problems ----------
+    problemGroups() {
+      const titles = { compile: 'Compile errors', test: 'Failed tests', goal: 'Failed goals', dependency: 'Dependency problems' };
+      return Object.keys(titles)
+        .map((kind) => ({ kind, title: titles[kind], items: this.jobProblems.filter((p) => p.kind === kind) }))
+        .filter((g) => g.items.length);
+    },
+
+    shownProblems(g) {
+      return this.probOpen[g.kind] ? g.items : g.items.slice(0, 8);
+    },
+
+    problemWhere(p) {
+      if (p.kind === 'compile') return `${p.file.split(/[\\/]/).pop()}:${p.line}`;
+      return '';
+    },
+
+    // Shows log line n: loads earlier lines if needed, switches to All, highlights it.
+    async goToLine(n) {
+      if (!n || !logView.el) return;
+      logView.flush();
+      if (this.firstLine && n < this.firstLine) {
+        const to = this.firstLine - 1;
+        const from = Math.max(1, n - 200);
+        const page = await api('GET', `/jobs/${this.job.id}/log?from=${from}&limit=${to - from + 1}`);
+        logView.prepend(page.lines);
+        this.firstLine = from;
+      }
+      if (this.logFilter !== 'all') this.setLogFilter('all');
+      if (this.logQuery) {
+        this.logQuery = '';
+        logView.search('');
+      }
+      await this.$nextTick();
+      const node = logView.el.children[n - (this.firstLine || 1)];
+      if (!node) return;
+      logView.follow = false;
+      logView.el.querySelectorAll('.hl').forEach((x) => x.classList.remove('hl'));
+      node.classList.add('hl');
+      logView.el.scrollTop = node.offsetTop - logView.el.offsetTop - logView.el.clientHeight / 3;
     },
 
     async loadEarlier() {
