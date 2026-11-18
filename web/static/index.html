@@ -14,6 +14,7 @@
     <nav>
       <a href="#/" :class="{active: view === 'projects' || view === 'project' || view === 'job' || view === 'compare'}">Projects</a>
       <a href="#/settings" :class="{active: view === 'settings'}">Settings</a>
+      <a href="#/activity" :class="{active: view === 'activity'}" title="Background work: JDK and tool detection, module discovery">Activity<span class="nav-dot" :class="activityDot()" x-show="activityDot()"></span></a>
     </nav>
     <span class="muted grow-right" x-text="health ? 'v' + health.version : ''"></span>
   </header>
@@ -703,6 +704,36 @@
       </template>
     </section>
 
+    <!-- ===================== Activity (background tasks) ===================== -->
+    <section x-show="view === 'activity'" x-cloak class="stack">
+      <h1>Activity</h1>
+      <div class="card">
+        <p class="muted small">Background work the daemon does besides builds. Kept in memory until the daemon restarts.</p>
+        <p class="muted" x-show="!btasks.length">Nothing has run since the daemon started.</p>
+        <table class="list" x-show="btasks.length">
+          <thead><tr><th>#</th><th>Task</th><th>Status</th><th>Started</th><th>Duration</th><th>Result</th></tr></thead>
+          <tbody>
+            <template x-for="t in btasks" :key="t.id">
+              <tr>
+                <td x-text="t.id"></td>
+                <td class="nowrap" x-text="taskLabel(t)"></td>
+                <td><span class="status" :class="t.status" x-text="t.status"></span></td>
+                <td class="small nowrap" x-text="when(t.startedAt || t.queuedAt)"></td>
+                <td class="small" x-text="duration(t)"></td>
+                <td class="small">
+                  <span x-show="!t.error" x-text="taskResult(t)"></span>
+                  <details x-show="t.error" class="task-error">
+                    <summary class="error" x-text="errorSummary(t.error)"></summary>
+                    <pre x-text="t.error"></pre>
+                  </details>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ===================== Global settings ===================== -->
     <section x-show="view === 'settings'" x-cloak class="stack">
       <h1>Settings</h1>
@@ -731,6 +762,26 @@
           <span class="muted" x-show="saved">Saved</span>
         </div>
       </form>
+
+      <template x-if="cform">
+        <form class="card" @submit.prevent="saveConfig()">
+          <h2>Daemon</h2>
+          <p class="muted small">Saved to <code x-text="cform.path"></code> and applied at once, no restart.</p>
+          <div class="row">
+            <label>Builds at once
+              <input class="short" type="number" min="1" max="64" required x-model.number="cform.maxConcurrentJobs" title="Running builds across all projects; one project always builds one job at a time">
+            </label>
+            <label>Runs kept per project
+              <input class="short" type="number" min="0" required x-model.number="cform.jobsPerProject" title="Older finished runs and their logs are deleted; 0 keeps all">
+            </label>
+          </div>
+          <p class="muted small">Port <span x-text="cform.port"></span>: set <code>port</code> in config.toml; it needs a restart.</p>
+          <div class="row">
+            <button class="primary" type="submit" :disabled="busy">Save</button>
+            <span class="muted" x-show="cfgSaved">Saved</span>
+          </div>
+        </form>
+      </template>
 
       <div class="card">
         <div class="row spread">

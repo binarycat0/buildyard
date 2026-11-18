@@ -378,6 +378,10 @@ document.addEventListener('alpine:init', () => {
     jdkError: '',
     detectTask: null,
     detectResult: '',
+    btasks: [],
+    cform: null,
+    cfgSaved: false,
+    seenTasksAt: loadPref('seenTasksAt', ''), // queuedAt of the newest task shown on the Activity page
 
     async init() {
       window.addEventListener('hashchange', () => this.route());
@@ -388,8 +392,15 @@ document.addEventListener('alpine:init', () => {
       }
       await this.route();
       // The daemon scans JDKs at startup; pick up a scan that is still running.
-      const running = (await api('GET', '/tasks')).find((t) => t.kind === 'jdk.detect' && (t.status === 'queued' || t.status === 'running'));
+      await this.loadActivity();
+      const running = this.btasks.find((t) => t.kind === 'jdk.detect' && (t.status === 'queued' || t.status === 'running'));
       if (running) this.followDetect(running);
+      // Background tasks are cheap to list (in memory); poll faster while the page is open.
+      const poll = async () => {
+        await this.loadActivity().catch(() => {});
+        setTimeout(poll, this.view === 'activity' ? 2000 : 10000);
+      };
+      setTimeout(poll, 2000);
     },
 
     async route() {
@@ -415,6 +426,9 @@ document.addEventListener('alpine:init', () => {
         } else if ((m = h.match(/^\/jobs\/(\d+)$/))) {
           this.view = 'job';
           await this.openJob(Number(m[1]));
+        } else if (h === '/activity') {
+          this.view = 'activity';
+          await this.loadActivity();
         } else if (h === '/settings') {
           this.view = 'settings';
           await this.loadSettings();
@@ -1368,6 +1382,49 @@ document.addEventListener('alpine:init', () => {
       return (argv || []).map(shellQuote).join(' ');
     },
 
+    async loadActivity() {
+      this.btasks = await api('GET', '/tasks');
+      this.now = Date.now();
+      // Times, not ids: task ids start over when the daemon restarts.
+      const newest = this.btasks[0]?.queuedAt ?? '';
+      if (this.view === 'activity' && newest && new Date(newest) > new Date(this.seenTasksAt || 0)) {
+        this.seenTasksAt = newest;
+        savePref('seenTasksAt', newest);
+      }
+    },
+
+    // The nav dot: red for a failure not seen on the Activity page yet, blue while something runs.
+    activityDot() {
+      if (this.btasks.some((t) => t.status === 'failed' && new Date(t.queuedAt) > new Date(this.seenTasksAt || 0))) return 'failed';
+      if (this.btasks.some((t) => t.status === 'running' || t.status === 'queued')) return 'running';
+      return '';
+    },
+
+    taskLabel(t) {
+      const names = { 'jdk.detect': 'JDK detection', 'tools.detect': 'Build tool detection', 'modules.discover': 'Module discovery' };
+      let label = names[t.kind] ?? t.kind;
+      const pid = Number(t.key.split(':')[1]);
+      if (pid) label += ' · ' + (this.projects.find((p) => p.id === pid)?.name ?? 'project ' + pid);
+      return label;
+    },
+
+    taskResult(t) {
+      const r = t.result;
+      if (r == null) return '';
+      if (t.kind === 'tools.detect' && Array.isArray(r)) {
+        return r.map((x) => `${x.id} ${x.path ? x.version || 'found' : 'not found'}`).join(', ');
+      }
+      if (t.kind === 'jdk.detect') return `${r.found} found, ${r.added} new, ${r.missing} missing`;
+      if (t.kind === 'modules.discover') return `${r.modules} modules` + (r.offline ? ', offline' : '');
+      return '';
+    },
+
+    // The first line that names the problem; the whole output is one click away.
+    errorSummary(err) {
+      const lines = (err || '').split('\n').map((l) => l.trim()).filter(Boolean);
+      return lines.find((l) => /^\[(FATAL|ERROR)\]\s*\S/.test(l) && !/^\[ERROR\]\s*(\[ERROR\])?\s*Some problems/.test(l)) ?? lines[0] ?? '';
+    },
+
     specText(j) {
       const s = j.spec || {};
       return [...(s.goals || []), ...(s.extraArgs || []).map(shellQuote)].join(' ') || this.shellJoin(j.argv);
@@ -1425,6 +1482,8 @@ document.addEventListener('alpine:init', () => {
         api('GET', '/settings'), api('GET', '/tools'), api('GET', '/jdks'), api('GET', '/jdk-managers'),
       ]);
       Object.assign(this, { settings, tools, jdks, managers });
+      this.cform = await api('GET', '/config');
+      this.cfgSaved = false;
       const mv = settings.tools?.maven ?? {};
       this.sform = { maven: { executable: mv.executable || 'auto', jdkId: mv.jdkId ?? 0 } };
     },
@@ -1438,6 +1497,20 @@ document.addEventListener('alpine:init', () => {
           tools: { maven: { executable: mv.executable, jdkId: Number(mv.jdkId) || null } },
         });
         this.saved = true;
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    async saveConfig() {
+      this.busy = true;
+      this.cfgSaved = false;
+      try {
+        const { maxConcurrentJobs, jobsPerProject } = this.cform;
+        this.cform = await api('PUT', '/config', { maxConcurrentJobs, jobsPerProject });
+        this.cfgSaved = true;
       } catch (e) {
         this.error = e.message;
       } finally {
