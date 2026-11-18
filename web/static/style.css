@@ -218,5 +218,33 @@ button.icon.danger { color: var(--danger); }
 .menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 200px; display: flex; flex-direction: column; padding: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .15); }
 .menu-list button { border: none; background: none; text-align: left; padding: 7px 10px; border-radius: 5px; }
 .menu-list button:hover:not(:disabled) { background: var(--bg); }
+
+/* Problems panel on the job page */
+.problems { gap: 6px; }
+.pgroup { display: flex; flex-direction: column; gap: 2px; }
+button.problem { display: flex; gap: 8px; align-items: baseline; text-align: left; border: none; background: none; padding: 3px 6px; border-radius: 5px; cursor: pointer; font: inherit; color: inherit; }
+button.problem:hover { background: var(--bg); }
+button.problem .where { color: var(--danger); white-space: nowrap; font-size: .85em; }
+button.problem .msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.log > div.hl { background: rgba(255, 200, 0, .25); outline: 1px solid rgba(255, 200, 0, .6); }
+
+/* Compare two runs */
+.cmpgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+a.cmpjob { text-decoration: none; color: inherit; }
+a.cmpjob:hover { border-color: var(--accent); }
+code.tok.added, .problem.added .msg { color: #1d6b35; }
+code.tok.added { border-color: #3a9a5b; }
+code.tok.removed { color: var(--danger); border-color: var(--danger); text-decoration: line-through; }
+.problem.removed .msg { color: var(--muted); text-decoration: line-through; }
+div.problem { display: flex; gap: 8px; align-items: baseline; padding: 2px 6px; }
+.cmptable { max-height: 70vh; }
+.cmptable th { text-align: left; font-weight: 500; color: var(--muted); padding: 4px 8px; position: sticky; top: 0; background: var(--card); }
+.cmptable th.num { text-align: right; }
+.cmptable td.num { text-align: right; }
+.cmptable tr.changed td:first-child { font-weight: 600; }
+td.slower { color: var(--danger); }
+td.faster { color: #3a9a5b; }
+@media (prefers-color-scheme: dark) { code.tok.added, .problem.added .msg { color: #8fd8a5; } }
+@media (max-width: 640px) { .cmpgrid { grid-template-columns: 1fr; } }
 .task-error summary { cursor: pointer; overflow-wrap: anywhere; }
 .task-error pre { max-height: 320px; overflow: auto; white-space: pre-wrap; font-size: .85em; margin: 6px 0 0; }

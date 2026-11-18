@@ -352,7 +352,12 @@ document.addEventListener('alpine:init', () => {
 
     job: null,
     jobProject: null,
+    cmp: null,
+    cmpSort: 'delta',
+    pick: [],
     jobMods: [],
+    jobProblems: [],
+    probOpen: {},
     modIndex: {},
     modsOpen: false,
     modsSort: 'reactor',
@@ -415,6 +420,9 @@ document.addEventListener('alpine:init', () => {
           } else {
             await this.loadProject(id);
           }
+        } else if ((m = h.match(/^\/compare\/(\d+)\/(\d+)$/))) {
+          this.view = 'compare';
+          await this.openCompare(Number(m[1]), Number(m[2]));
         } else if ((m = h.match(/^\/jobs\/(\d+)$/))) {
           this.view = 'job';
           await this.openJob(Number(m[1]));
@@ -1083,6 +1091,8 @@ document.addEventListener('alpine:init', () => {
       const job = await api('GET', `/jobs/${id}`);
       this.job = job;
       this.setMods([]);
+      this.jobProblems = [];
+      this.probOpen = {};
       this.firstLine = 0;
       this.logCount = job.liveLines;
       if (this.jobProject?.id !== job.projectId) this.jobProject = await api('GET', `/projects/${job.projectId}`);
@@ -1102,6 +1112,8 @@ document.addEventListener('alpine:init', () => {
         logView.push(ev.text);
       });
       es.addEventListener('modules', (e) => this.setMods(JSON.parse(e.data) || []));
+      es.addEventListener('problems', (e) => { this.jobProblems = JSON.parse(e.data) || []; });
+      es.addEventListener('problem', (e) => { this.jobProblems.push(JSON.parse(e.data)); });
       es.addEventListener('module', (e) => {
         const m = JSON.parse(e.data);
         const i = this.modIndex[m.key];
@@ -1179,6 +1191,168 @@ document.addEventListener('alpine:init', () => {
       this.logQuery = m.key.split(':')[1] || m.name;
       if (this.logFilter !== 'all') this.setLogFilter('all');
       logView.search(this.logQuery);
+    },
+
+    // ---------- compare two runs ----------
+    async openCompare(a, b) {
+      const load = async (id) => {
+        const [job, mods, probs] = await Promise.all([api('GET', `/jobs/${id}`), api('GET', `/jobs/${id}/modules`), api('GET', `/jobs/${id}/problems`)]);
+        return { job, mods, probs };
+      };
+      const [A, B] = await Promise.all([load(a), load(b)]);
+      if (this.jobProject?.id !== B.job.projectId) this.jobProject = await api('GET', `/projects/${B.job.projectId}`);
+      this.cmp = { A, B };
+    },
+
+    togglePick(id) {
+      this.pick = this.pick.includes(id) ? this.pick.filter((x) => x !== id) : [...this.pick.slice(-1), id];
+    },
+
+    comparePicked() {
+      const [x, y] = [...this.pick].sort((p, q) => p - q);
+      this.pick = [];
+      location.hash = `#/compare/${x}/${y}`;
+    },
+
+    async compareWithPrevious(j) {
+      const jobs = await api('GET', `/projects/${j.projectId}/jobs`);
+      const prev = jobs.find((x) => x.id < j.id && x.status !== 'queued' && x.status !== 'running');
+      if (!prev) {
+        this.error = 'There is no earlier finished run of this project to compare with.';
+        return;
+      }
+      location.hash = `#/compare/${prev.id}/${j.id}`;
+    },
+
+    jobMs(j) {
+      if (!j?.startedAt) return 0;
+      return new Date(j.finishedAt || Date.now()) - new Date(j.startedAt);
+    },
+
+    fmtMs(ms) {
+      if (ms === null || ms === undefined) return '';
+      const neg = ms < 0;
+      ms = Math.abs(ms);
+      let t;
+      if (ms < 1000) t = ms + ' ms';
+      else if (ms < 60000) t = (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + ' s';
+      else t = `${Math.floor(ms / 60000)}:${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')} min`;
+      return (neg ? '−' : '') + t;
+    },
+
+    // Argument differences, with a -pl list compared as a set of modules.
+    cmpArgs() {
+      const { A, B } = this.cmp;
+      const split = (argv) => {
+        const args = [];
+        let pl = [];
+        for (let i = 1; i < argv.length; i++) {
+          if (argv[i] === '-pl' && i + 1 < argv.length) pl = argv[++i].split(',');
+          else if ((argv[i] === '-P' || argv[i] === '-T') && i + 1 < argv.length) args.push(argv[i] + ' ' + argv[++i]);
+          else args.push(argv[i]);
+        }
+        return { args, pl, exe: argv[0] };
+      };
+      const a = split(A.job.argv || []);
+      const b = split(B.job.argv || []);
+      const only = (x, y) => x.filter((v) => !y.includes(v));
+      return {
+        removed: only(a.args, b.args), added: only(b.args, a.args),
+        plRemoved: only(a.pl, b.pl), plAdded: only(b.pl, a.pl),
+        exe: a.exe === b.exe ? '' : `${a.exe} → ${b.exe}`,
+        same: !only(a.args, b.args).length && !only(b.args, a.args).length && !only(a.pl, b.pl).length && !only(b.pl, a.pl).length && a.exe === b.exe,
+      };
+    },
+
+    cmpRows() {
+      const { A, B } = this.cmp;
+      const byKey = new Map();
+      const add = (m, side) => {
+        const k = m.key;
+        if (!byKey.has(k)) byKey.set(k, { key: k, name: m.name || k, ord: m.ord, a: null, b: null });
+        byKey.get(k)[side] = m;
+      };
+      A.mods.forEach((m) => add(m, 'a'));
+      B.mods.forEach((m) => add(m, 'b'));
+      const rows = [...byKey.values()].map((r) => {
+        const built = (m) => m && m.status !== 'pending' && m.status !== 'skipped';
+        r.delta = built(r.a) && built(r.b) ? (r.b.ms || 0) - (r.a.ms || 0) : null;
+        r.changed = r.a && r.b && r.a.status !== r.b.status;
+        if (r.b) r.ord = r.b.ord;
+        return r;
+      });
+      if (this.cmpSort === 'delta') rows.sort((x, y) => Math.abs(y.delta ?? -1) - Math.abs(x.delta ?? -1) || x.ord - y.ord);
+      else rows.sort((x, y) => x.ord - y.ord);
+      return rows;
+    },
+
+    cmpSummary() {
+      const { A, B } = this.cmp;
+      const ta = this.jobMs(A.job);
+      const tb = this.jobMs(B.job);
+      const rows = this.cmpRows();
+      const parts = [];
+      if (ta && tb) {
+        const pct = Math.round(((tb - ta) / ta) * 100);
+        parts.push(pct === 0 ? 'Same total time' : `Run ${B.job.id} took ${this.fmtMs(Math.abs(tb - ta))} ${tb > ta ? 'longer' : 'less'} (${pct > 0 ? '+' : ''}${pct}%)`);
+      }
+      const changed = rows.filter((r) => r.changed).length;
+      if (changed) parts.push(this.plural(changed, 'module') + ' changed status');
+      const onlyA = rows.filter((r) => r.a && !r.b).length;
+      const onlyB = rows.filter((r) => r.b && !r.a).length;
+      if (onlyA) parts.push(`${onlyA} only in run ${A.job.id}`);
+      if (onlyB) parts.push(`${onlyB} only in run ${B.job.id}`);
+      return parts.join(' · ');
+    },
+
+    cmpProblems() {
+      const { A, B } = this.cmp;
+      const key = (p) => [p.kind, p.module, p.file, p.line, p.message].join('|');
+      const ka = new Set(A.probs.map(key));
+      const kb = new Set(B.probs.map(key));
+      return { added: B.probs.filter((p) => !ka.has(key(p))), fixed: A.probs.filter((p) => !kb.has(key(p))) };
+    },
+
+    // ---------- problems ----------
+    problemGroups() {
+      const titles = { compile: 'Compile errors', test: 'Failed tests', goal: 'Failed goals', dependency: 'Dependency problems' };
+      return Object.keys(titles)
+        .map((kind) => ({ kind, title: titles[kind], items: this.jobProblems.filter((p) => p.kind === kind) }))
+        .filter((g) => g.items.length);
+    },
+
+    shownProblems(g) {
+      return this.probOpen[g.kind] ? g.items : g.items.slice(0, 8);
+    },
+
+    problemWhere(p) {
+      if (p.kind === 'compile') return `${p.file.split(/[\\/]/).pop()}:${p.line}`;
+      return '';
+    },
+
+    // Shows log line n: loads earlier lines if needed, switches to All, highlights it.
+    async goToLine(n) {
+      if (!n || !logView.el) return;
+      logView.flush();
+      if (this.firstLine && n < this.firstLine) {
+        const to = this.firstLine - 1;
+        const from = Math.max(1, n - 200);
+        const page = await api('GET', `/jobs/${this.job.id}/log?from=${from}&limit=${to - from + 1}`);
+        logView.prepend(page.lines);
+        this.firstLine = from;
+      }
+      if (this.logFilter !== 'all') this.setLogFilter('all');
+      if (this.logQuery) {
+        this.logQuery = '';
+        logView.search('');
+      }
+      await this.$nextTick();
+      const node = logView.el.children[n - (this.firstLine || 1)];
+      if (!node) return;
+      logView.follow = false;
+      logView.el.querySelectorAll('.hl').forEach((x) => x.classList.remove('hl'));
+      node.classList.add('hl');
+      logView.el.scrollTop = node.offsetTop - logView.el.offsetTop - logView.el.clientHeight / 3;
     },
 
     async loadEarlier() {
