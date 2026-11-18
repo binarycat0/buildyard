@@ -132,3 +132,17 @@ a.modname:hover { text-decoration: underline; }
 .stack.tight > p { margin: 0; }
 .warn { color: #9a6700; margin: 4px 0 0; }
 .nowrap { white-space: nowrap; }
+
+.logbar { gap: 10px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; border-right: 1px solid var(--border); padding: 5px 10px; font-size: .9em; }
+.seg button:last-child { border-right: none; }
+.seg button.active { background: var(--accent); color: var(--accent-fg); }
+.seg button span { opacity: .75; font-size: .85em; margin-left: 2px; }
+.log .lv-error { color: #ff8a8a; }
+.log .lv-warn { color: #f0c96a; }
+.log .lv-debug { color: #8b93a1; }
+.log[data-f=important] > div:not(.imp) { display: none; }
+.log[data-f=warn] > div:not(.lv-error):not(.lv-warn) { display: none; }
+.log[data-f=error] > div:not(.lv-error) { display: none; }
+.log.searching > div.nomatch { display: none; }
