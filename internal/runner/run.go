@@ -51,6 +51,8 @@ type run struct {
 	cancelled   bool
 	interrupted bool
 	ended       bool
+	stopAt      time.Time // when a stop was first requested
+	reaper      bool
 	done        chan struct{}
 }
 
@@ -133,37 +135,48 @@ func (rn *run) end(status string) {
 	}
 }
 
-// stop cancels a running job: SIGTERM to the process group, SIGKILL after grace.
-func (rn *run) stop(grace time.Duration, interrupted bool) {
+// signal sends sig to the job's process group (or only to the leader for mvnd, whose
+// long-lived daemon must survive). It reports whether the process had started.
+func (rn *run) signal(sig syscall.Signal, interrupted bool) bool {
 	rn.mu.Lock()
 	rn.cancelled = true
 	if interrupted {
 		rn.interrupted = true
 	}
+	if rn.stopAt.IsZero() {
+		rn.stopAt = time.Now()
+	}
 	proc, leaderOnly, ended := rn.proc, rn.cmd.SignalLeaderOnly, rn.ended
+	if !rn.reaper && proc != nil && !leaderOnly {
+		// Once the leader is gone, take down anything left in its group.
+		rn.reaper = true
+		go func() {
+			<-rn.done
+			syscall.Kill(-proc.Pid, syscall.SIGKILL)
+		}()
+	}
 	rn.mu.Unlock()
 	if proc == nil || ended {
-		return // not started yet; runProcess sees the flag
+		return false // not started yet; runProcess sees the flag
 	}
-	pgid := proc.Pid
 	if leaderOnly {
-		proc.Signal(syscall.SIGINT)
+		proc.Signal(sig)
 	} else {
-		syscall.Kill(-pgid, syscall.SIGTERM)
+		syscall.Kill(-proc.Pid, sig)
+	}
+	return true
+}
+
+// stop asks the job to finish (SIGTERM) and kills it after grace.
+func (rn *run) stop(grace time.Duration, interrupted bool) {
+	if !rn.signal(syscall.SIGTERM, interrupted) {
+		return
 	}
 	go func() {
 		select {
 		case <-rn.done:
-			if !leaderOnly {
-				// The leader is gone; take down anything in the group that ignored SIGTERM.
-				syscall.Kill(-pgid, syscall.SIGKILL)
-			}
 		case <-time.After(grace):
-			if leaderOnly {
-				proc.Kill()
-			} else {
-				syscall.Kill(-pgid, syscall.SIGKILL)
-			}
+			rn.signal(syscall.SIGKILL, interrupted)
 		}
 	}()
 }

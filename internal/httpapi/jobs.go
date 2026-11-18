@@ -23,7 +23,8 @@ const tailLines = 2000
 // jobView is a job plus what only the runner knows.
 type jobView struct {
 	store.Job
-	LiveLines int `json:"liveLines"` // lines so far while running; logLines once finished
+	LiveLines       int        `json:"liveLines"`       // lines so far while running; logLines once finished
+	StopRequestedAt *time.Time `json:"stopRequestedAt"` // set while a running job is being stopped
 }
 
 func (s *Server) view(j store.Job) jobView {
@@ -31,6 +32,9 @@ func (s *Server) view(j store.Job) jobView {
 	if s.Runner != nil {
 		if n := s.Runner.Lines(j.ID); n >= 0 {
 			v.LiveLines = n
+		}
+		if t := s.Runner.StopRequested(j.ID); !t.IsZero() {
+			v.StopRequestedAt = &t
 		}
 	}
 	return v
@@ -252,16 +256,24 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
-	j, ok := s.jobFor(w, r)
-	if !ok {
-		return
+// controlJob handles cancel (stop, then kill after a grace period), stop (graceful,
+// like Ctrl+C) and kill (immediate). A queued job is dropped by any of them.
+func (s *Server) controlJob(action string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		j, ok := s.jobFor(w, r)
+		if !ok {
+			return
+		}
+		do := map[string]func(int64) error{"cancel": s.Runner.Cancel, "stop": s.Runner.Stop, "kill": s.Runner.Kill}[action]
+		if err := do(j.ID); errors.Is(err, runner.ErrNotActive) {
+			writeError(w, http.StatusConflict, "conflict", "the job is already "+j.Status)
+			return
+		}
+		if fresh, err := s.Store.GetJob(r.Context(), j.ID); err == nil {
+			j = fresh
+		}
+		writeJSON(w, http.StatusAccepted, s.view(j))
 	}
-	if err := s.Runner.Cancel(j.ID); errors.Is(err, runner.ErrNotActive) {
-		writeError(w, http.StatusConflict, "conflict", "the job is already "+j.Status)
-		return
-	}
-	writeJSON(w, http.StatusAccepted, s.view(j))
 }
 
 func (s *Server) rerunJob(w http.ResponseWriter, r *http.Request) {

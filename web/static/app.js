@@ -769,12 +769,22 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    async cancelJob() {
+    // stop: graceful (SIGINT, like Ctrl+C); kill: SIGKILL to the whole process group.
+    async controlJob(action, j = this.job) {
+      if (action === 'kill' && !confirm(`Kill job ${j.id} now? The build and all its processes end at once.`)) return;
       try {
-        await api('POST', `/jobs/${this.job.id}/cancel`);
+        const v = await api('POST', `/jobs/${j.id}/${action}`);
+        if (this.job?.id === v.id) this.job = v;
+        const i = this.pjobs.findIndex((x) => x.id === v.id);
+        if (i >= 0) this.pjobs.splice(i, 1, v);
       } catch (e) {
         this.error = e.message;
       }
+    },
+
+    since(t) {
+      const sec = Math.max(0, Math.round((this.now - new Date(t)) / 1000));
+      return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
     },
 
     async openJob(id) {
