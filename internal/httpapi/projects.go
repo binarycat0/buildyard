@@ -95,10 +95,12 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "executable must be auto, wrapper, mvnd, mvn or an absolute path")
 		return
 	}
-	if patch.JdkID != nil && *patch.JdkID > 0 {
-		if _, err := s.Store.GetJDK(r.Context(), *patch.JdkID); err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "unknown jdkId")
-			return
+	for name, id := range map[string]*int64{"jdkId": patch.JdkID, "toolJdkId": patch.ToolJdkID} {
+		if id != nil && *id > 0 {
+			if _, err := s.Store.GetJDK(r.Context(), *id); err != nil {
+				writeError(w, http.StatusBadRequest, "bad_request", "unknown "+name)
+				return
+			}
 		}
 	}
 	p, err := s.Store.UpdateProject(r.Context(), id, patch)

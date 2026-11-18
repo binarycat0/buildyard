@@ -108,14 +108,17 @@ func TestJDKDetectSettingsAndRuntime(t *testing.T) {
 
 	// Global settings.
 	j17 := strconv.FormatInt(jdks[1].ID, 10)
-	w = call("PUT", "/api/settings", `{"defaultExecutable":"mvnd","defaultJdkId":`+j17+`}`)
+	w = call("PUT", "/api/settings", `{"tools":{"maven":{"executable":"mvnd","jdkId":`+j17+`}}}`)
 	var st store.Settings
 	decodeInto(w, &st)
-	if w.Code != 200 || st.DefaultExecutable != "mvnd" || *st.DefaultJdkID != jdks[1].ID {
+	if w.Code != 200 || st.Tool("maven").Executable != "mvnd" || *st.Tool("maven").JdkID != jdks[1].ID {
 		t.Fatalf("settings: %d %s", w.Code, w.Body)
 	}
-	if w := call("PUT", "/api/settings", `{"defaultExecutable":"gradle"}`); w.Code != 400 {
+	if w := call("PUT", "/api/settings", `{"tools":{"maven":{"executable":"gradle"}}}`); w.Code != 400 {
 		t.Fatalf("bad executable: %d", w.Code)
+	}
+	if w := call("PUT", "/api/settings", `{"tools":{"ant":{}}}`); w.Code != 400 {
+		t.Fatalf("unknown tool: %d", w.Code)
 	}
 
 	// Project with a wrapper: default is mvnd (not installed here) → error shown, project override → wrapper.
@@ -146,8 +149,20 @@ func TestJDKDetectSettingsAndRuntime(t *testing.T) {
 		t.Fatalf("project jdk: %+v", info)
 	}
 
+	// The build tool's own JDK beats the project JDK.
+	j17p := strconv.FormatInt(jdks[1].ID, 10)
+	call("PATCH", "/api/projects/"+strconv.FormatInt(p.ID, 10), `{"toolJdkId":`+j17p+`}`)
+	info = runtimeInfo{}
+	decodeInto(call("GET", rt, ""), &info)
+	if info.JDK == nil || info.JDK.Major != 17 || info.JDKFrom != "tool" || info.ProjectJDK == nil || info.ProjectJDK.Major != 21 {
+		t.Fatalf("tool jdk: %+v", info)
+	}
+	if w := call("PATCH", "/api/projects/"+strconv.FormatInt(p.ID, 10), `{"toolJdkId":99999}`); w.Code != 400 {
+		t.Fatalf("unknown toolJdkId: %d", w.Code)
+	}
+
 	// Reset project to defaults with "" and 0.
-	call("PATCH", "/api/projects/"+strconv.FormatInt(p.ID, 10), `{"executable":"","jdkId":0}`)
+	call("PATCH", "/api/projects/"+strconv.FormatInt(p.ID, 10), `{"executable":"","jdkId":0,"toolJdkId":0}`)
 	info = runtimeInfo{}
 	decodeInto(call("GET", rt, ""), &info)
 	if info.ExecutableFrom != "default" || info.JDKFrom != "default" {

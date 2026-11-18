@@ -81,13 +81,13 @@
                 <dd>
                   <template x-if="runtime.executable">
                     <span><code x-text="runtime.executable.path"></code>
-                      <span class="muted" x-text="'(' + runtime.executable.reason + (runtime.executableFrom === 'default' ? ', from global settings' : '') + ')'"></span></span>
+                      <span class="muted" x-text="'(' + runtime.executable.reason + (runtime.executableFrom === 'default' ? ', global Maven default' : '') + ')'"></span></span>
                   </template>
                   <span class="error" x-show="runtime.executableError" x-text="runtime.executableError"></span>
                 </dd>
-                <dt>JDK</dt>
+                <dt>JDK for Maven</dt>
                 <dd>
-                  <span x-show="runtime.jdk" x-text="runtime.jdk && jdkLabel(runtime.jdk) + (runtime.jdkFrom === 'default' ? ' (from global settings)' : '')"></span>
+                  <span x-show="runtime.jdk" x-text="runtime.jdk && jdkLabel(runtime.jdk) + ' (' + jdkFromText(runtime.jdkFrom) + ')'"></span>
                   <span x-show="!runtime.jdk" class="muted" x-text="'Daemon JAVA_HOME' + (tools.javaHome ? ': ' + tools.javaHome : ' (not set)')"></span>
                 </dd>
               </dl>
@@ -95,37 +95,58 @@
           </div>
 
           <form class="card" @submit.prevent="saveProject()">
-            <label>Name <input x-model="pform.name" required></label>
+            <nav class="tabs" role="tablist">
+              <button type="button" role="tab" :class="{active: ptab === 'general'}" @click="ptab = 'general'">General</button>
+              <button type="button" role="tab" :class="{active: ptab === 'jdk'}" @click="ptab = 'jdk'">JDK</button>
+              <button type="button" role="tab" :class="{active: ptab === 'maven'}" @click="ptab = 'maven'">Maven</button>
+            </nav>
 
-            <fieldset>
-              <legend>Executable</legend>
-              <label class="radio"><input type="radio" value="" x-model="pform.execChoice">
-                Global default <span class="muted" x-text="'(' + execLabel(settings.defaultExecutable) + ')'"></span></label>
-              <label class="radio"><input type="radio" value="auto" x-model="pform.execChoice">
-                Auto <span class="muted">— ./mvnw if present, else mvnd, else mvn</span></label>
-              <label class="radio" :class="{disabled: !runtime?.wrapper}"><input type="radio" value="wrapper" x-model="pform.execChoice">
-                Project wrapper ./mvnw
-                <span class="muted" x-text="runtime?.wrapper ? (runtime.wrapper.mavenVersion ? '— Maven ' + runtime.wrapper.mavenVersion : '') : '— the project has no mvnw'"></span></label>
-              <label class="radio"><input type="radio" value="mvnd" x-model="pform.execChoice">
-                mvnd <span class="muted" x-text="runtime?.tools.mvnd ? '— ' + runtime.tools.mvnd : '— not found'"></span></label>
-              <label class="radio"><input type="radio" value="mvn" x-model="pform.execChoice">
-                mvn <span class="muted" x-text="runtime?.tools.mvn ? '— ' + runtime.tools.mvn : '— not found'"></span></label>
-              <label class="radio"><input type="radio" value="custom" x-model="pform.execChoice"> Custom path</label>
-              <input x-show="pform.execChoice === 'custom'" x-model="pform.customPath" placeholder="/opt/maven/bin/mvn">
-            </fieldset>
+            <div class="stack" x-show="ptab === 'general'">
+              <label>Name <input x-model="pform.name" required></label>
+              <label>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span>
+                <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
+              </label>
+            </div>
 
-            <label>JDK
-              <select x-model.number="pform.jdkId">
-                <option value="0" x-text="'Global default (' + defaultJdkText() + ')'"></option>
-                <template x-for="j in jdks" :key="j.id">
-                  <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.jdkId"></option>
-                </template>
-              </select>
-            </label>
+            <div class="stack" x-show="ptab === 'jdk'">
+              <label>Project JDK
+                <select x-model.number="pform.jdkId">
+                  <option value="0" x-text="'Not set (use the build tool default: ' + jdkText(maven().jdkId, 'daemon JAVA_HOME') + ')'"></option>
+                  <template x-for="j in jdks" :key="j.id">
+                    <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.jdkId"></option>
+                  </template>
+                </select>
+              </label>
+              <p class="muted small">Build tools run on the project JDK unless their own tab picks a different one.</p>
+            </div>
 
-            <label>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span>
-              <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
-            </label>
+            <div class="stack" x-show="ptab === 'maven'">
+              <fieldset>
+                <legend>Executable</legend>
+                <label class="radio"><input type="radio" value="" x-model="pform.execChoice">
+                  Global default <span class="muted" x-text="'(' + execLabel(maven().executable) + ')'"></span></label>
+                <label class="radio"><input type="radio" value="auto" x-model="pform.execChoice">
+                  Auto <span class="muted">— ./mvnw if present, else mvnd, else mvn</span></label>
+                <label class="radio" :class="{disabled: !runtime?.wrapper}"><input type="radio" value="wrapper" x-model="pform.execChoice">
+                  Project wrapper ./mvnw
+                  <span class="muted" x-text="runtime?.wrapper ? (runtime.wrapper.mavenVersion ? '— Maven ' + runtime.wrapper.mavenVersion : '') : '— the project has no mvnw'"></span></label>
+                <label class="radio"><input type="radio" value="mvnd" x-model="pform.execChoice">
+                  mvnd <span class="muted" x-text="runtime?.tools.mvnd ? '— ' + runtime.tools.mvnd : '— not found'"></span></label>
+                <label class="radio"><input type="radio" value="mvn" x-model="pform.execChoice">
+                  mvn <span class="muted" x-text="runtime?.tools.mvn ? '— ' + runtime.tools.mvn : '— not found'"></span></label>
+                <label class="radio"><input type="radio" value="custom" x-model="pform.execChoice"> Custom path</label>
+                <input x-show="pform.execChoice === 'custom'" x-model="pform.customPath" placeholder="/opt/maven/bin/mvn">
+              </fieldset>
+
+              <label>JDK for Maven
+                <select x-model.number="pform.toolJdkId">
+                  <option value="0" x-text="toolJdkFallbackText()"></option>
+                  <template x-for="j in jdks" :key="j.id">
+                    <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.toolJdkId"></option>
+                  </template>
+                </select>
+              </label>
+            </div>
 
             <p class="error" x-show="pformError" x-text="pformError"></p>
             <div class="row">
@@ -142,20 +163,21 @@
       <h1>Settings</h1>
 
       <form class="card" @submit.prevent="saveSettings()">
-        <h2>Project defaults</h2>
+        <h2>Maven defaults</h2>
+        <p class="muted small">Used by Maven projects unless the project overrides them in its Maven tab or sets a project JDK.</p>
         <label>Executable
-          <select x-model="sform.defaultExecutable">
+          <select x-model="sform.maven.executable">
             <option value="auto">Auto: ./mvnw if present, else mvnd, else mvn</option>
             <option value="wrapper">Always the project wrapper ./mvnw</option>
             <option value="mvnd" x-text="'mvnd' + (tools.tools?.mvnd ? ' — ' + tools.tools.mvnd : ' — not found')"></option>
             <option value="mvn" x-text="'mvn' + (tools.tools?.mvn ? ' — ' + tools.tools.mvn : ' — not found')"></option>
           </select>
         </label>
-        <label>JDK
-          <select x-model.number="sform.defaultJdkId">
+        <label>JDK for Maven
+          <select x-model.number="sform.maven.jdkId">
             <option value="0" x-text="'Daemon JAVA_HOME' + (tools.javaHome ? ' (' + tools.javaHome + ')' : ' (not set)')"></option>
             <template x-for="j in jdks" :key="j.id">
-              <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === sform.defaultJdkId"></option>
+              <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === sform.maven.jdkId"></option>
             </template>
           </select>
         </label>

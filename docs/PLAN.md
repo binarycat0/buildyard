@@ -55,7 +55,7 @@ The MVP is phases 1–4: projects, runs with chosen modules and flags, profiles,
 | F12 | Package scanner: per-module tree and a combined tree | 5 |
 | F13 | "Build changed" from git diff | 6 |
 | F14 | Completion notifications, daemon autostart, CLI client, old log cleanup | 7 |
-| F15 | Global settings: list of available JDKs (auto-detected + manual), default executable and JDK; per-project executable (`./mvnw`, mvnd, mvn, custom path), JDK and environment | 1 (done) |
+| F15 | Global settings: list of available JDKs (auto-detected + manual) and per-build-tool defaults (Maven: executable and JDK); per-project JDK, build-tool overrides (executable, JDK for the tool) and environment | 1 (done) |
 
 ## Key decisions
 
@@ -71,8 +71,8 @@ Stack: Go, a single binary with an embedded UI and SQLite without cgo. The only 
 | UI | Static HTML + Alpine.js + ES modules, embedded with `go:embed`; JSON API + `EventSource`. UI text is English | No node build; the CLI uses the same API later |
 | Module discovery | From Maven itself: `help:active-profiles` (offline, with the project's flags) lists every module and its active profiles without running lifecycle plugins (5.5 s for 952 modules in the spike). Runs as a background task. No hand-written pom walker | Exact reactor, fast enough; decided by the user after the spike |
 | Build events | Own Java Maven extension (EventSpy), loaded with `-Dmaven.ext.class.path`, writes JSON Lines. The jar is embedded in the binary and unpacked to `~/.buildyard/ext/` on start | Exact start and end of modules and mojos regardless of log format; the project is not changed. Log parsing stays as a fallback |
-| Build executable | Mode `auto | wrapper | mvnd | mvn | /absolute/path`. The global default is in settings; a project can override it. `auto`: the project's `./mvnw` if present, else mvnd, else mvn. mvn/mvnd are looked up on PATH and in Homebrew/sdkman dirs | The wrapper pins the project's Maven version; mvnd gives a warm JVM |
-| JDK | A JDK list in global settings. Detection asks managers first (macOS `/usr/libexec/java_home -X`, `brew --prefix`, `SDKMAN_DIR`/`JENV_ROOT`/`ASDF_DATA_DIR`/`MISE_DATA_DIR`), then scans well-known paths (JavaVirtualMachines, Homebrew opt/ and Cellar/, sdkman, jenv, asdf, mise, Gradle jdks, /usr/lib/jvm, JAVA_HOME); plus manual entries. Version/vendor/arch come from the `release` file, falling back to `java -XshowSettings:properties -version`. Each JDK gets a name from its install location (`openjdk@21 21.0.8 (Homebrew)`, `21.0.7-tem (sdkman)`, `temurin-21`) and keeps the path it was found at. A default JDK in settings; a project can pick its own | Different projects need different JDKs |
+| Build executable | Mode `auto | wrapper | mvnd | mvn | /absolute/path`. The global default is in the Maven settings; a project can override it. `auto`: the project's `./mvnw` if present, else mvnd, else mvn. mvn/mvnd are looked up on PATH and in Homebrew/sdkman dirs | The wrapper pins the project's Maven version; mvnd gives a warm JVM |
+| JDK | A JDK list in global settings. Detection asks managers first (macOS `/usr/libexec/java_home -X`, `brew --prefix`, `SDKMAN_DIR`/`JENV_ROOT`/`ASDF_DATA_DIR`/`MISE_DATA_DIR`), then scans well-known paths (JavaVirtualMachines, Homebrew opt/ and Cellar/, sdkman, jenv, asdf, mise, Gradle jdks, /usr/lib/jvm, JAVA_HOME); plus manual entries. Version/vendor/arch come from the `release` file, falling back to `java -XshowSettings:properties -version`. Each JDK gets a name from its install location (`openjdk@21 21.0.8 (Homebrew)`, `21.0.7-tem (sdkman)`, `temurin-21`) and keeps the path it was found at. Like IntelliJ, each build tool has its own JDK setting. The JDK a Maven run uses: the project's "JDK for Maven" → the project JDK → the global Maven default → the daemon's `JAVA_HOME`. Bazel/Gradle will get the same pair of settings | Different projects need different JDKs, and every Java-based tool has its own JDK setting |
 | Background tasks | JDK detection, module and package scans are queued in `internal/tasks`: the API returns the task at once (`202`), the UI polls `GET /api/tasks/{id}`. One active task per key | Long operations never hold an HTTP request |
 | Stopping processes | `os/exec` + `SysProcAttr{Setpgid: true}`; cancel = SIGTERM (SIGINT for the mvnd client) to the whole group, SIGKILL after 10 s | Works on macOS and Linux, kills surefire, node and other children |
 | Command | Always a `[]string` argv, never a shell | No quoting or injection problems |
@@ -127,7 +127,8 @@ CREATE TABLE project (
   root_path         TEXT NOT NULL UNIQUE,
   build_tool        TEXT NOT NULL DEFAULT 'maven', -- maven | gradle (later)
   executable        TEXT,                          -- NULL = global default; auto | wrapper | mvnd | mvn | /abs/path
-  jdk_id            INTEGER REFERENCES jdk(id) ON DELETE SET NULL, -- NULL = global default JDK
+  jdk_id            INTEGER REFERENCES jdk(id) ON DELETE SET NULL, -- project JDK; NULL = not set
+  tool_jdk_id       INTEGER REFERENCES jdk(id) ON DELETE SET NULL, -- JDK for the build tool; NULL = project JDK
   env_json          TEXT NOT NULL DEFAULT '{}',
   skip_presets_json TEXT NOT NULL DEFAULT '[]',    -- project's own skip presets
   created_at        TEXT NOT NULL
@@ -147,7 +148,7 @@ CREATE TABLE jdk (
 );
 
 CREATE TABLE setting (                      -- global settings edited in the UI
-  key   TEXT PRIMARY KEY,                   -- defaultExecutable, defaultJdkId
+  key   TEXT PRIMARY KEY,                   -- tool.<id>, e.g. tool.maven = {executable, jdkId}; detected.*
   value TEXT NOT NULL                       -- JSON
 );
 
@@ -284,7 +285,7 @@ There is no hand-written pom.xml walker: the user decided the Maven listing is e
 
 The argv order is fixed so the preview and tests stay stable:
 
-1. Executable: `spec.executable` → `project.executable` → global default → `auto` (`./mvnw` → mvnd → mvn).
+1. Executable: `spec.executable` → `project.executable` → global Maven default → `auto` (`./mvnw` → mvnd → mvn).
 2. Always `-B`: no colours or prompts; the line level comes from the `[INFO]` / `[WARNING]` / `[ERROR]` prefix.
 3. Flags: `-o`, `-nsu`, `-T <n>`, `-ntp`, `-ff` / `-fae`, `-e`.
 4. Log level: `quiet` → `-q`, `debug` → `-X`, `default` → nothing.
@@ -427,7 +428,7 @@ All functionality is available through the JSON API under `/api`. The UI and the
 | GET | `/api/jobs/{id}/log?from=&limit=&levels=` | A batch of log lines |
 | GET | `/api/jobs/{id}/stream` | SSE: log, modules, status |
 | GET | `/api/events` | SSE: status of all jobs for the global job bar |
-| GET / PUT | `/api/settings` | Global settings: default executable and JDK |
+| GET / PUT | `/api/settings` | Global settings: `{tools: {maven: {executable, jdkId}}}` |
 | GET | `/api/tools` | mvn and mvnd with versions (from the last detection), project wrappers and their Maven versions, the daemon's `JAVA_HOME` |
 | POST | `/api/tools/detect` | Detect mvn/mvnd and their versions as a background task → `202 {task}` |
 | GET | `/api/jdk-managers` | JDK managers (macOS registry, Homebrew, SDKMAN!, jenv, asdf, mise, Gradle toolchains), whether installed, and how many JDKs came from each |
@@ -457,8 +458,8 @@ The UI has a job bar at the top, visible everywhere, and these screens. The main
   - *Profiles.* A list with Run / Edit / Clone / Pin.
   - *History.* A job table: status, profile, modules, duration, commit, time. Selecting two jobs compares per-module timings.
   - *Packages.* A tree with a "per module / combined" switch, search and a generated toggle.
-  - *Settings* (done). Executable (global default, auto, `./mvnw`, mvnd, mvn, custom path), JDK from the global list, environment variables, and a "what a run will use" summary. Later: skip preset editor, arbitrary commands.
-- **Settings** (done) — default executable and JDK; build tools (mvn, mvnd with versions read from their install files, project wrappers with the Maven version they pin); JDKs grouped by the manager they came from, with "Detect again", manual add, rename and remove, and the managers not found on the machine.
+  - *Settings* (done). A "what a run will use" summary and tabs: *General* (name, environment variables), *JDK* (project JDK), *Maven* (executable: global default, auto, `./mvnw`, mvnd, mvn, custom path; JDK for Maven, defaulting to the project JDK). A future build tool gets its own tab. Later: skip preset editor, arbitrary commands.
+- **Settings** (done) — Maven defaults (executable, JDK for Maven); build tools (mvn, mvnd with versions read from their install files, project wrappers with the Maven version they pin); JDKs grouped by the manager they came from, with "Detect again", manual add, rename and remove, and the managers not found on the machine.
 - **Job** — header (status, command, time, Cancel / Rerun), n/m progress bar, horizontal per-module timing bars (current module highlighted), log viewer and problems panel.
 
 The log is rendered as a virtual list: only visible lines are in the DOM, otherwise the browser chokes on a large log. Hotkeys: `r` — rerun the current job, `/` — search the log, `e` — next error.
@@ -518,7 +519,7 @@ Eight phases in total; the MVP ends with phase 4. Each phase ends with a working
    - Repository layout and `Makefile`, config, lock file, `slog`.
    - SQLite and goose migrations.
    - Projects CRUD, embedded UI with the projects screen.
-   - Global settings (JDK list, default executable and JDK), project settings (executable, JDK, environment), background task queue.
+   - Global settings (JDK list, per-build-tool defaults), project settings (project JDK, Maven executable and JDK, environment), background task queue.
    - **Done when:** `buildyard serve` starts the daemon; a project can be added and survives a restart; a second instance does not start.
 2. **Job runner**
    - Queue and per-project lock, running saved shell commands, log to file.
