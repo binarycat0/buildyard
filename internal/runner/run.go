@@ -19,6 +19,7 @@ type Event struct {
 	// events, sent when the reactor becomes known).
 	Module  *store.JobModule  `json:"module,omitempty"`
 	Modules []store.JobModule `json:"modules,omitempty"`
+	Problem *store.JobProblem `json:"problem,omitempty"`
 }
 
 // Sub is a live subscription to one job.
@@ -27,8 +28,10 @@ type Sub struct {
 	From int // lines 1..From are in the log file; C starts at From+1
 	// Modules is the per-module progress at subscription time; C carries later changes.
 	Modules []store.JobModule
-	c       chan Event
-	run     *run
+	// Problems found up to subscription time; C carries later ones.
+	Problems []store.JobProblem
+	c        chan Event
+	run      *run
 	// Dropped is set when the subscriber fell behind and C was closed early.
 	Dropped bool
 }
@@ -61,6 +64,8 @@ type run struct {
 	reaper      bool
 	done        chan struct{}
 	prog        progress
+	parser      OutputParser
+	problems    []store.JobProblem
 }
 
 func (rn *run) openLog(path string) error {
@@ -84,6 +89,25 @@ func (rn *run) writeLine(text string) {
 	}
 	rn.lines++
 	rn.publishLocked(Event{Type: "line", N: rn.lines, Text: text})
+	if rn.parser != nil {
+		probs, changed := rn.parser.Line(rn.lines, text)
+		for i := range probs {
+			if len(rn.problems) >= maxProblems {
+				break
+			}
+			rn.problems = append(rn.problems, probs[i])
+			rn.publishLocked(Event{Type: "problem", Problem: &probs[i]})
+		}
+		if changed {
+			rn.syncLogModulesLocked()
+		}
+	}
+}
+
+func (rn *run) problemsSnapshot() []store.JobProblem {
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+	return append([]store.JobProblem(nil), rn.problems...)
 }
 
 func (rn *run) publishStatus(status string) {
@@ -108,7 +132,7 @@ func (rn *run) subscribe() *Sub {
 	rn.mu.Lock()
 	defer rn.mu.Unlock()
 	c := make(chan Event, subBuffer)
-	s := &Sub{C: c, c: c, From: rn.lines, Modules: rn.prog.snapshot(), run: rn}
+	s := &Sub{C: c, c: c, From: rn.lines, Modules: rn.prog.snapshot(), Problems: append([]store.JobProblem(nil), rn.problems...), run: rn}
 	if rn.ended {
 		close(c)
 		return s

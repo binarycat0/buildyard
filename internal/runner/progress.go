@@ -14,8 +14,9 @@ import (
 // progress tracks per-module state from the build tool extension's JSON Lines events:
 // session (the reactor), project_start, project_end.
 type progress struct {
-	mods  []store.JobModule
-	index map[string]int
+	mods   []store.JobModule
+	index  map[string]int
+	source string // "" | ext (extension events) | log (fallback parser)
 }
 
 type evLine struct {
@@ -39,10 +40,11 @@ func (p *progress) apply(line []byte) (changed []store.JobModule, session bool) 
 	}
 	switch e.T {
 	case "session":
-		if len(p.mods) > 0 {
+		if p.source == "ext" {
 			return nil, false // a nested Maven run (e.g. a plugin forking Maven) keeps the outer reactor
 		}
-		p.index = map[string]int{}
+		// Events win over the log fallback, whichever came first.
+		p.source, p.mods, p.index = "ext", nil, map[string]int{}
 		for i, pr := range e.Projects {
 			p.index[pr.Key] = i
 			p.mods = append(p.mods, store.JobModule{Key: pr.Key, Name: pr.Name, Ord: i, Status: "pending"})
@@ -113,6 +115,46 @@ func (rn *run) finishProgress(jobStatus string) []store.JobModule {
 		rn.publishLocked(Event{Type: "module", Module: &m})
 	}
 	return rn.prog.snapshot()
+}
+
+// syncLogModulesLocked applies the output parser's module list while the build tool sent
+// no events: the first time as a whole list, then as single changed modules.
+func (rn *run) syncLogModulesLocked() {
+	p := &rn.prog
+	if p.source == "ext" {
+		return
+	}
+	mods := rn.parser.Modules()
+	now := time.Now()
+	if p.source != "log" || len(mods) != len(p.mods) {
+		p.source, p.mods, p.index = "log", make([]store.JobModule, len(mods)), map[string]int{}
+		for i, m := range mods {
+			m.Ord = i
+			if m.Status == "running" {
+				m.StartedAt = &now
+			}
+			p.mods[i], p.index[m.Key] = m, i
+		}
+		rn.publishLocked(Event{Type: "modules", Modules: p.snapshot()})
+		return
+	}
+	for i, m := range mods {
+		old := &p.mods[i]
+		if m.Status == old.Status && (m.DurationMs == 0 || m.DurationMs == old.DurationMs) {
+			continue
+		}
+		if m.Status == "running" && old.StartedAt == nil {
+			old.StartedAt = &now
+		}
+		if m.DurationMs > 0 {
+			old.DurationMs = m.DurationMs
+		} else if m.Status != "running" && old.StartedAt != nil && old.DurationMs == 0 {
+			old.DurationMs = now.Sub(*old.StartedAt).Milliseconds()
+		}
+		old.Status = m.Status
+		changed := *old
+		rn.publishLocked(Event{Type: "module", Module: &changed})
+	}
 }
 
 // eventTail follows a JSON Lines events file the build tool appends to.

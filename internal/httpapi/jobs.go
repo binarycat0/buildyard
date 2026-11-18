@@ -48,7 +48,7 @@ type preview struct {
 	Env      map[string]string `json:"env"`      // project variables added to the daemon's environment
 	// MavenOpts is MAVEN_OPTS as the run gets it, when the memory setting changed it.
 	MavenOpts string `json:"mavenOpts,omitempty"`
-	Error    string            `json:"error,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // presetsFor returns the default skip presets with the project's own applied.
@@ -92,10 +92,31 @@ func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpe
 	}
 	cmd := runner.Command{Argv: pv.Argv, Dir: p.RootPath, Env: env}
 	cmd.SignalLeaderOnly = info.Executable != nil && info.Executable.Kind == maven.ModeMvnd
+	cmd.Parser = func() runner.OutputParser { return &mavenOutput{p: maven.NewLogParser()} }
 	if jar := s.ExtJar; jar != "" {
 		cmd.EventArgs = func(path string) []string { return maven.ExtArgs(jar, path) }
 	}
 	return pv, cmd, nil
+}
+
+// mavenOutput adapts the Maven log parser to the runner.
+type mavenOutput struct{ p *maven.LogParser }
+
+func (o *mavenOutput) Line(n int, text string) ([]store.JobProblem, bool) {
+	probs, changed := o.p.Line(n, text)
+	var out []store.JobProblem
+	for _, p := range probs {
+		out = append(out, store.JobProblem{Kind: p.Kind, Module: p.Module, File: p.File, Line: p.Line, Message: p.Message, LogLine: p.LogLine})
+	}
+	return out, changed
+}
+
+func (o *mavenOutput) Modules() []store.JobModule {
+	out := make([]store.JobModule, len(o.p.Modules))
+	for i, m := range o.p.Modules {
+		out[i] = store.JobModule{Key: m.Name, Name: m.Name, Ord: i, Status: m.Status, DurationMs: m.Ms}
+	}
+	return out
 }
 
 // resourcesFor returns the project's default resources.
@@ -343,6 +364,33 @@ func (s *Server) jobModules(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mods)
 }
 
+// jobProblems returns the problems found in a job's log: live for an active job.
+func (s *Server) jobProblems(w http.ResponseWriter, r *http.Request) {
+	j, ok := s.jobFor(w, r)
+	if !ok {
+		return
+	}
+	if s.Runner != nil && !j.Finished() {
+		if probs := s.Runner.Problems(j.ID); probs != nil {
+			writeJSON(w, http.StatusOK, probs)
+			return
+		}
+	}
+	probs, err := s.Store.ListJobProblems(r.Context(), j.ID)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, probs)
+}
+
+func nonNil[T any](v []T) []T {
+	if v == nil {
+		return []T{}
+	}
+	return v
+}
+
 type logPage struct {
 	From  int      `json:"from"`
 	Lines []string `json:"lines"`
@@ -446,8 +494,14 @@ func (s *Server) jobStream(w http.ResponseWriter, r *http.Request) {
 		if sub.Modules != nil {
 			send("modules", "", sub.Modules)
 		}
-	} else if mods, err := s.Store.ListJobModules(r.Context(), j.ID); err == nil && len(mods) > 0 {
-		send("modules", "", mods)
+		send("problems", "", nonNil(sub.Problems))
+	} else {
+		if mods, err := s.Store.ListJobModules(r.Context(), j.ID); err == nil && len(mods) > 0 {
+			send("modules", "", mods)
+		}
+		if probs, err := s.Store.ListJobProblems(r.Context(), j.ID); err == nil {
+			send("problems", "", probs)
+		}
 	}
 	flusher.Flush()
 
@@ -475,6 +529,8 @@ func (s *Server) jobStream(w http.ResponseWriter, r *http.Request) {
 					send("modules", "", ev.Modules)
 				case "module":
 					send("module", "", ev.Module)
+				case "problem":
+					send("problem", "", ev.Problem)
 				default:
 					send("status", "", ev)
 				}
