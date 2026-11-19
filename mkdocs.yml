@@ -1,0 +1,47 @@
+site_name: buildyard
+site_description: A personal build manager for Maven projects, a local daemon with a web UI that runs builds with saved parameters and shows their logs, modules and problems.
+site_url: https://tools.binaryc.at/buildyard/
+repo_url: https://github.com/binarycat0/buildyard
+repo_name: binarycat0/buildyard
+edit_uri: edit/main/doc/
+docs_dir: doc
+
+theme:
+  name: material
+  features:
+    - content.action.edit
+    - content.code.copy
+    - navigation.top
+    - search.highlight
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md

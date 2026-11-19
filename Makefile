@@ -8,7 +8,7 @@ BUILDYARD_HOME ?= $(HOME)/.buildyard
 BINDIR := $(BUILDYARD_HOME)/bin
 LINKDIR ?= $(HOME)/.local/bin
 
-.PHONY: build test vet fmt run clean ext install uninstall
+.PHONY: build test vet fmt run clean ext install uninstall docs docs-image docs-serve
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o bin/buildyard ./cmd/buildyard
@@ -58,4 +58,26 @@ uninstall:
 	@echo "kept $(BUILDYARD_HOME) (config, database, logs); delete it yourself if you want"
 
 clean:
-	rm -rf bin maven-ext/target
+	rm -rf bin maven-ext/target site
+
+# Docs site (MkDocs Material in a container, see utils/mkdocs), published to
+# https://tools.binaryc.at/buildyard/ by .github/workflows/docs.yml.
+DOCKER ?= docker
+DOCS_IMAGE ?= buildyard-docs
+ifeq ($(notdir $(DOCKER)),podman)
+# Rootless podman: run as your own user so site/ stays yours; :z for SELinux.
+DOCS_RUN = $(DOCKER) run --rm --userns=keep-id -v "$(CURDIR)":/docs:z
+else
+DOCS_RUN = $(DOCKER) run --rm --user $(shell id -u):$(shell id -g) -v "$(CURDIR)":/docs
+endif
+
+docs-image:
+	$(DOCKER) build -q -t $(DOCS_IMAGE) utils/mkdocs >/dev/null
+
+# Builds site/.
+docs: docs-image
+	$(DOCS_RUN) $(DOCS_IMAGE) build --strict
+
+# http://127.0.0.1:8000; restart to pick up README.md changes.
+docs-serve: docs-image
+	$(DOCS_RUN) -it -p 8000:8000 $(DOCS_IMAGE) serve -a 0.0.0.0:8000
