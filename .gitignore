@@ -1,4 +1,6 @@
 /bin/
 /dist/
 /maven-ext/target/
-/testdata/sample-maven/**/target/
+# Local-only material, kept out of the public repository.
+/docs/
+/testdata/

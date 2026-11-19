@@ -8,7 +8,7 @@ import (
 
 func TestArgv(t *testing.T) {
 	presets := MergePresets([]SkipPreset{
-		{ID: "no-ui", Label: "UI", Args: []string{"-Ddremio.no-ui"}},
+		{ID: "no-ui", Label: "UI", Args: []string{"-Dskip.ui"}},
 		{ID: "sources"}, // removed
 	})
 	cases := []struct {
@@ -26,7 +26,7 @@ func TestArgv(t *testing.T) {
 			Flags:      Flags{Offline: true, NoSnapshotUpdates: true, Threads: "1.5C", NoTransferProgress: true, FailMode: "end", Errors: true},
 			LogLevel:   "quiet",
 			ExtraArgs:  []string{"-Dmaven.repo.local=/r"},
-		}, "mvn -B -o -nsu -T 1.5C -ntp -fae -e -q -pl :core,g:app -am -amd -P fast,!slow -DskipTests -Ddremio.no-ui -Da=1 -Db=2 -Dflag install -Dmaven.repo.local=/r"},
+		}, "mvn -B -o -nsu -T 1.5C -ntp -fae -e -q -pl :core,g:app -am -amd -P fast,!slow -DskipTests -Dskip.ui -Da=1 -Db=2 -Dflag install -Dmaven.repo.local=/r"},
 		{"warnings only", RunSpec{Goals: []string{"install"}, LogLevel: "warn"}, "mvn -B -Dorg.slf4j.simpleLogger.defaultLogLevel=warn install"},
 		{"all modules ignores list", RunSpec{Goals: []string{"verify"}, Modules: Modules{Mode: "all", List: []string{":x"}, AlsoMake: true}, LogLevel: "debug", Flags: Flags{FailMode: "fast"}},
 			"mvn -B -ff -X verify"},
@@ -70,7 +70,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestParseDiscovery(t *testing.T) {
-	out, err := os.ReadFile("../../../testdata/maven-logs/07-active-profiles.log")
+	out, err := os.ReadFile("testdata/07-active-profiles.log")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestParseDiscovery(t *testing.T) {
 		t.Fatalf("got\n%s", strings.Join(got, "\n"))
 	}
 
-	out, _ = os.ReadFile("../../../testdata/maven-logs/08-active-profiles-none.log")
+	out, _ = os.ReadFile("testdata/08-active-profiles-none.log")
 	if mods := ParseDiscovery(out); len(mods) != 3 || len(mods[1].Profiles) != 0 || mods[2].Name != "Demo App" {
 		t.Fatalf("none: %+v", mods)
 	}

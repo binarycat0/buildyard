@@ -8,22 +8,22 @@ import (
 
 func TestPickProject(t *testing.T) {
 	ps := []client.Project{
-		{ID: 1, Name: "Dremio", RootPath: "/src/dremio"},
-		{ID: 2, Name: "dremio-oss", RootPath: "/src/dremio/oss/"},
-		{ID: 3, Name: "other", RootPath: "/src/dremio-other"},
+		{ID: 1, Name: "Acme", RootPath: "/src/acme"},
+		{ID: 2, Name: "acme-oss", RootPath: "/src/acme/oss/"},
+		{ID: 3, Name: "other", RootPath: "/src/acme-other"},
 	}
 	cases := []struct {
 		arg, cwd string
 		want     int64
 	}{
 		{"2", "/", 2},
-		{"dremio", "/", 1},            // name, case-insensitive
-		{"", "/src/dremio/sabot", 1},  // inside the project
-		{"", "/src/dremio/oss/x", 2},  // deepest project wins
-		{"", "/src/dremio-other", 3},  // not confused by a shared prefix
-		{"", "/src/dremio/oss", 2},    // the root itself
-		{"", "/home", 0},              // outside every project
-		{"missing", "/src/dremio", 0}, // explicit name that does not exist
+		{"acme", "/", 1},            // name, case-insensitive
+		{"", "/src/acme/server", 1}, // inside the project
+		{"", "/src/acme/oss/x", 2},  // deepest project wins
+		{"", "/src/acme-other", 3},  // not confused by a shared prefix
+		{"", "/src/acme/oss", 2},    // the root itself
+		{"", "/home", 0},            // outside every project
+		{"missing", "/src/acme", 0}, // explicit name that does not exist
 	}
 	for _, c := range cases {
 		p, err := pickProject(ps, c.arg, c.cwd)

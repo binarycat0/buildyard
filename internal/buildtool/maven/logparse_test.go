@@ -9,7 +9,24 @@ import (
 
 func parseFixture(t *testing.T, name string) (*LogParser, []Problem) {
 	t.Helper()
-	f, err := os.Open("../../../testdata/maven-logs/" + name)
+	return parseFile(t, "testdata/"+name)
+}
+
+// localFixtures holds real-world logs kept out of the repository (/testdata is
+// gitignored); tests that use them are skipped when the folder is absent.
+const localFixtures = "../../../testdata/maven-logs/"
+
+func parseLocalFixture(t *testing.T, name string) (*LogParser, []Problem) {
+	t.Helper()
+	if _, err := os.Stat(localFixtures + name); err != nil {
+		t.Skipf("local fixture %s not present", name)
+	}
+	return parseFile(t, localFixtures+name)
+}
+
+func parseFile(t *testing.T, path string) (*LogParser, []Problem) {
+	t.Helper()
+	f, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,28 +100,34 @@ func TestLogParserCompileThreaded(t *testing.T) {
 	}
 }
 
-func TestLogParserDremioFixtures(t *testing.T) {
-	_, probs := parseFixture(t, "02-compile-error.log")
+// Real-world logs from a large private reactor; run only where they exist locally.
+func TestLogParserLocalFixtures(t *testing.T) {
+	_, probs := parseLocalFixture(t, "02-compile-error.log")
 	k := kinds(probs)
 	// 37 javac errors, printed twice (module thread and the main summary): kept once.
 	if k["compile"] != 37 || k["goal"] < 1 || k["dependency"] < 1 {
 		t.Fatalf("02: %v", k)
 	}
+	module := ""
 	for _, p := range probs {
-		if p.Kind == "compile" && p.Module != "dremio-ee-sabot-kernel" {
+		if p.Kind != "compile" {
+			continue
+		}
+		if module == "" {
+			module = p.Module
+		}
+		if p.Module == "" || p.Module != module {
 			t.Fatalf("02 compile module: %+v", p)
 		}
 	}
-	_, probs = parseFixture(t, "03-plugin-failure-quarkus-generate-code.log")
+	_, probs = parseLocalFixture(t, "03-plugin-failure-quarkus-generate-code.log")
 	if k := kinds(probs); k["goal"] != 2 || len(probs) != 2 {
 		t.Fatalf("03: %+v", probs)
 	}
 	// A recovered [ERROR] is not a problem.
-	if _, probs = parseFixture(t, "06-false-error-gosdk-fallback.log"); len(probs) != 0 {
+	if _, probs = parseLocalFixture(t, "06-false-error-gosdk-fallback.log"); len(probs) != 0 {
 		t.Fatalf("06: %+v", probs)
 	}
-	p, _ := parseFixture(t, "04-reactor-summary-failure-skipped.log")
-	_ = p // no Reactor Build Order in this tail: the summary alone does not invent modules
 }
 
 func TestParseDuration(t *testing.T) {

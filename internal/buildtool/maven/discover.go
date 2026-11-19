@@ -22,7 +22,7 @@ func (m Module) Key() string { return m.GroupID + ":" + m.ArtifactID }
 
 // DiscoverArgs returns the arguments (after the executable) that list the reactor:
 // help:active-profiles prints every module with its active profiles and runs no
-// lifecycle plugins (5.5 s for Dremio's 952 modules, see docs/SPIKE.md). The spec's
+// lifecycle plugins (seconds even for reactors of ~1000 modules). The spec's
 // profiles, skips and properties are passed because they can add or remove modules.
 // extArgs (see ExtArgs) add module folders and dependencies through the extension.
 func DiscoverArgs(spec RunSpec, presets []SkipPreset, offline bool, extArgs []string) []string {

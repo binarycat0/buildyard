@@ -19,7 +19,7 @@ func TestModuleDiscoveryRetriesOnline(t *testing.T) {
 	call := func(method, path, body string) *httptest.ResponseRecorder {
 		return do(t, h, req{method: method, path: path, body: body})
 	}
-	fixture, _ := filepath.Abs("../../testdata/maven-logs/07-active-profiles.log")
+	fixture, _ := filepath.Abs("../buildtool/maven/testdata/07-active-profiles.log")
 	root := t.TempDir()
 	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<project/>"), 0o644)
 	// Offline fails like a missing help plugin; online prints the fixture. Args are logged.
@@ -136,7 +136,7 @@ func TestModuleDiscoveryTree(t *testing.T) {
 	call := func(method, path, body string) *httptest.ResponseRecorder {
 		return do(t, h, req{method: method, path: path, body: body})
 	}
-	fixture, _ := filepath.Abs("../../testdata/maven-logs/07-active-profiles.log")
+	fixture, _ := filepath.Abs("../buildtool/maven/testdata/07-active-profiles.log")
 	root := t.TempDir()
 	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<project/>"), 0o644)
 	// Like the extension: write the session event to the file named by -Dbuildyard.events.

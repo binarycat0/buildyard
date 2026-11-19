@@ -1,6 +1,6 @@
 # buildyard
 
-A personal build manager for Maven projects: a local daemon with a web UI. Specification: [docs/PLAN.md](docs/PLAN.md); phase 0 spike results: [docs/SPIKE.md](docs/SPIKE.md).
+A personal build manager for Maven projects: a local daemon with a web UI.
 
 ## Install
 
@@ -25,7 +25,7 @@ With the daemon running, the CLI drives it (see `buildyard help`):
 ```sh
 buildyard status                 # daemon and projects with their last job
 buildyard run "Quick build"      # run a saved task of the project you are in, follow its log
-buildyard run -d -p dremio Full  # queue it and print the job id
+buildyard run -d -p my-app Full  # queue it and print the job id
 buildyard jobs                   # recent jobs
 buildyard logs -f 42             # follow a job's log
 buildyard cancel 42

@@ -263,7 +263,7 @@ func (s RunSpec) Validate(presets []SkipPreset) error {
 	return nil
 }
 
-// Argv builds the command line in a fixed order (docs/PLAN.md, "Building the command"):
+// Argv builds the command line in a fixed order:
 // executable, -B, flags, log level, modules, profiles, skips, properties, goals, extra args.
 func (s RunSpec) Argv(executable string, presets []SkipPreset) []string {
 	argv := []string{executable, "-B"}
