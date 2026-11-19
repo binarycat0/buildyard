@@ -2,6 +2,8 @@
 
 A personal build manager for Maven projects: a local daemon with a web UI.
 
+Documentation: https://tools.binaryc.at/buildyard
+
 ## Install
 
 macOS or Linux, from a release (no Go needed):
