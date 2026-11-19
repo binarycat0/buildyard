@@ -57,3 +57,7 @@ Phase 1 (skeleton): config, lock file, SQLite with migrations, projects CRUD and
 Settings: a JDK list (auto-detected as a background task, plus manual entries), default executable and JDK; per project — `./mvnw`, mvnd, mvn or a custom path, a JDK and environment variables.
 
 Settings has a tab per tool (General, JDK, Maven, mvnd, Gradle, Bazel). Each tool tab shows the detected installs and the versions projects pin, and edits the tool's user config files: `~/.m2/settings.xml`, `~/.m2/toolchains.xml` (can be generated from the JDK list), `~/.mavenrc`, `~/.m2/mvnd.properties` (`MVND_PROPERTIES_PATH`), `gradle.properties` in `GRADLE_USER_HOME`, `~/.bazelrc` and `~/.bazeliskrc`. Before every save the previous version is copied to `~/.buildyard/backups/<file>/` (the last 30 are kept); a file changed on disk since it was loaded is not overwritten. XML files must be well-formed. The mvnd tab can also show and stop running mvnd daemons.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
