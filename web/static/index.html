@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buildyard</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+  <script defer src="/vendor/alpine-3.14.9.min.js"></script>
+</head>
+<body x-data="app">
+  <header class="top">
+    <a href="#/" class="brand">Buildyard</a>
+    <nav>
+      <a href="#/" :class="{active: view === 'projects' || view === 'project' || view === 'job' || view === 'compare'}">Projects</a>
+      <a href="#/settings" :class="{active: view === 'settings'}">Settings</a>
+      <a href="#/activity" :class="{active: view === 'activity'}" title="Background work: JDK and tool detection, module discovery">Activity<span class="nav-dot" :class="activityDot()" x-show="activityDot()"></span></a>
+    </nav>
+    <span class="muted grow-right" x-text="health ? 'v' + health.version : ''"></span>
+  </header>
+
+  <main>
+    <p class="error" x-show="error" x-text="error"></p>
+    <p class="notice row" x-show="uiStale" x-cloak>Buildyard was restarted, and this page still runs the previous UI.
+      <button @click="location.reload()">Reload</button></p>
+
+    <!-- ===================== Projects ===================== -->
+    <section x-show="view === 'projects'">
+      <div class="toolbar">
+        <h1>Projects</h1>
+        <button class="primary" @click="openAdd()" x-show="!adding">Add project</button>
+      </div>
+
+      <form class="card add" x-show="adding" x-cloak @submit.prevent="add()">
+        <label>Project root path
+          <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
+        </label>
+        <label><span>Name <span class="muted">(optional, defaults to the folder name)</span></span>
+          <input x-model="form.name">
+        </label>
+        <p class="error" x-show="formError" x-text="formError"></p>
+        <div class="row">
+          <button class="primary" type="submit" :disabled="busy">Add</button>
+          <button type="button" @click="adding = false">Cancel</button>
+        </div>
+      </form>
+
+      <p class="muted" x-show="loaded && projects.length === 0 && !adding">
+        No projects yet. Add a folder with a pom.xml.
+      </p>
+
+      <div class="card flush" x-show="projects.length">
+        <table class="list projects">
+          <thead>
+            <tr><th>Name</th><th>Path</th><th>Tool</th><th>Last run</th><th></th></tr>
+          </thead>
+          <tbody>
+            <template x-for="p in projects" :key="p.id">
+              <tr>
+                <td><a class="pname" :href="'#/projects/' + p.id" x-text="p.name"></a></td>
+                <td><code class="path" :title="p.rootPath" x-text="p.rootPath"></code></td>
+                <td><span class="badge" x-text="p.buildTool"></span></td>
+                <td class="nowrap">
+                  <template x-if="p.lastJob"><a :href="'#/jobs/' + p.lastJob.id" class="status-link">
+                    <span class="status" :class="p.lastJob.status" x-text="p.lastJob.status"></span></a></template>
+                  <span class="muted small" x-text="lastJobText(p)"></span>
+                </td>
+                <td class="actions">
+                  <a class="button small primary" :href="'#/projects/' + p.id">Run</a>
+                  <a class="button small" :href="'#/projects/' + p.id + '/history'">History</a>
+                  <a class="button small" :href="'#/projects/' + p.id + '/settings'">Settings</a>
+                  <button class="small danger" @click="remove(p)">Remove</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== Project settings ===================== -->
+    <section x-show="view === 'project'" x-cloak>
+      <template x-if="proj">
+        <div class="stack">
+          <div class="projhead">
+            <div class="toolbar">
+              <h1 x-text="proj.name"></h1>
+              <code class="path" x-text="proj.rootPath"></code>
+            </div>
+            <div class="uses small" x-show="runtime">
+              <span class="muted">Runs with</span>
+              <span x-show="runtime?.executable" :title="runtime?.executable?.reason + (runtime?.executableFrom === 'default' ? ', global Maven default' : '')">
+                <strong x-text="runtime?.executable?.kind === 'wrapper' ? './mvnw' : runtime?.executable?.kind"></strong>
+                <code class="muted" x-text="runtime?.executable?.path"></code></span>
+              <span class="error" x-show="runtime?.executableError" x-text="runtime?.executableError"></span>
+              <span class="muted">·</span>
+              <span x-show="runtime?.jdk" :title="runtime?.jdk?.home"><strong x-text="runtime?.jdk && jdkLabel(runtime.jdk)"></strong>
+                <span class="muted" x-text="'(' + jdkFromText(runtime?.jdkFrom) + ')'"></span></span>
+              <span x-show="runtime && !runtime.jdk" class="muted" x-text="'Daemon JAVA_HOME' + (tools.javaHome ? ': ' + tools.javaHome : ' (not set)')"></span>
+              <a class="small" :href="'#/projects/' + proj.id + '/settings'" x-show="pview !== 'settings'">change</a>
+            </div>
+          </div>
+          <nav class="tabs page-tabs">
+            <a :href="'#/projects/' + proj.id" :class="{active: pview === 'run'}">Run</a>
+            <a :href="'#/projects/' + proj.id + '/history'" :class="{active: pview === 'history'}">History</a>
+            <a :href="'#/projects/' + proj.id + '/settings'" :class="{active: pview === 'settings'}">Settings</a>
+          </nav>
+
+          <!-- Run -->
+          <div class="run-layout" x-show="pview === 'run'">
+            <aside class="card tasks">
+              <h2>Tasks</h2>
+              <p class="muted small" x-show="!profiles.length">No saved tasks yet. Set up a run on the right and save it as a task.</p>
+              <template x-for="t in profiles" :key="t.id">
+                <div class="task" :class="{active: editingTask?.id === t.id}">
+                  <div class="row spread">
+                    <button type="button" class="link pin" :class="{on: t.pinned}" @click="togglePin(t)" :title="t.pinned ? 'Unpin' : 'Pin to the top'">★</button>
+                    <a href="javascript:void 0" class="grow" @click="editTask(t)" x-text="t.name" title="Load into the form"></a>
+                    <button type="button" class="small primary" @click="runTask(t)" :disabled="busy">Run</button>
+                  </div>
+                  <div class="tags">
+                    <template x-for="(g, i) in taskTags(t.spec)" :key="i">
+                      <span class="tag" :class="g.cls" :title="g.title || ''" x-text="g.text"></span>
+                    </template>
+                  </div>
+                  <div class="row small" x-show="t.lastJob">
+                    <a :href="'#/jobs/' + t.lastJob?.id"><span class="status" :class="t.lastJob?.status" x-text="t.lastJob?.status"></span></a>
+                    <span class="muted" x-text="t.lastJob && when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt)"></span>
+                  </div>
+                </div>
+              </template>
+            </aside>
+
+            <form class="card runform" @submit.prevent="runJob()">
+              <div class="runbar">
+                <button class="primary runbtn" type="submit" :disabled="busy || !!rpreview?.error" title="Run this build"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg> Run</button>
+                <div class="runtitle">
+                  <template x-if="editingTask">
+                    <span class="row" title="Editing a saved task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> <strong x-text="editingTask?.name"></strong></span>
+                  </template>
+                  <span class="muted" x-show="!editingTask">New run</span>
+                </div>
+                <span class="grow"></span>
+                <button type="button" class="icon" @click="editingTask ? updateTask() : (saveAsNew = true)" :disabled="busy || !!rpreview?.error"
+                  :title="editingTask ? 'Save changes to this task' : 'Save as a task'" :aria-label="editingTask ? 'Save task' : 'Save as task'"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9l2 2v9h-11z M5 2.5v3.5h5V2.5 M4.5 13.5V9h7v4.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
+                <button type="button" class="icon danger" x-show="editingTask" @click="deleteTask(editingTask)" title="Delete this task" aria-label="Delete task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <button type="button" class="icon" x-show="editingTask" @click="stopEditing()" title="Close the task (keep the form)" aria-label="Close task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+                <div class="menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+                  <button type="button" class="icon" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
+                  <div class="menu-list" x-show="open" x-cloak @click="open = false">
+                    <button type="button" @click="saveAsNew = true" :disabled="!!rpreview?.error" x-text="editingTask ? 'Save as new task…' : 'Save as task…'"></button>
+                    <button type="button" @click="copyCommand(rpreview?.argv)" :disabled="!rpreview">Copy command</button>
+                    <button type="button" @click="showCommand(rpreview)" :disabled="!rpreview">Show full command</button>
+                    <button type="button" @click="resetRunForm()">Reset the form</button>
+                  </div>
+                </div>
+              </div>
+              <div class="row" x-show="saveAsNew">
+                <input class="grow" x-model="taskName" placeholder="Task name, e.g. Fast core build" @keydown.enter.prevent="createTask()" @keydown.escape="saveAsNew = false" x-effect="saveAsNew && $nextTick(() => $el.focus())">
+                <button type="button" class="primary" @click="createTask()">Save</button>
+                <button type="button" @click="saveAsNew = false">Cancel</button>
+              </div>
+              <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
+
+              <label>Goals</label>
+              <div class="row wrap">
+                <template x-for="g in commonGoals" :key="g">
+                  <button type="button" class="chip" :class="{active: hasGoal(g)}" @click="toggleGoal(g)" x-text="g"></button>
+                </template>
+                <template x-for="g in customGoals()" :key="g">
+                  <button type="button" class="chip active" @click="toggleGoal(g)" :title="'Remove ' + g"><span x-text="g"></span> ×</button>
+                </template>
+                <input class="goal-add" x-model="goalDraft" placeholder="+ goal, e.g. dependency:tree" aria-label="Add a goal"
+                  @keydown.enter.prevent="addGoals()" @blur="addGoals()">
+              </div>
+
+              <div class="final">
+                <div class="preview row wrap" x-show="rpreview">
+                  <template x-for="(t, i) in shortArgs(rpreview?.argv)" :key="i">
+                    <code class="tok" :class="t.cls" :title="t.title || ''" x-text="t.text"></code>
+                  </template>
+                  <code class="tok" x-show="rpreview?.mavenOpts" title="MAVEN_OPTS" x-text="'MAVEN_OPTS ' + (rpreview?.mavenOpts || '')"></code>
+                  <span class="grow"></span>
+                  <button type="button" class="link small" @click="showCommand(rpreview)">Full command</button>
+                </div>
+              </div>
+
+              <nav class="tabs subtabs" role="tablist">
+                <template x-for="t in runTabs()" :key="t.id">
+                  <button type="button" role="tab" :class="{active: rtab === t.id}" @click="setRunTab(t.id)">
+                    <span x-text="t.label"></span><span class="count" x-show="t.count" x-text="t.count"></span>
+                  </button>
+                </template>
+              </nav>
+              <div class="stack tabbody" x-show="rtab === 'modules'">
+                <div class="row wrap">
+                  <label class="radio"><input type="radio" value="all" :checked="rform.modulesMode === 'all'" @change="rform.modulesMode = 'all'; refreshPreview()"> All modules</label>
+                  <label class="radio"><input type="radio" value="selected" :checked="rform.modulesMode !== 'all'"
+                    @change="rform.modulesMode = 'selected'; refreshPreview()">
+                    Pick modules <span class="muted" x-text="'(' + rform.selected.length + ')'"></span></label>
+                  <div class="seg small" x-show="rform.modulesMode !== 'all'" title="What the ticked modules mean">
+                    <button type="button" :class="{active: rform.modulesMode === 'selected'}" @click="setPickMode('selected')">Build ticked</button>
+                    <button type="button" :class="{active: rform.modulesMode === 'exclude'}" @click="setPickMode('exclude')">Skip ticked</button>
+                  </div>
+                  <span class="grow"></span>
+                  <span class="muted small" x-text="moduleStatus()"></span>
+                  <button type="button" class="small" @click="discover()" :disabled="discoverTask" x-text="discoverTask ? 'Discovering…' : (modules.length ? 'Rediscover' : 'Discover modules')"
+                    title="Lists the reactor with mvn help:active-profiles, using the profiles, skips and properties below"></button>
+                </div>
+                <pre class="error small" x-show="discoverError" x-text="discoverError"></pre>
+                <div x-show="rform.modulesMode !== 'all'" class="stack tight">
+                  <p class="small muted" x-show="rform.modulesMode === 'exclude'">Everything is built except the ticked modules (<code>-pl !…</code>). A folder is left out only when everything under it is ticked.</p>
+                  <div class="row wrap" x-show="rform.modulesMode === 'selected'">
+                    <label class="radio"><input type="checkbox" x-model="rform.alsoMake" @change="refreshPreview()"> also make dependencies <code>-am</code></label>
+                    <label class="radio"><input type="checkbox" x-model="rform.alsoMakeDependents" @change="refreshPreview()"> also make dependents <code>-amd</code></label>
+                  </div>
+                  <div class="row">
+                    <input class="grow" x-model="moduleFilter" @input="$refs.modlist.scrollTop = 0; modScroll = 0" placeholder="Filter modules by name or artifactId">
+                    <button type="button" class="small" x-show="hasTree()" @click="setAllOpen(true)">Expand all</button>
+                    <button type="button" class="small" x-show="hasTree()" @click="setAllOpen(false)">Collapse</button>
+                    <button type="button" class="small" x-show="moduleFilter" @click="selectShown()">Select shown</button>
+                    <button type="button" class="small" @click="rform.selected = []; refreshPreview()">Clear</button>
+                  </div>
+                  <p class="small muted" x-show="rform.modulesMode === 'selected' && rform.selected.length && hasTree() && !allSelected()" x-text="impactText()"></p>
+                  <p class="small muted" x-show="rform.modulesMode === 'selected' && rform.selected.length && allSelected()">Every module is selected, so the run builds all modules without <code>-pl</code>.</p>
+                  <div class="modules" x-ref="modlist" @scroll="onModScroll($event)" :style="'height:' + modHeight + 'px'"
+                    x-effect="[rtab, pview, view, rform.modulesMode, moduleInfo, rpreview, rform.selected.length, editingTask, saveAsNew, modules.length]; $nextTick(() => fitModules())"
+                    @resize.window.debounce.100ms="fitModules()">
+                    <div x-data="{ v: { rows: [], top: 0, bottom: 0 } }" x-effect="v = visibleRows()">
+                      <div :style="'height:' + v.top + 'px'"></div>
+                      <template x-for="r in v.rows" :key="r.m.key + (r.ctx ? '~' : '')">
+                        <div class="module" :style="'padding-left:' + (r.depth * 18) + 'px'" :class="rowClass(r)">
+                          <button type="button" class="caret" x-show="r.kids" @click="toggleOpen(r)" x-text="r.open ? '▾' : '▸'"
+                            :title="r.open ? 'Collapse' : 'Expand'"></button>
+                          <span class="caret" x-show="!r.kids"></span>
+                          <input type="checkbox" :checked="checkState(r) === 'all'" x-effect="$el.indeterminate = checkState(r) === 'some'"
+                            @change="toggleModule(r)" :title="r.ctx ? 'Select the matching modules under it' : r.kids ? 'Select this module and everything under it' : 'Select'">
+                          <a href="javascript:void 0" class="modname" @click="moduleInfo = moduleInfo === r.m.key ? null : r.m.key" x-text="r.m.name" :title="r.m.name + ' — show dependencies'"></a>
+                          <code class="muted small" x-text="r.flat && r.m.relPath ? r.m.relPath : r.m.artifactId"></code>
+                          <span class="badge small" x-show="r.m.packaging !== 'jar'" x-text="r.m.packaging"></span>
+                          <span class="muted small" x-show="r.kids && !r.open" x-text="'(' + (r.size - 1) + ')'"></span>
+                          <span class="muted small" x-show="r.ctx" x-text="r.hits && r.hits.length + ' match' + (r.hits.length === 1 ? '' : 'es')"></span>
+                        </div>
+                      </template>
+                      <div :style="'height:' + v.bottom + 'px'"></div>
+                    </div>
+                    <p class="muted small" x-show="!modules.length">No modules yet. Discover them, or type them as extra arguments.</p>
+                    <p class="muted small" x-show="modules.length && moduleFilter && !shownRows().length">No module matches the filter.</p>
+                  </div>
+                  <template x-if="moduleInfo && infoFor(moduleInfo)">
+                    <div class="modinfo" x-data="{ i: null }" x-effect="i = infoFor(moduleInfo)">
+                      <div class="row spread">
+                        <strong x-text="i?.m.name"></strong>
+                        <button type="button" class="link small" @click="moduleInfo = null">close</button>
+                      </div>
+                      <div class="small muted"><code x-text="i?.m.key"></code> <span x-show="i?.m.relPath" x-text="'· ' + i?.m.relPath + '/'"></span></div>
+                      <div class="small" x-show="!hasTree()">Dependencies are not known: discovery ran without the Buildyard extension.</div>
+                      <div class="small" x-show="hasTree()">
+                        <span class="muted" x-text="'Depends on (' + (i?.deps.length || 0) + '):'"></span>
+                        <template x-for="d in i?.deps || []" :key="d.key"><a href="javascript:void 0" class="dep" @click="moduleInfo = d.key" x-text="d.name"></a></template>
+                        <span class="muted" x-show="!i?.deps.length">nothing in this project</span>
+                      </div>
+                      <div class="small" x-show="hasTree()">
+                        <span class="muted" x-text="'Used by (' + (i?.users.length || 0) + '):'"></span>
+                        <template x-for="d in i?.users || []" :key="d.key"><a href="javascript:void 0" class="dep" @click="moduleInfo = d.key" x-text="d.name"></a></template>
+                        <span class="muted" x-show="!i?.users.length">nothing in this project</span>
+                      </div>
+                      <div class="small muted" x-show="hasTree()"
+                        x-text="'Building it with -am adds ' + plural(i?.upAll, 'module') + ', with -amd ' + plural(i?.downAll, 'module') + '.'"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'skip'">
+                <p class="muted small" x-show="!skipPresets.length">No skip presets. Add them in Settings → Maven.</p>
+                <div class="row wrap">
+                  <template x-for="sp in skipPresets" :key="sp.id">
+                    <label class="radio" :title="sp.args.join(' ') + (sp.note ? ' — ' + sp.note : '')">
+                      <input type="checkbox" :checked="rform.skips.includes(sp.id)" @change="toggleSkip(sp.id)"> <span x-text="sp.label || sp.id"></span>
+                    </label>
+                  </template>
+                </div>
+                <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'options'">
+                <div class="row wrap">
+                  <label class="radio" title="-o"><input type="checkbox" x-model="rform.offline" @change="refreshPreview()"> Offline</label>
+                  <label class="radio" title="-nsu"><input type="checkbox" x-model="rform.nsu" @change="refreshPreview()"> No snapshot updates</label>
+                  <label class="radio" title="-ntp"><input type="checkbox" x-model="rform.ntp" @change="refreshPreview()"> No transfer progress</label>
+                  <label class="radio" title="-e"><input type="checkbox" x-model="rform.errors" @change="refreshPreview()"> Error details</label>
+                </div>
+                <div class="row wrap">
+                  <label class="inline">On failure
+                    <select x-model="rform.failMode" @change="refreshPreview()">
+                      <option value="">Maven default</option>
+                      <option value="fast">Stop at once (-ff)</option>
+                      <option value="end">Fail at end (-fae)</option>
+                      <option value="never">Never fail (-fn)</option>
+                    </select></label>
+                  <label class="inline">Log
+                    <select x-model="rform.logLevel" @change="refreshPreview()">
+                      <option value="default">Normal</option>
+                      <option value="warn">Warnings and errors (hides progress)</option>
+                      <option value="quiet">Errors only (-q, hides progress)</option>
+                      <option value="debug">Debug (-X)</option>
+                    </select></label>
+                </div>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'resources'">
+                <div class="row wrap">
+                  <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
+                    <select x-model="rform.cpu" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('cpu')"></option>
+                      <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.cpu"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.cpu === 'custom'" x-model="rform.cpuCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
+                  </label>
+                  <label class="inline" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span>
+                    <select x-model="rform.heap" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('heap')"></option>
+                      <option value="-1">JVM default (a quarter of the RAM)</option>
+                      <template x-for="c in resChoices('heap')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.heap"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.heap === 'custom'" x-model="rform.heapCustom" @input.debounce.250ms="refreshPreview()" placeholder="GB" >
+                    <span class="muted" x-show="rform.heap === 'custom'">GB</span>
+                  </label>
+                  <label class="inline" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span>
+                    <select x-model="rform.forks" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('forks')"></option>
+                      <option value="none">Test plugin default (1 JVM)</option>
+                      <template x-for="c in resChoices('forks')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.forks"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.forks === 'custom'" x-model="rform.forksCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
+                  </label>
+                </div>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'properties'">
+              <label><span>Maven profiles <code>-P</code> <span class="muted">(comma or space separated; !id turns one off)</span></span>
+                <input x-model="rform.profiles" list="known-profiles" placeholder="fast,!slow" @input.debounce.250ms="refreshPreview()">
+              </label>
+              <datalist id="known-profiles">
+                <template x-for="p in knownProfiles()" :key="p"><option :value="p"></option></template>
+              </datalist>
+              <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
+                <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
+              </label>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'extra'">
+              <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
+                <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
+              </label>
+              </div>
+            </form>
+          </div>
+
+          <!-- History -->
+          <div class="card" x-show="pview === 'history'">
+            <p class="muted" x-show="!pjobs.length">No runs yet.</p>
+            <div class="row" x-show="pjobs.length > 1">
+              <span class="muted small" x-text="pick.length === 2 ? 'Runs ' + pick.join(' and ') + ' picked' : 'Tick two runs to compare them'"></span>
+              <button class="small" :disabled="pick.length !== 2" @click="comparePicked()">Compare</button>
+            </div>
+            <table class="list" x-show="pjobs.length">
+              <thead><tr><th title="Pick two runs to compare"></th><th>#</th><th>Status</th><th>Command</th><th>Started</th><th>Duration</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="j in pjobs" :key="j.id">
+                  <tr class="clickable" @click="location.hash = '#/jobs/' + j.id">
+                    <td @click.stop><input type="checkbox" :checked="pick.includes(j.id)" @change="togglePick(j.id)" title="Pick to compare"></td>
+                    <td><a :href="'#/jobs/' + j.id" x-text="j.id"></a></td>
+                    <td><span class="status" :class="j.status" x-text="j.status"></span></td>
+                    <td><code x-text="specText(j)"></code></td>
+                    <td class="small" x-text="when(j.startedAt || j.queuedAt)"></td>
+                    <td class="small" x-text="duration(j)"></td>
+                    <td class="nowrap">
+                      <button class="small" x-show="j.status !== 'running' && j.status !== 'queued'" @click.stop="rerun(j)">Rerun</button>
+                      <button class="small" x-show="j.status === 'queued'" @click.stop="controlJob('stop', j)">Cancel</button>
+                      <button class="small" x-show="j.status === 'running' && !j.stopRequestedAt" @click.stop="controlJob('stop', j)" title="Graceful, like Ctrl+C">Stop</button>
+                      <button class="small danger" x-show="j.status === 'running'" @click.stop="controlJob('kill', j)" title="SIGKILL at once">Kill</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="stack" x-show="pview === 'settings'">
+          <form class="card" @submit.prevent="saveProject()">
+            <nav class="tabs" role="tablist">
+              <button type="button" role="tab" :class="{active: ptab === 'general'}" @click="ptab = 'general'">General</button>
+              <button type="button" role="tab" :class="{active: ptab === 'jdk'}" @click="ptab = 'jdk'">JDK</button>
+              <button type="button" role="tab" :class="{active: ptab === 'maven'}" @click="ptab = 'maven'">Maven</button>
+            </nav>
+
+            <div class="stack" x-show="ptab === 'general'">
+              <label>Name <input x-model="pform.name" required></label>
+              <label><span>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span></span>
+                <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
+              </label>
+            </div>
+
+            <div class="stack" x-show="ptab === 'jdk'">
+              <label>Project JDK
+                <select x-model.number="pform.jdkId">
+                  <option value="0" x-text="'Not set (use the build tool default: ' + jdkText(maven().jdkId, 'daemon JAVA_HOME') + ')'"></option>
+                  <template x-for="j in jdks" :key="j.id">
+                    <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.jdkId"></option>
+                  </template>
+                </select>
+              </label>
+              <p class="muted small">Build tools run on the project JDK unless their own tab picks a different one.</p>
+            </div>
+
+            <div class="stack" x-show="ptab === 'maven'">
+              <fieldset>
+                <legend>Executable</legend>
+                <label class="radio"><input type="radio" value="" x-model="pform.execChoice">
+                  Global default <span class="muted" x-text="'(' + execLabel(maven().executable) + ')'"></span></label>
+                <label class="radio"><input type="radio" value="auto" x-model="pform.execChoice">
+                  Auto <span class="muted">— ./mvnw if present, else mvnd, else mvn</span></label>
+                <label class="radio" :class="{disabled: !runtime?.wrapper}"><input type="radio" value="wrapper" x-model="pform.execChoice">
+                  Project wrapper ./mvnw
+                  <span class="muted" x-text="runtime?.wrapper ? (runtime.wrapper.mavenVersion ? '— Maven ' + runtime.wrapper.mavenVersion : '') : '— the project has no mvnw'"></span></label>
+                <label class="radio"><input type="radio" value="mvnd" x-model="pform.execChoice">
+                  mvnd <span class="muted" x-text="runtime?.tools.mvnd ? '— ' + runtime.tools.mvnd : '— not found'"></span></label>
+                <label class="radio"><input type="radio" value="mvn" x-model="pform.execChoice">
+                  mvn <span class="muted" x-text="runtime?.tools.mvn ? '— ' + runtime.tools.mvn : '— not found'"></span></label>
+                <label class="radio"><input type="radio" value="custom" x-model="pform.execChoice"> Custom path</label>
+                <input x-show="pform.execChoice === 'custom'" x-model="pform.customPath" placeholder="/opt/maven/bin/mvn">
+              </fieldset>
+
+              <fieldset>
+                <legend>Skip presets</legend>
+                <p class="muted small">Checkboxes in the run form. Change the built-in ones or add project flags such as <code>-Dskip.ui</code>.</p>
+                <table class="list presets">
+                  <thead><tr><th>Id</th><th>Label</th><th>Arguments</th><th></th></tr></thead>
+                  <tbody>
+                    <template x-for="(sp, i) in pform.presets" :key="i">
+                      <tr>
+                        <td><input class="short" x-model="sp.id" :readonly="!!sp.builtin"></td>
+                        <td><input x-model="sp.label"></td>
+                        <td><input x-model="sp.argsText" placeholder="-Dsome.skip"></td>
+                        <td><button type="button" class="small danger" @click="pform.presets.splice(i, 1)">Remove</button></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div class="row">
+                  <button type="button" class="small" @click="pform.presets.push({id: '', label: '', argsText: '', builtin: false})">Add preset</button>
+                  <button type="button" class="small" @click="resetPresets()">Reset to built-in</button>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Default resources</legend>
+                <p class="muted small">Used by every run of this project unless the run form picks something else.</p>
+                <div class="row wrap">
+                  <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
+                    <select x-model="pform.cpu" >
+                      <option value="" x-text="isMvnd() ? 'Build tool default (mvnd: cores − 1, parallel)' : 'Build tool default (Maven: 1 thread, sequential)'"></option>
+                      <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === pform.cpu"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="pform.cpu === 'custom'" x-model="pform.cpuCustom" placeholder="e.g. 3 or 0.75C" >
+                  </label>
+                  <label class="inline" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span>
+                    <select x-model="pform.heap" >
+                      <option value="">JVM default (a quarter of the RAM)</option>
+                      <template x-for="c in resChoices('heap')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === pform.heap"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="pform.heap === 'custom'" x-model="pform.heapCustom" placeholder="GB" >
+                    <span class="muted" x-show="pform.heap === 'custom'">GB</span>
+                  </label>
+                  <label class="inline" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span>
+                    <select x-model="pform.forks" >
+                      <option value="">Test plugin default (1 JVM)</option>
+                      <template x-for="c in resChoices('forks')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === pform.forks"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="pform.forks === 'custom'" x-model="pform.forksCustom" placeholder="e.g. 3 or 0.75C" >
+                  </label>
+                </div>
+              </fieldset>
+
+              <label>JDK for Maven
+                <select x-model.number="pform.toolJdkId">
+                  <option value="0" x-text="toolJdkFallbackText()"></option>
+                  <template x-for="j in jdks" :key="j.id">
+                    <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.toolJdkId"></option>
+                  </template>
+                </select>
+              </label>
+            </div>
+
+            <p class="error" x-show="pformError" x-text="pformError"></p>
+            <div class="row">
+              <button class="primary" type="submit" :disabled="busy">Save</button>
+              <span class="muted" x-show="saved">Saved</span>
+            </div>
+          </form>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===================== Job ===================== -->
+    <section x-show="view === 'job'" x-cloak>
+      <template x-if="job">
+        <div class="stack">
+          <div class="toolbar">
+            <div class="row">
+              <h1>
+                <a :href="'#/projects/' + job.projectId + '/history'" x-text="jobProject?.name"></a>
+                <span class="muted" x-text="'· job ' + job.id"></span>
+              </h1>
+              <span class="status big" :class="job.status" x-text="job.status"></span>
+              <span class="muted" x-text="duration(job)"></span>
+              <template x-if="failReason()">
+                <button type="button" class="link fail-reason" @click="failReason().line && goToLine(failReason().line)"
+                  :title="failReason().line ? 'Go to log line ' + failReason().line : ''" x-text="failReason().text"></button>
+              </template>
+            </div>
+            <div class="row">
+              <span class="muted small" x-show="job.status === 'running' && job.stopRequestedAt"
+                x-text="'Stopping for ' + since(job.stopRequestedAt) + '…'"></span>
+              <button x-show="job.status === 'queued'" @click="controlJob('stop')">Cancel</button>
+              <button x-show="job.status === 'running' && !job.stopRequestedAt" @click="controlJob('stop')"
+                title="Like Ctrl+C: Maven finishes its shutdown and the build ends by itself">Stop</button>
+              <button class="danger" x-show="job.status === 'running'" @click="controlJob('kill')"
+                title="Ends the build and all its processes at once (SIGKILL)">Kill</button>
+              <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="compareWithPrevious(job)" title="Compare with the previous finished run of this project">Compare</button>
+              <button x-show="job.status !== 'running' && job.status !== 'queued'" @click="rerun(job)">Rerun</button>
+              <button x-show="job.status === 'failed' && failedMods().length" @click="rerun(job, true)"
+                :title="'Run again without ' + failedMods().map((m) => m.name).join(', ') + ' and the modules that depend on them'">Rerun without failed</button>
+            </div>
+          </div>
+          <div class="preview row wrap">
+            <template x-for="(t, i) in shortArgs(job.argv)" :key="i">
+              <code class="tok" :class="t.cls" :title="t.title || ''" x-text="t.text"></code>
+            </template>
+            <span class="grow"></span>
+            <button type="button" class="link small" @click="showCommand({ argv: job.argv })">Full command</button>
+          </div>
+          <div class="muted small">
+            <span x-text="'Queued ' + when(job.queuedAt)"></span>
+            <span x-show="job.gitHead" x-text="'· commit ' + (job.gitHead || '').slice(0, 10)"></span>
+            <span x-show="job.exitCode !== null && job.exitCode !== undefined" x-text="'· exit code ' + job.exitCode"></span>
+            <span x-text="'· ' + logCount + ' lines'"></span>
+          </div>
+          <div class="card modprog" x-show="jobMods.length">
+            <div class="row spread">
+              <strong x-text="modsSummary()" :title="modsWith('running').map((m) => m.name + ' · ' + modTime(m)).join('\n')"></strong>
+              <button class="small" @click="modsOpen = !modsOpen" x-text="modsOpen ? 'Hide modules' : 'All modules'"></button>
+            </div>
+            <div class="bar"><div :style="'width:' + modsPercent() + '%'" :class="{bad: modsWith('failed').length}"></div></div>
+            <div class="row wrap small" x-show="modsWith('failed').length">
+              <span class="muted">Failed</span>
+              <template x-for="m in modsWith('failed')" :key="m.key">
+                <button class="chip failed" :title="'Find ' + m.key + ' in the log'" @click="findModule(m)" x-text="m.name"></button>
+              </template>
+            </div>
+            <template x-if="modsOpen">
+              <div class="stack">
+                <div class="seg small">
+                  <button x-show="jobTreeRows()" :class="{active: modsSort === 'tree'}" @click="modsSort = 'tree'">Tree</button>
+                  <button :class="{active: modsSort === 'reactor' || (modsSort === 'tree' && !jobTreeRows())}" @click="modsSort = 'reactor'">Build order</button>
+                  <button :class="{active: modsSort === 'slowest'}" @click="modsSort = 'slowest'">Slowest first</button>
+                </div>
+                <div class="modtable modtree" x-show="modsSort === 'tree' && jobTreeRows()" @scroll="jobModScroll = $event.target.scrollTop">
+                  <div x-data="{ v: { rows: [], top: 0, bottom: 0 } }" x-effect="v = jobTreeVisible()">
+                    <div :style="'height:' + v.top + 'px'"></div>
+                    <template x-for="r in v.rows" :key="r.key + treeStatus(r).cls">
+                      <div class="trow" :style="'padding-left:' + (8 + r.depth * 18) + 'px'">
+                        <button type="button" class="caret" x-show="r.kids" @click="toggleJobOpen(r)" x-text="r.open ? '▾' : '▸'"
+                          :title="r.open ? 'Collapse' : 'Expand'"></button>
+                        <span class="caret" x-show="!r.kids"></span>
+                        <span class="status" :class="treeStatus(r).cls" x-text="treeStatus(r).text"></span>
+                        <a href="javascript:void 0" class="modname" x-show="r.a.jm" @click="findModule(r.a.jm)" :title="'Find ' + r.key + ' in the log'" x-text="r.name"></a>
+                        <span class="modname" x-show="!r.a.jm" :title="r.key" x-text="r.name"></span>
+                        <span class="muted small" x-show="r.kids" x-text="'(' + r.a.n + ')'"></span>
+                        <span class="grow"></span>
+                        <span class="num muted" x-text="treeTime(r)" :title="r.kids ? 'Total time of the modules under it (they may run in parallel)' : ''"></span>
+                      </div>
+                    </template>
+                    <div :style="'height:' + v.bottom + 'px'"></div>
+                  </div>
+                </div>
+                <div class="modtable" x-show="modsSort !== 'tree' || !jobTreeRows()">
+                  <table>
+                    <tbody>
+                      <template x-for="m in modsTable()" :key="m.key">
+                        <tr>
+                          <td><span class="status" :class="m.status" x-text="modStatus(m)"></span></td>
+                          <td :title="m.key" x-text="m.name"></td>
+                          <td class="num muted" x-text="modTime(m)"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="card problems" x-show="jobProblems.length">
+            <strong x-text="plural(jobProblems.length, 'problem')"></strong>
+            <template x-for="g in problemGroups()" :key="g.kind">
+              <div class="pgroup">
+                <div class="muted small" x-text="g.title + ' (' + g.items.length + ')'"></div>
+                <template x-for="(p, i) in shownProblems(g)" :key="g.kind + i">
+                  <button type="button" class="problem" @click="goToLine(p.logLine)" :title="(p.file || '') + (p.logLine ? '  (log line ' + p.logLine + ')' : '')">
+                    <code class="where" x-show="problemWhere(p)" x-text="problemWhere(p)"></code>
+                    <span class="badge small" x-show="p.module" x-text="p.module"></span>
+                    <span class="msg" x-text="p.message"></span>
+                  </button>
+                </template>
+                <button type="button" class="link small" x-show="g.items.length > 8"
+                  @click="probOpen = { ...probOpen, [g.kind]: !probOpen[g.kind] }"
+                  x-text="probOpen[g.kind] ? 'Show fewer' : 'Show all ' + g.items.length"></button>
+              </div>
+            </template>
+          </div>
+          <div class="row wrap logbar">
+            <div class="seg">
+              <button :class="{active: logFilter === 'important'}" @click="setLogFilter('important')"
+                title="Errors, warnings, module starts, test summaries, the Reactor Summary and the result">Important <span x-text="logCounts.important"></span></button>
+              <button :class="{active: logFilter === 'warn'}" @click="setLogFilter('warn')">Warnings <span x-text="logCounts.warn"></span></button>
+              <button :class="{active: logFilter === 'error'}" @click="setLogFilter('error')">Errors <span x-text="logCounts.error"></span></button>
+              <button :class="{active: logFilter === 'all'}" @click="setLogFilter('all')">All <span x-text="logCounts.all"></span></button>
+            </div>
+            <input class="grow" type="search" x-model="logQuery" @input.debounce.200ms="searchLog()" placeholder="Search the log">
+          </div>
+          <div class="logwrap">
+            <button class="small earlier" x-show="firstLine > 1" @click="loadEarlier()" x-text="'Load ' + (firstLine - 1) + ' earlier lines'"></button>
+            <div class="log" x-ref="log" :data-f="logFilter" @scroll="onLogScroll($event)"></div>
+          </div>
+          <p class="muted small" x-show="job.status === 'queued'">Waiting for another job of this project, or for a free slot.</p>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===================== Compare two runs ===================== -->
+    <section x-show="view === 'compare'" x-cloak>
+      <template x-if="cmp">
+        <div class="stack">
+          <div class="toolbar">
+            <h1>
+              <a :href="'#/projects/' + cmp.B.job.projectId + '/history'" x-text="jobProject?.name"></a>
+              <span class="muted" x-text="'· run ' + cmp.A.job.id + ' vs ' + cmp.B.job.id"></span>
+            </h1>
+            <a class="button" :href="'#/compare/' + cmp.B.job.id + '/' + cmp.A.job.id">Swap</a>
+          </div>
+          <div class="cmpgrid">
+            <template x-for="side in [['A', cmp.A], ['B', cmp.B]]" :key="side[0]">
+              <a class="card cmpjob" :href="'#/jobs/' + side[1].job.id">
+                <div class="row">
+                  <strong x-text="'Run ' + side[1].job.id"></strong>
+                  <span class="status" :class="side[1].job.status" x-text="side[1].job.status"></span>
+                  <span class="grow"></span>
+                  <strong x-text="fmtMs(jobMs(side[1].job))"></strong>
+                </div>
+                <div class="muted small">
+                  <span x-text="when(side[1].job.startedAt || side[1].job.queuedAt)"></span>
+                  <span x-show="side[1].job.gitHead" x-text="'· commit ' + (side[1].job.gitHead || '').slice(0, 10)"></span>
+                  <span x-text="'· ' + plural(side[1].probs.length, 'problem')"></span>
+                </div>
+              </a>
+            </template>
+          </div>
+          <p x-text="cmpSummary()"></p>
+
+          <div class="card">
+            <h2>Command</h2>
+            <p class="muted small" x-show="cmpArgs().same">Both runs used the same command.</p>
+            <div class="row wrap" x-show="!cmpArgs().same">
+              <code class="tok" x-show="cmpArgs().exe" x-text="cmpArgs().exe"></code>
+              <template x-for="t in cmpArgs().removed" :key="'r' + t"><code class="tok removed" :title="'Only in run ' + cmp.A.job.id" x-text="t"></code></template>
+              <template x-for="t in cmpArgs().added" :key="'a' + t"><code class="tok added" :title="'Only in run ' + cmp.B.job.id" x-text="t"></code></template>
+              <code class="tok removed" x-show="cmpArgs().plRemoved.length" :title="cmpArgs().plRemoved.join('\n')" x-text="'-pl −' + cmpArgs().plRemoved.length + ' modules'"></code>
+              <code class="tok added" x-show="cmpArgs().plAdded.length" :title="cmpArgs().plAdded.join('\n')" x-text="'-pl +' + cmpArgs().plAdded.length + ' modules'"></code>
+            </div>
+          </div>
+
+          <div class="card" x-show="cmpProblems().added.length || cmpProblems().fixed.length">
+            <h2>Problems</h2>
+            <template x-for="grp in [['New in run ' + cmp.B.job.id, cmpProblems().added, 'added'], ['Gone since run ' + cmp.A.job.id, cmpProblems().fixed, 'removed']]" :key="grp[0]">
+              <div class="pgroup" x-show="grp[1].length">
+                <div class="muted small" x-text="grp[0] + ' (' + grp[1].length + ')'"></div>
+                <template x-for="(p, i) in grp[1].slice(0, 30)" :key="grp[2] + i">
+                  <div class="problem" :class="grp[2]">
+                    <code class="where" x-show="problemWhere(p)" x-text="problemWhere(p)"></code>
+                    <span class="badge small" x-show="p.module" x-text="p.module"></span>
+                    <span class="msg" x-text="p.message"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <div class="card" x-show="cmpRows().length">
+            <div class="row spread">
+              <h2>Modules</h2>
+              <div class="seg small">
+                <button :class="{active: cmpSort === 'delta'}" @click="cmpSort = 'delta'">Biggest change</button>
+                <button :class="{active: cmpSort === 'order'}" @click="cmpSort = 'order'">Build order</button>
+              </div>
+            </div>
+            <div class="modtable cmptable">
+              <table>
+                <thead><tr><th>Module</th><th class="num" x-text="'Run ' + cmp.A.job.id"></th><th class="num" x-text="'Run ' + cmp.B.job.id"></th><th class="num">Change</th></tr></thead>
+                <tbody>
+                  <template x-for="r in cmpRows()" :key="r.key">
+                    <tr :class="{changed: r.changed}">
+                      <td :title="r.key" x-text="r.name"></td>
+                      <td class="num">
+                        <span class="status" x-show="r.a && r.a.status !== 'succeeded'" :class="r.a?.status" x-text="r.a?.status"></span>
+                        <span x-text="r.a ? (r.a.ms ? fmtMs(r.a.ms) : '') : '—'"></span>
+                      </td>
+                      <td class="num">
+                        <span class="status" x-show="r.b && r.b.status !== 'succeeded'" :class="r.b?.status" x-text="r.b?.status"></span>
+                        <span x-text="r.b ? (r.b.ms ? fmtMs(r.b.ms) : '') : '—'"></span>
+                      </td>
+                      <td class="num" :class="{slower: r.delta > 500, faster: r.delta < -500}" x-text="r.delta === null ? '' : (r.delta > 0 ? '+' : '') + fmtMs(r.delta)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===================== Activity (background tasks) ===================== -->
+    <section x-show="view === 'activity'" x-cloak class="stack">
+      <h1>Activity</h1>
+      <div class="card">
+        <p class="muted small">Background work the daemon does besides builds. Kept in memory until the daemon restarts.</p>
+        <p class="muted" x-show="!btasks.length">Nothing has run since the daemon started.</p>
+        <table class="list" x-show="btasks.length">
+          <thead><tr><th>#</th><th>Task</th><th>Status</th><th>Started</th><th>Duration</th><th>Result</th></tr></thead>
+          <tbody>
+            <template x-for="t in btasks" :key="t.id">
+              <tr>
+                <td x-text="t.id"></td>
+                <td class="nowrap" x-text="taskLabel(t)"></td>
+                <td><span class="status" :class="t.status" x-text="t.status"></span></td>
+                <td class="small nowrap" x-text="when(t.startedAt || t.queuedAt)"></td>
+                <td class="small" x-text="duration(t)"></td>
+                <td class="small">
+                  <span x-show="!t.error" x-text="taskResult(t)"></span>
+                  <details x-show="t.error" class="task-error">
+                    <summary class="error" x-text="errorSummary(t.error)"></summary>
+                    <pre x-text="t.error"></pre>
+                  </details>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== Global settings ===================== -->
+    <section x-show="view === 'settings'" x-cloak class="stack">
+      <h1>Settings</h1>
+      <nav class="tabs page-tabs">
+        <template x-for="t in settingsTabs" :key="t.id">
+          <a :href="'#/settings/' + t.id" :class="{active: stab === t.id}">
+            <span x-text="t.name"></span>
+            <span class="tab-dot" x-show="tabDirty(t.id)" title="Unsaved changes">●</span>
+          </a>
+        </template>
+      </nav>
+
+      <template x-if="cform && stab === 'general'">
+        <form class="card" @submit.prevent="saveConfig()">
+          <h2>Daemon</h2>
+          <p class="muted small">Saved to <code x-text="cform.path"></code> and applied at once, no restart.</p>
+          <div class="row">
+            <label>Builds at once
+              <input class="short" type="number" min="1" max="64" required x-model.number="cform.maxConcurrentJobs" title="Running builds across all projects; one project always builds one job at a time">
+            </label>
+            <label>Runs kept per project
+              <input class="short" type="number" min="0" required x-model.number="cform.jobsPerProject" title="Older finished runs and their logs are deleted; 0 keeps all">
+            </label>
+          </div>
+          <p class="muted small">Port <span x-text="cform.port"></span>: set <code>port</code> in config.toml; it needs a restart.</p>
+          <div class="row">
+            <button class="primary" type="submit" :disabled="busy">Save</button>
+            <span class="muted" x-show="cfgSaved">Saved</span>
+          </div>
+        </form>
+      </template>
+
+      <template x-if="stab === 'jdk'">
+        <p class="muted small">JDKs found on this machine. Pick the one each build tool uses on its tab; Maven toolchains can be generated from this list on the Maven tab.
+          Daemon <code>JAVA_HOME</code>: <code x-text="tools.javaHome || 'not set'"></code></p>
+      </template>
+      <div class="card" x-show="stab === 'jdk'">
+        <div class="row spread">
+          <h2>Available JDKs</h2>
+          <button @click="detect()" :disabled="detectTask">
+            <span x-text="detectTask ? 'Detecting…' : 'Detect again'"></span>
+          </button>
+        </div>
+        <p class="muted" x-show="detectResult" x-text="detectResult"></p>
+        <table class="list" x-show="jdks.length">
+          <thead><tr><th>Version</th><th>Name</th><th>Path</th><th></th></tr></thead>
+          <template x-for="g in jdkGroups()" :key="g.key">
+            <tbody>
+              <tr class="group">
+                <td colspan="4">
+                  <span x-text="g.title"></span>
+                  <span class="muted small" x-text="g.kind ? ' · ' + g.kind : ''"></span>
+                  <span class="muted small" x-show="g.location"> · <code x-text="g.location"></code></span>
+                  <div class="muted small" x-show="g.description" x-text="g.description"></div>
+                </td>
+              </tr>
+              <template x-for="j in g.jdks" :key="j.id">
+                <tr :class="{missing: j.missing}">
+                  <td><strong x-text="j.version || '?'"></strong> <span class="muted" x-text="j.arch"></span>
+                    <div class="muted small" x-text="j.vendor"></div></td>
+                  <td class="name-cell">
+                    <template x-if="editingJdk !== j.id">
+                      <span><span x-text="j.name || j.label || j.vendor"></span>
+                        <button class="link small" @click="editingJdk = j.id" title="Rename">rename</button></span>
+                    </template>
+                    <template x-if="editingJdk === j.id">
+                      <input class="inline" :value="j.name" :placeholder="j.label || j.vendor" x-init="$el.focus()"
+                        @keydown.enter="renameJdk(j, $event.target.value); editingJdk = null"
+                        @keydown.escape="editingJdk = null" @blur="renameJdk(j, $event.target.value); editingJdk = null"
+                        title="Leave empty to use the detected name">
+                    </template>
+                  </td>
+                  <td><code class="path" x-text="j.home"></code> <span class="error" x-show="j.missing">not found</span>
+                    <div class="muted small" x-show="j.foundAt">found at <code x-text="j.foundAt"></code></div></td>
+                  <td><button class="danger small" @click="deleteJdk(j)">Remove</button></td>
+                </tr>
+              </template>
+              <tr x-show="!g.jdks.length"><td colspan="4" class="muted small">Installed, but no JDKs found through it.</td></tr>
+            </tbody>
+          </template>
+        </table>
+        <p class="muted" x-show="!jdks.length && !detectTask">No JDKs found. Add one by path.</p>
+        <p class="muted small" x-show="missingManagers().length">
+          Not found on this machine:
+          <template x-for="(m, i) in missingManagers()" :key="m.id">
+            <span><span x-text="(i ? ', ' : '') + m.name" :title="m.description"></span></span>
+          </template>
+        </p>
+        <form class="row" @submit.prevent="addJdk()">
+          <input class="grow" x-model="jdkPath" placeholder="JDK path, e.g. /Library/Java/JavaVirtualMachines/temurin-21.jdk">
+          <button type="submit">Add</button>
+        </form>
+        <p class="error" x-show="jdkError" x-text="jdkError"></p>
+      </div>
+
+      <form class="card" x-show="stab === 'maven'" @submit.prevent="saveSettings()">
+        <h2>Maven defaults</h2>
+        <p class="muted small">Used by Maven projects unless the project overrides them in its Maven tab or sets a project JDK.</p>
+        <div class="row">
+          <label>Executable
+            <select x-model="sform.maven.executable">
+              <option value="auto">Auto: ./mvnw if present, else mvnd, else mvn</option>
+              <option value="wrapper">Always the project wrapper ./mvnw</option>
+              <option value="mvnd" x-text="'mvnd' + (tools.tools?.mvnd ? ' — ' + tools.tools.mvnd : ' — not found')"></option>
+              <option value="mvn" x-text="'mvn' + (tools.tools?.mvn ? ' — ' + tools.tools.mvn : ' — not found')"></option>
+            </select>
+          </label>
+          <label>JDK for Maven
+            <select x-model.number="sform.maven.jdkId">
+              <option value="0" x-text="'Daemon JAVA_HOME' + (tools.javaHome ? ' (' + tools.javaHome + ')' : ' (not set)')"></option>
+              <template x-for="j in jdks" :key="j.id">
+                <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === sform.maven.jdkId"></option>
+              </template>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <button class="primary" type="submit" :disabled="busy">Save</button>
+          <span class="muted" x-show="saved">Saved</span>
+        </div>
+      </form>
+
+      <div class="card" x-show="toolTab()">
+        <div class="row spread">
+          <h2>Installed</h2>
+          <button class="small" @click="detectTools()" :disabled="toolsTask" title="Scan PATH, Homebrew and sdkman again">
+            <span x-text="toolsTask ? 'Detecting…' : '↻ Detect again'"></span>
+          </button>
+        </div>
+        <p class="muted small" x-show="stab === 'maven'">Projects with <code>./mvnw</code> use the Maven version their wrapper pins; a global <code>mvn</code> is only used for projects without a wrapper.</p>
+        <p class="muted small" x-show="stab === 'mvnd'"><code>mvnd</code> bundles its own Maven and runs builds in long-lived daemons. It reads <code>settings.xml</code> but not <code>MAVEN_OPTS</code> or <code>.mavenrc</code>: daemon heap and JVM options go in <code>mvnd.properties</code> below.</p>
+        <p class="muted small" x-show="stab === 'gradle'">Projects with <code>./gradlew</code> use the Gradle version their wrapper pins.</p>
+        <p class="muted small" x-show="stab === 'bazel'">Usually <code>bazel</code> is a bazelisk launcher that downloads the version a project pins in <code>.bazelversion</code>.</p>
+        <table class="list">
+          <thead><tr><th>Tool</th><th>Version</th><th>Path</th></tr></thead>
+          <tbody>
+            <template x-for="t in toolRows()" :key="t.id">
+              <tr :class="{missing: !t.installed}">
+                <td><strong x-text="t.name"></strong></td>
+                <td>
+                  <template x-if="t.installed">
+                    <span><span x-text="t.version || 'unknown'"></span>
+                      <span class="muted small" x-show="t.id === 'mvnd' && t.mavenVersion" x-text="'(Maven ' + t.mavenVersion + ')'"></span></span>
+                  </template>
+                  <span class="muted" x-show="!t.installed">not installed</span>
+                </td>
+                <td>
+                  <code class="path" x-show="t.installed" x-text="t.resolvedPath"></code>
+                  <div class="muted small" x-show="t.installed && t.path !== t.resolvedPath">found at <code x-text="t.path"></code></div>
+                  <span class="muted small" x-show="!t.installed" x-text="t.installHint"></span>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="!toolRows().length"><td colspan="3" class="muted small">Not detected yet. Press Detect again.</td></tr>
+          </tbody>
+          <tbody x-show="projectPins().rows.length">
+            <tr class="group"><td colspan="3"><span x-text="projectPins().title"></span> <span class="muted small" x-text="'(' + projectPins().file + ')'"></span></td></tr>
+            <template x-for="w in projectPins().rows" :key="w.projectId">
+              <tr>
+                <td><a :href="'#/projects/' + w.projectId" x-text="w.project"></a></td>
+                <td x-text="w.version"></td>
+                <td class="muted small" x-text="'pinned in ' + projectPins().file"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" x-show="stab === 'mvnd'">
+        <div class="row spread">
+          <h2>Daemons</h2>
+          <div class="row">
+            <button class="small" @click="mvndAction('status')" :disabled="mvndTask || !tools.tools?.mvnd">Status</button>
+            <button class="small danger" @click="mvndAction('stop')" :disabled="mvndTask || !tools.tools?.mvnd"
+              title="Stops all mvnd daemons; running mvnd builds fail">Stop all</button>
+          </div>
+        </div>
+        <p class="muted small">Changes to <code>mvnd.properties</code> apply to daemons started afterwards. Stop the running ones (when no mvnd build runs) to apply them now.</p>
+        <p class="muted small" x-show="mvndTask">Running <code x-text="'mvnd --' + mvndTask?.action"></code>…</p>
+        <pre class="cmd" x-show="mvndOut" x-text="mvndOut"></pre>
+      </div>
+
+      <template x-for="f in cfgFiles()" :key="f.id">
+        <div class="card cfg">
+          <div class="row spread">
+            <div class="cfg-title">
+              <h2 x-text="f.name"></h2>
+              <code class="path" x-text="f.path"></code>
+              <span class="muted small" x-show="f.pathFrom !== 'default'" x-text="'(from $' + f.pathFrom + ')'"></span>
+              <span class="badge small" x-show="!f.exists">not created</span>
+              <span class="badge small warn" x-show="cfgDirty(f)">unsaved</span>
+            </div>
+            <div class="row">
+              <select class="small" x-show="f.backups?.length" @change="restoreBackup(f, $event.target.value); $event.target.value = ''" title="Load a backup into the editor (saving it backs up the current file first)">
+                <option value="">Backups…</option>
+                <template x-for="b in f.backups || []" :key="b.name">
+                  <option :value="b.name" x-text="backupLabel(b)"></option>
+                </template>
+              </select>
+              <button class="small" type="button" @click="reloadCfg(f)" :disabled="f.busy" title="Reload from disk, dropping unsaved changes">↻</button>
+              <button class="small primary" type="button" @click="saveCfg(f)" :disabled="f.busy || !cfgDirty(f)">Save</button>
+            </div>
+          </div>
+          <p class="muted small" x-text="f.description"></p>
+
+          <template x-if="cfgKeys(f).length">
+            <details class="cfg-keys" :open="!f.exists">
+              <summary class="small">Common settings</summary>
+              <div class="kv">
+                <template x-for="k in cfgKeys(f)" :key="k.key">
+                  <label class="kv-row" :title="k.help">
+                    <code x-text="k.key"></code>
+                    <input class="inline" :value="propValue(f.content, k.key)" :placeholder="k.placeholder"
+                      @change="f.content = setProp(f.content, k.key, $event.target.value)">
+                    <span class="muted small" x-text="k.help"></span>
+                  </label>
+                </template>
+              </div>
+              <p class="muted small">Editing a field rewrites its line below; an empty field removes it.</p>
+            </details>
+          </template>
+
+          <div class="row" x-show="(!f.content && f.template) || f.id === 'maven.toolchains'">
+            <button class="small" type="button" x-show="!f.content && f.template" @click="f.content = f.template">Insert template</button>
+            <button class="small" type="button" x-show="f.id === 'maven.toolchains'" @click="generateToolchains(f)"
+              title="Replace the editor content with one jdk toolchain per detected JDK (review, then Save)">Generate from JDKs</button>
+          </div>
+          <textarea class="cfg-text" spellcheck="false" :rows="cfgRows(f)" x-model="f.content"
+            :placeholder="f.exists ? '(empty file)' : 'The file does not exist yet; saving creates it.'"
+            @keydown.ctrl.s.prevent="saveCfg(f)" @keydown.meta.s.prevent="saveCfg(f)"></textarea>
+          <p class="error" x-show="f.error" x-text="f.error"></p>
+          <p class="muted small" x-show="f.msg" x-text="f.msg"></p>
+        </div>
+      </template>
+    </section>
+  </main>
+
+  <dialog class="modal" x-ref="cmdDialog" @close="cmdShown = null" @click="if ($event.target === $el) $el.close()">
+    <div class="stack" x-show="cmdShown">
+      <div class="row spread">
+        <h2>Command</h2>
+        <button type="button" class="link" @click="$refs.cmdDialog.close()">Close</button>
+      </div>
+      <div class="muted small" x-show="cmdShown?.dir" x-text="'In ' + cmdShown?.dir"></div>
+      <div class="muted small" x-show="cmdShown?.javaHome" x-text="'JAVA_HOME=' + cmdShown?.javaHome"></div>
+      <div class="muted small" x-show="cmdShown?.mavenOpts" x-text="'MAVEN_OPTS=' + cmdShown?.mavenOpts"></div>
+      <pre class="cmd full" x-text="cmdShown ? shellJoin(cmdShown.argv) : ''"></pre>
+      <div class="row">
+        <button type="button" class="primary" @click="copyCommand(cmdShown.argv)" x-text="copied ? 'Copied' : 'Copy'"></button>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

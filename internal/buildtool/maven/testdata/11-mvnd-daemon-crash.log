@@ -1,0 +1,27 @@
+# buildyard fixture: mvnd -T build whose daemon died mid-build (shape of a real mvnd 1.0 log, names generic)
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Demo Parent                                                        [pom]
+[INFO] Demo Core                                                          [jar]
+[INFO] Demo App                                                           [jar]
+[INFO] 
+[demo-parent] [INFO] -----------------------< com.example:demo-parent >-----------------------
+[demo-parent] [INFO] Building Demo Parent 1.0 [1/3]
+[demo-parent] [INFO] --- install:3.1.2:install (default-install) @ demo-parent ---
+[demo-core] [INFO] ------------------------< com.example:demo-core >------------------------
+[demo-core] [INFO] Building Demo Core 1.0 [2/3]
+[demo-core] [INFO] --- compiler:3.14.1:compile (default-compile) @ demo-core ---
+[demo-core] [INFO] Compiling 12 source files with javac [debug release 21] to target/classes
+Exception in thread "main" org.mvndaemon.mvnd.common.DaemonException$StaleAddressException: Could not receive a message from the daemon.
+	at org.mvndaemon.mvnd.client.DaemonClientConnection.receive(DaemonClientConnection.java:173)
+	at org.mvndaemon.mvnd.client.DefaultClient.execute(DefaultClient.java:345)
+	at org.mvndaemon.mvnd.client.DefaultClient.main(DefaultClient.java:120)
+Caused by: java.io.IOException: No message received within 3000ms, daemon may have crashed. You may want to check its status using mvnd --status
+	at org.mvndaemon.mvnd.client.DaemonClientConnection.receive(DaemonClientConnection.java:162)
+	... 2 more
+----- Last  200 lines from daemon log file - /home/u/.m2/mvnd/registry/1.0.6/daemon-abc.log -----
+12:01:44.512 I Dispatch message: BuildEvent{projectId='demo-core', message='Compiling 12 source files'}
+12:01:47.020 I Dispatch message: KeepAliveMessage
+----- End of the daemon log -----
