@@ -117,7 +117,8 @@ tr.clickable:hover td { background: var(--bg); }
 a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 
 table.list.tasks .tags { display: flex; flex-wrap: wrap; gap: 4px; }
-table.list.tasks td.pin-cell { width: 1%; padding-right: 0; }
+table.list.tasks td.pin-cell, table.list.tasks td.run-cell { width: 1%; padding-right: 0; }
+table.list.tasks .runbtn { padding: 3px 10px; gap: 4px; }
 table.list.tasks td.actions { width: 1%; text-align: right; }
 table.list.tasks td.actions > * { vertical-align: middle; }
 button.icon.small { width: 28px; height: 28px; }

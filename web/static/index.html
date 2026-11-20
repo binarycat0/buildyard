@@ -133,14 +133,15 @@
               <button type="button" class="primary" @click="openNewTask()">New task</button>
               <span class="error small" x-show="runError && !$refs.taskDialog?.open" x-text="runError"></span>
             </div>
-            <p class="muted" x-show="!profiles.length">No saved tasks yet. Create one with New task; you can also run it once without saving.</p>
+            <p class="muted" x-show="!profiles.length">No saved tasks yet. Create one with New task, then run it from this list.</p>
             <div class="card flush" x-show="profiles.length">
               <table class="list tasks">
-                <thead><tr><th></th><th>Task</th><th>Command</th><th>Last run</th><th></th></tr></thead>
+                <thead><tr><th></th><th></th><th>Task</th><th>Command</th><th>Last run</th><th></th></tr></thead>
                 <tbody>
                   <template x-for="t in profiles" :key="t.id">
                     <tr>
                       <td class="pin-cell"><button type="button" class="link pin" :class="{on: t.pinned}" @click="togglePin(t)" :title="t.pinned ? 'Unpin' : 'Pin to the top'">★</button></td>
+                      <td class="run-cell"><button type="button" class="small primary runbtn" @click="runTask(t)" :disabled="busy" :title="'Run ' + t.name"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg> Run</button></td>
                       <td class="nowrap"><a href="javascript:void 0" @click="openEditTask(t)" x-text="t.name" title="Edit the task"></a></td>
                       <td><div class="tags">
                         <template x-for="(g, i) in taskTags(t.spec)" :key="i">
@@ -151,7 +152,6 @@
                         <span class="muted small" x-text="t.lastJob ? when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt) : 'never'"></span>
                       </td>
                       <td class="actions nowrap">
-                        <button type="button" class="small primary" @click="runTask(t)" :disabled="busy">Run</button>
                         <button type="button" class="icon small" @click="openEditTask(t)" title="Edit the task" aria-label="Edit the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
                       </td>
                     </tr>
@@ -162,9 +162,8 @@
           </div>
 
           <dialog class="modal wide" x-ref="taskDialog" @close="stopEditing()">
-            <form class="card runform" @submit.prevent="runJob()">
+            <form class="card runform" @submit.prevent="editingTask ? updateTask() : createTask()">
               <div class="runbar">
-                <button class="primary runbtn" type="submit" :disabled="busy || !!rpreview?.error" title="Run this build"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg> Run</button>
                 <div class="runtitle">
                   <template x-if="editingTask">
                     <span class="row" title="Editing a saved task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> <strong x-text="editingTask?.name"></strong></span>
@@ -172,7 +171,7 @@
                   <strong x-show="!editingTask">New task</strong>
                 </div>
                 <span class="grow"></span>
-                <button type="button" class="icon" @click="editingTask ? updateTask() : (saveAsNew = true)" :disabled="busy || !!rpreview?.error"
+                <button type="button" class="icon" x-show="editingTask" @click="updateTask()" :disabled="busy || !!rpreview?.error"
                   :title="editingTask ? 'Save changes to this task' : 'Save as a task'" :aria-label="editingTask ? 'Save task' : 'Save as task'"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9l2 2v9h-11z M5 2.5v3.5h5V2.5 M4.5 13.5V9h7v4.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
                 <button type="button" class="icon danger" x-show="editingTask" @click="deleteTask(editingTask)" title="Delete this task" aria-label="Delete task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                 <button type="button" class="icon" @click="$refs.taskDialog.close()" title="Close" aria-label="Close"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
@@ -186,10 +185,10 @@
                   </div>
                 </div>
               </div>
-              <div class="row" x-show="saveAsNew">
+              <div class="row" x-show="saveAsNew || !editingTask">
                 <input class="grow" x-model="taskName" placeholder="Task name, e.g. Fast core build" @keydown.enter.prevent="createTask()" @keydown.escape="saveAsNew = false" x-effect="saveAsNew && $nextTick(() => $el.focus())">
                 <button type="button" class="primary" @click="createTask()">Save</button>
-                <button type="button" @click="saveAsNew = false">Cancel</button>
+                <button type="button" x-show="editingTask" @click="saveAsNew = false">Cancel</button>
               </div>
               <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
 

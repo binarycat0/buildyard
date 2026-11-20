@@ -1290,19 +1290,6 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    async runJob() {
-      this.busy = true;
-      this.runError = '';
-      try {
-        const j = await api('POST', `/projects/${this.proj.id}/jobs`, { spec: this.spec() });
-        location.hash = `#/jobs/${j.id}`;
-      } catch (e) {
-        this.runError = e.message;
-      } finally {
-        this.busy = false;
-      }
-    },
-
     // The modules that failed in the open job (from its per-module progress).
     failedMods() {
       return (this.jobMods || []).filter((m) => m.status === 'failed');
