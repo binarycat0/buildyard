@@ -16,13 +16,15 @@ type Project struct {
 	RootPath    string            `json:"rootPath"`
 	BuildTool   string            `json:"buildTool"`
 	Executable  *string           `json:"executable"` // nil = global default; else auto|wrapper|mvnd|mvn|/abs/path
-	JdkID       *int64            `json:"jdkId"`      // project JDK; nil = none set
-	ToolJdkID   *int64            `json:"toolJdkId"`  // JDK for the build tool; nil = project JDK, then the tool's global default
+	JdkID       *int64            `json:"jdkId"`      // JDK the build runs on; nil = the build tool's global default
+	ToolJdkID   *int64            `json:"toolJdkId"`  // deprecated: merged into JdkID by migration 10; still honoured if set
 	Env         map[string]string `json:"env"`
 	SkipPresets json.RawMessage   `json:"skipPresets"`
 	Resources   json.RawMessage   `json:"resources"` // default CPU, memory and test JVMs for runs
-	CreatedAt   time.Time         `json:"createdAt"`
-	LastJob     *JobSummary       `json:"lastJob"`
+	// TaskDefaults are profiles, properties and skips every task gets (maven.TaskDefaults).
+	TaskDefaults json.RawMessage `json:"taskDefaults"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	LastJob      *JobSummary     `json:"lastJob"`
 }
 
 // JobSummary is the short form of a job shown on project cards.
@@ -36,17 +38,18 @@ type JobSummary struct {
 
 // ProjectPatch holds the fields PATCH /api/projects/{id} may change. Nil means "leave as is".
 type ProjectPatch struct {
-	Name        *string            `json:"name"`
-	Executable  *string            `json:"executable"` // "" resets to the global default
-	JdkID       *int64             `json:"jdkId"`      // 0 clears the project JDK
-	ToolJdkID   *int64             `json:"toolJdkId"`  // 0 resets to "use the project JDK"
-	Env         *map[string]string `json:"env"`
-	SkipPresets *json.RawMessage   `json:"skipPresets"`
-	Resources   *json.RawMessage   `json:"resources"`
+	Name         *string            `json:"name"`
+	Executable   *string            `json:"executable"` // "" resets to the global default
+	JdkID        *int64             `json:"jdkId"`      // 0 clears the project JDK
+	ToolJdkID    *int64             `json:"toolJdkId"`  // 0 resets to "use the project JDK"
+	Env          *map[string]string `json:"env"`
+	SkipPresets  *json.RawMessage   `json:"skipPresets"`
+	Resources    *json.RawMessage   `json:"resources"`
+	TaskDefaults *json.RawMessage   `json:"taskDefaults"`
 }
 
 const projectCols = `p.id, p.name, p.root_path, p.build_tool, p.executable, p.jdk_id, p.tool_jdk_id,
-	p.env_json, p.skip_presets_json, p.resources_json, p.created_at,
+	p.env_json, p.skip_presets_json, p.resources_json, p.task_defaults_json, p.created_at,
 	j.id, j.status, j.queued_at, j.started_at, j.finished_at`
 
 const projectFrom = ` FROM project p LEFT JOIN job j ON j.id = (
@@ -130,6 +133,9 @@ func (s *Store) UpdateProject(ctx context.Context, id int64, patch ProjectPatch)
 	if patch.Resources != nil {
 		sets, args = append(sets, "resources_json = ?"), append(args, string(*patch.Resources))
 	}
+	if patch.TaskDefaults != nil {
+		sets, args = append(sets, "task_defaults_json = ?"), append(args, string(*patch.TaskDefaults))
+	}
 	if len(sets) > 0 {
 		args = append(args, id)
 		res, err := s.db.ExecContext(ctx, `UPDATE project SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
@@ -160,12 +166,12 @@ type scanner interface{ Scan(...any) error }
 func scanProject(r scanner) (Project, error) {
 	var (
 		p                                  Project
-		env, presets, res, created         string
+		env, presets, res, defs, created   string
 		jobID                              sql.NullInt64
 		jobStatus, queued, started, finish sql.NullString
 	)
 	if err := r.Scan(&p.ID, &p.Name, &p.RootPath, &p.BuildTool, &p.Executable, &p.JdkID, &p.ToolJdkID,
-		&env, &presets, &res, &created, &jobID, &jobStatus, &queued, &started, &finish); err != nil {
+		&env, &presets, &res, &defs, &created, &jobID, &jobStatus, &queued, &started, &finish); err != nil {
 		return Project{}, err
 	}
 	if err := json.Unmarshal([]byte(env), &p.Env); err != nil || p.Env == nil {
@@ -173,6 +179,7 @@ func scanProject(r scanner) (Project, error) {
 	}
 	p.SkipPresets = json.RawMessage(presets)
 	p.Resources = json.RawMessage(res)
+	p.TaskDefaults = json.RawMessage(defs)
 	p.CreatedAt = parseTime(created)
 	if jobID.Valid {
 		p.LastJob = &JobSummary{

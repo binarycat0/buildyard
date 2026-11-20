@@ -187,3 +187,29 @@ func TestWithout(t *testing.T) {
 		t.Errorf("validate: %v", err)
 	}
 }
+
+func TestWithTaskDefaults(t *testing.T) {
+	d := TaskDefaults{Profiles: []string{"a", "b"}, Properties: map[string]string{"k": "1", "p": ""}, Skips: []string{"tests"}}
+	s := RunSpec{Goals: []string{"install"}, Profiles: []string{"!b", "c"}, Properties: map[string]string{"k": "2"}, Skips: []string{"javadoc", "tests"}}.Normalize()
+	got := s.WithTaskDefaults(d)
+	if strings.Join(got.Profiles, ",") != "a,!b,c" || got.Properties["k"] != "2" || got.Properties["p"] != "" || strings.Join(got.Skips, ",") != "tests,javadoc" {
+		t.Fatalf("merge: %+v", got)
+	}
+	if again := got.WithTaskDefaults(d); strings.Join(again.Profiles, ",") != "a,!b,c" || strings.Join(again.Skips, ",") != "tests,javadoc" {
+		t.Fatalf("not idempotent: %+v", again)
+	}
+	if s2 := s.WithTaskDefaults(TaskDefaults{}); strings.Join(s2.Profiles, ",") != "!b,c" {
+		t.Fatalf("empty defaults changed the spec: %+v", s2)
+	}
+}
+
+func TestReadRepoConfig(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(root+"/.mvn", 0o755)
+	os.WriteFile(root+"/.mvn/jvm.config", []byte("-Xmx2g\n\n"), 0o644)
+	os.WriteFile(root+"/.mvn/extensions.xml", []byte(`<extensions><extension><groupId>g</groupId><artifactId>a</artifactId><version>1</version></extension></extensions>`), 0o644)
+	c := ReadRepoConfig(root)
+	if c.MavenConfigPath != "" || strings.Join(c.JvmConfig, " ") != "-Xmx2g" || strings.Join(c.Extensions, ",") != "g:a" {
+		t.Fatalf("%+v", c)
+	}
+}

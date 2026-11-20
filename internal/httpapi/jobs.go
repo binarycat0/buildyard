@@ -48,7 +48,9 @@ type preview struct {
 	Env      map[string]string `json:"env"`      // project variables added to the daemon's environment
 	// MavenOpts is MAVEN_OPTS as the run gets it, when the memory setting changed it.
 	MavenOpts string `json:"mavenOpts,omitempty"`
-	Error     string `json:"error,omitempty"`
+	// ProjectArgs are the arguments the project's task defaults add (marked in the UI).
+	ProjectArgs []string `json:"projectArgs"`
+	Error       string   `json:"error,omitempty"`
 }
 
 // presetsFor returns the default skip presets with the project's own applied.
@@ -58,11 +60,32 @@ func presetsFor(p store.Project) []maven.SkipPreset {
 	return maven.MergePresets(own)
 }
 
-// prepare resolves a spec into a command. A non-empty preview.Error means it cannot run.
-func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpec) (preview, runner.Command, error) {
-	spec = spec.Normalize().WithDefaults(resourcesFor(p))
+// taskDefaultsFor returns the project's task defaults, without skips whose preset was
+// removed since.
+func taskDefaultsFor(p store.Project) maven.TaskDefaults {
+	var d maven.TaskDefaults
+	_ = json.Unmarshal(p.TaskDefaults, &d)
 	presets := presetsFor(p)
-	pv := preview{Dir: p.RootPath, Env: p.Env}
+	var skips []string
+	for _, id := range d.Skips {
+		for _, sp := range presets {
+			if sp.ID == id {
+				skips = append(skips, id)
+				break
+			}
+		}
+	}
+	d.Skips = skips
+	return d.Normalize()
+}
+
+// prepare resolves a spec into a command: the task's settings over the project's task
+// defaults and resources. A non-empty preview.Error means it cannot run.
+func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpec) (preview, runner.Command, error) {
+	defs := taskDefaultsFor(p)
+	spec = spec.Normalize().WithTaskDefaults(defs).WithDefaults(resourcesFor(p))
+	presets := presetsFor(p)
+	pv := preview{Dir: p.RootPath, Env: p.Env, ProjectArgs: nonNil(defs.DefaultArgs(presets))}
 	info, err := s.runtimeFor(ctx, p)
 	if err != nil {
 		return pv, runner.Command{}, err

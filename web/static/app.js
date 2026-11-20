@@ -269,19 +269,12 @@ function specToForm(spec) {
     offline: !!fl.offline, nsu: !!fl.noSnapshotUpdates, ntp: spec.flags ? !!fl.noTransferProgress : true,
     errors: !!fl.errors, failMode: fl.failMode || '', logLevel: spec.logLevel || 'default',
     profiles: (spec.profiles || []).join(','),
-    props: Object.entries(spec.properties || {}).map(([k, v]) => (v === '' ? k : `${k}=${v}`)).join('\n'),
+    props: propsToText(spec.properties),
   };
 }
 
 function formToSpec(f) {
-  const properties = {};
-  for (const raw of f.props.split('\n')) {
-    const line = raw.trim().replace(/^-D/, '');
-    if (!line) continue;
-    const i = line.indexOf('=');
-    if (i < 0) properties[line] = '';
-    else properties[line.slice(0, i).trim()] = line.slice(i + 1);
-  }
+  const properties = textToProps(f.props);
   return {
     kind: 'maven',
     goals: splitArgs(f.goals),
@@ -294,6 +287,22 @@ function formToSpec(f) {
     logLevel: f.logLevel,
     extraArgs: splitArgs(f.args),
   };
+}
+
+function textToProps(text) {
+  const properties = {};
+  for (const raw of text.split('\n')) {
+    const line = raw.trim().replace(/^-D/, '');
+    if (!line) continue;
+    const i = line.indexOf('=');
+    if (i < 0) properties[line] = '';
+    else properties[line.slice(0, i).trim()] = line.slice(i + 1);
+  }
+  return properties;
+}
+
+function propsToText(props) {
+  return Object.entries(props || {}).map(([k, v]) => (v === '' ? k : `${k}=${v}`)).join('\n');
 }
 
 function envToText(env) {
@@ -374,6 +383,12 @@ document.addEventListener('alpine:init', () => {
     pformError: '',
 
     ptab: 'general',
+    layers: null,
+    buildTools: [
+      { id: 'maven', label: 'Maven', supported: true },
+      { id: 'gradle', label: 'Gradle', supported: false },
+      { id: 'bazel', label: 'Bazel', supported: false },
+    ],
     pview: 'run',
     pjobs: [],
     commonGoals: ['clean', 'compile', 'test', 'package', 'verify', 'install'],
@@ -488,16 +503,17 @@ document.addEventListener('alpine:init', () => {
       document.querySelectorAll('dialog[open]').forEach((d) => d.close());
       try {
         if (!h.startsWith('/jobs/')) closeStream();
-        if ((m = h.match(/^\/projects\/(\d+)(?:\/(history|settings))?$/))) {
+        if ((m = h.match(/^\/projects\/(\d+)(?:\/(history|settings|config))?$/))) {
           const id = Number(m[1]);
           const same = this.view === 'project' && this.proj?.id === id;
-          this.pview = m[2] === 'history' ? 'history' : 'run';
+          this.pview = m[2] === 'history' || m[2] === 'config' ? m[2] : 'run';
           this.view = 'project';
           if (same) {
             if (this.pview === 'history') this.pjobs = await api('GET', `/projects/${id}/jobs`);
           } else {
             await this.loadProject(id);
           }
+          if (this.pview === 'config') await this.loadLayers();
           // Project settings are a dialog over the task list; the old URL still opens it.
           if (m[2] === 'settings') {
             history.replaceState(null, '', `#/projects/${id}`);
@@ -608,21 +624,85 @@ document.addEventListener('alpine:init', () => {
         name: p.name,
         execChoice: known ? exe : 'custom',
         customPath: known ? '' : exe,
-        jdkId: p.jdkId ?? 0,
-        toolJdkId: p.toolJdkId ?? 0,
+        // One JDK per project; a build tool JDK from before is shown as it (runs used it).
+        jdkId: p.toolJdkId ?? p.jdkId ?? 0,
         presets: this.skipPresets.map((sp) => ({
           id: sp.id, label: sp.label, argsText: sp.args.join(' '),
           builtin: this.defaultPresets.some((d) => d.id === sp.id),
+          on: this.projDefaults().skips.includes(sp.id),
         })),
+        profiles: this.projDefaults().profiles.join(','),
+        props: propsToText(this.projDefaults().properties),
         envText: envToText(p.env),
         ...this.resourcesToForm(p.resources),
       };
       this.pformError = '';
     },
 
+    // The project's task defaults, always with all fields.
+    projDefaults() {
+      const d = this.proj?.taskDefaults || {};
+      return { profiles: d.profiles || [], properties: d.properties || {}, skips: d.skips || [] };
+    },
+
+    projSkip(id) {
+      return this.projDefaults().skips.includes(id);
+    },
+
+    // The project defaults as command-line arguments, for the task form.
+    projectArgList() {
+      const d = this.projDefaults();
+      const out = [];
+      if (d.profiles.length) out.push('-P ' + d.profiles.join(','));
+      for (const [k, v] of Object.entries(d.properties).sort()) out.push(v === '' ? `-D${k}` : `-D${k}=${v}`);
+      return out;
+    },
+
+    pformDefaultsCount() {
+      const f = this.pform;
+      if (!f.presets) return '';
+      const n = f.profiles.split(/[\s,]+/).filter(Boolean).length + f.props.split('\n').filter((l) => l.trim()).length
+        + f.presets.filter((r) => r.on).length + [f.cpu, f.heap, f.forks].filter(Boolean).length;
+      return n ? String(n) : '';
+    },
+
+    toolName(id) {
+      return this.buildTools.find((t) => t.id === id)?.label ?? id;
+    },
+
+    async loadLayers() {
+      if (!this.proj) return;
+      try {
+        this.layers = await api('GET', `/projects/${this.proj.id}/layers`);
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+
+    // The layers from the server plus the task layer, which lives in each task.
+    layerList() {
+      if (!this.layers) return [];
+      const n = this.profiles.length;
+      return [...this.layers.layers, {
+        id: 'task', title: 'Task',
+        hint: 'Each task: goals, modules, profiles, -D properties, skips and flags. They win over everything above.',
+        rows: [{ name: 'Tasks', values: n ? this.profiles.map((t) => t.name) : [], source: 'Buildyard', edit: `#/projects/${this.proj.id}`,
+          note: n ? 'open one in the Tasks tab to change it' : 'no tasks yet', status: n ? 'used' : '' }],
+      }];
+    },
+
+    // Where a configuration row's edit button leads.
+    editLayer(target) {
+      if (target.startsWith('#')) {
+        location.hash = target;
+      } else if (target.startsWith('settings:')) {
+        this.openProjectSettings(target.slice('settings:'.length));
+      }
+    },
+
     openProjectSettings(tab) {
       this.resetProjectForm();
-      if (tab) this.ptab = tab;
+      this.ptab = tab || 'general';
       this.$refs.projDialog.showModal();
     },
 
@@ -635,8 +715,13 @@ document.addEventListener('alpine:init', () => {
         const executable = f.execChoice === 'custom' ? f.customPath.trim() : f.execChoice;
         if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Enter an absolute path to the executable');
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
-          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: Number(f.toolJdkId) || 0,
+          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: 0,
           env: textToEnv(f.envText), skipPresets: this.presetDiff(f.presets),
+          taskDefaults: {
+            profiles: f.profiles.split(/[\s,]+/).filter(Boolean),
+            properties: textToProps(f.props),
+            skips: f.presets.filter((r) => r.on && r.id.trim()).map((r) => r.id.trim()),
+          },
           resources: {
             threads: joinChoice('cpu', f.cpu, f.cpuCustom),
             heapMb: joinChoice('heap', f.heap, f.heapCustom),
@@ -649,6 +734,7 @@ document.addEventListener('alpine:init', () => {
         this.rform.skips = this.rform.skips.filter((id) => this.skipPresets.some((sp) => sp.id === id));
         this.saved = true;
         this.refreshPreview();
+        if (this.pview === 'config') await this.loadLayers();
         this.$refs.projDialog.close();
       } catch (e) {
         this.pformError = e.message;
@@ -1197,8 +1283,11 @@ document.addEventListener('alpine:init', () => {
 
     // The command as short tokens: the executable's name, then the flags; a long -pl list
     // becomes a module count (the full command is one click away).
-    shortArgs(argv) {
+    shortArgs(argv, projectArgs) {
       if (!argv?.length) return [];
+      const fromProject = new Set(projectArgs || []);
+      for (let i = 0; i + 1 < (projectArgs || []).length; i++) if (projectArgs[i] === '-P') fromProject.add('-P ' + projectArgs[i + 1]);
+      const mark = (t) => (fromProject.has(t.text) ? { ...t, cls: ((t.cls || '') + ' proj').trim(), title: (t.title ? t.title + ' — ' : '') + 'from the project task defaults' } : t);
       const out = [{ text: argv[0].split('/').pop(), cls: 'exe', title: argv[0] }];
       for (let i = 1; i < argv.length; i++) {
         const a = argv[i];
@@ -1211,11 +1300,11 @@ document.addEventListener('alpine:init', () => {
           continue;
         }
         if ((a === '-P' || a === '-T') && i + 1 < argv.length) {
-          out.push({ text: a + ' ' + argv[++i] });
+          out.push(mark({ text: a + ' ' + argv[++i] }));
           continue;
         }
         const goal = !a.startsWith('-');
-        out.push({ text: shellQuote(a), cls: goal ? 'goal' : '' });
+        out.push(mark({ text: shellQuote(a), cls: goal ? 'goal' : '' }));
       }
       return out;
     },
@@ -1255,7 +1344,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     resetPresets() {
-      this.pform.presets = this.defaultPresets.map((sp) => ({ id: sp.id, label: sp.label, argsText: sp.args.join(' '), builtin: true }));
+      this.pform.presets = this.defaultPresets.map((sp) => ({ id: sp.id, label: sp.label, argsText: sp.args.join(' '), builtin: true, on: false }));
     },
 
     customGoals() {
@@ -1827,17 +1916,6 @@ document.addEventListener('alpine:init', () => {
     jdkText(id, fallback) {
       const j = this.jdks.find((x) => x.id === id);
       return j ? this.jdkLabel(j) : fallback;
-    },
-
-    // What "JDK for Maven: use the project JDK" resolves to in the project form.
-    toolJdkFallbackText() {
-      const pid = Number(this.pform.jdkId) || 0;
-      if (pid) return 'Project JDK: ' + this.jdkText(pid, '?');
-      return 'Global Maven default: ' + this.jdkText(this.maven().jdkId, 'daemon JAVA_HOME');
-    },
-
-    jdkFromText(from) {
-      return { tool: 'Maven tab', project: 'project JDK', default: 'global Maven default' }[from] ?? '';
     },
 
     jdkLabel(j) {

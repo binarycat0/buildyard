@@ -58,6 +58,15 @@ Phase 1 (skeleton): config, lock file, SQLite with migrations, projects CRUD and
 
 Settings: a JDK list (auto-detected as a background task, plus manual entries), default executable and JDK; per project — `./mvnw`, mvnd, mvn or a custom path, a JDK and environment variables.
 
+A project's runs are configured in layers, from widest to narrowest:
+
+1. **Global**: your user's settings, shared by every project. Buildyard's default launcher and JDK per build tool, and the tool's files in your home directory (`~/.m2/settings.xml`, `~/.mavenrc`, `~/.m2/mvnd.properties`, …).
+2. **Repository**: what the project keeps in git and every Maven run reads, inside Buildyard or not: the wrapper `./mvnw`, `.mvn/maven.config`, `.mvn/jvm.config`, `.mvn/extensions.xml`. Buildyard shows these but does not edit them.
+3. **Project**: the project's settings in Buildyard. One build tool, its launcher (auto, `./mvnw`, mvnd, mvn or a path) and JDK, environment variables, and *task defaults*: profiles, `-D` properties, skips and resources every task gets.
+4. **Task**: goals, modules, profiles, properties, skips and flags of one saved task, for the project's build tool only. A task adds to the project defaults and wins where both set the same thing (`!id` turns a project profile off).
+
+The project's Configuration tab lists all four layers with what overrides what. mvn, `./mvnw` and mvnd are launchers of the same Maven, so they share the global and repository layers (`mvnd.properties` is read by mvnd only).
+
 Settings has a tab per tool (General, JDK, Maven, mvnd, Gradle, Bazel). Each tool tab shows the detected installs and the versions projects pin, and edits the tool's user config files: `~/.m2/settings.xml`, `~/.m2/toolchains.xml` (can be generated from the JDK list), `~/.mavenrc`, `~/.m2/mvnd.properties` (`MVND_PROPERTIES_PATH`), `gradle.properties` in `GRADLE_USER_HOME`, `~/.bazelrc` and `~/.bazeliskrc`. Before every save the previous version is copied to `~/.buildyard/backups/<file>/` (the last 30 are kept); a file changed on disk since it was loaded is not overwritten. XML files must be well-formed. The mvnd tab can also show and stop running mvnd daemons.
 
 ## License

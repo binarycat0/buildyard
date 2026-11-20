@@ -309,8 +309,7 @@ type runtimeInfo struct {
 	ExecutableError string          `json:"executableError,omitempty"`
 	ExecutableFrom  string          `json:"executableFrom"` // project | default
 	JDK             *store.JDK      `json:"jdk"`            // nil = daemon's own JAVA_HOME
-	JDKFrom         string          `json:"jdkFrom"`        // tool (project's build tool JDK) | project (project JDK) | default | environment
-	ProjectJDK      *store.JDK      `json:"projectJdk"`     // the project JDK, if set
+	JDKFrom         string          `json:"jdkFrom"`        // project | default (the tool's global JDK) | environment
 	Wrapper         *maven.Wrapper  `json:"wrapper"`
 	Tools           maven.Tools     `json:"tools"`
 }
@@ -353,17 +352,15 @@ func (s *Server) runtimeFor(ctx context.Context, p store.Project) (runtimeInfo, 
 		info.Executable = &res
 	}
 
-	// Same order as IntelliJ: the tool's own JDK, else the project JDK, else the tool's global default.
+	// The project's JDK, else the build tool's global default. ToolJdkID is from before
+	// projects had one JDK; migration 10 moved it into JdkID.
 	jdkID := tool.JdkID
 	info.JDKFrom = "default"
 	if p.JdkID != nil {
 		jdkID, info.JDKFrom = p.JdkID, "project"
-		if j, err := s.Store.GetJDK(ctx, *p.JdkID); err == nil {
-			info.ProjectJDK = &j
-		}
 	}
 	if p.ToolJdkID != nil {
-		jdkID, info.JDKFrom = p.ToolJdkID, "tool"
+		jdkID, info.JDKFrom = p.ToolJdkID, "project"
 	}
 	if jdkID == nil {
 		info.JDKFrom = "environment"

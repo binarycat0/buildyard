@@ -277,3 +277,61 @@ func TestProjectResources(t *testing.T) {
 		t.Fatalf("overrides: %q %q", got, pv.MavenOpts)
 	}
 }
+
+func TestProjectTaskDefaultsAndLayers(t *testing.T) {
+	h, _ := newServer(t)
+	call := func(method, path, body string) *httptest.ResponseRecorder {
+		return do(t, h, req{method: method, path: path, body: body})
+	}
+	root := mavenProject(t)
+	os.MkdirAll(filepath.Join(root, ".mvn"), 0o755)
+	os.WriteFile(filepath.Join(root, ".mvn", "maven.config"), []byte("# comment\n-ntp\n-Dstyle.color=never\n"), 0o644)
+	var p store.Project
+	decodeInto(call("POST", "/api/projects", `{"rootPath":"`+root+`"}`), &p)
+	pid := strconv.FormatInt(p.ID, 10)
+	if w := call("PATCH", "/api/projects/"+pid, `{"taskDefaults":{"skips":["nope"]}}`); w.Code != 400 {
+		t.Fatalf("unknown skip: %d", w.Code)
+	}
+	if w := call("PATCH", "/api/projects/"+pid, `{"taskDefaults":{"profiles":["fast","ci"],"properties":{"-Drepo":"/r","x":"1"},"skips":["tests"]}}`); w.Code != 200 {
+		t.Fatalf("patch: %d %s", w.Code, w.Body)
+	}
+	var pv preview
+	decodeInto(call("POST", "/api/projects/"+pid+"/preview", `{"spec":{"goals":["install"],"profiles":["!ci","extra"],"properties":{"x":"2"}}}`), &pv)
+	if got := strings.Join(pv.Argv[1:], " "); got != "-B -P fast,!ci,extra -DskipTests -Drepo=/r -Dx=2 install" {
+		t.Fatalf("merged: %q", got)
+	}
+	if strings.Join(pv.ProjectArgs, " ") != "-P fast,ci -DskipTests -Drepo=/r -Dx=1" {
+		t.Fatalf("project args: %q", pv.ProjectArgs)
+	}
+
+	// Removing the preset a default skip uses leaves the defaults runnable.
+	if w := call("PATCH", "/api/projects/"+pid, `{"skipPresets":[{"id":"tests"}]}`); w.Code != 200 {
+		t.Fatalf("drop preset: %d %s", w.Code, w.Body)
+	}
+	pv = preview{}
+	decodeInto(call("POST", "/api/projects/"+pid+"/preview", `{"spec":{"goals":["install"]}}`), &pv)
+	if pv.Error != "" || strings.Contains(strings.Join(pv.Argv, " "), "skipTests") {
+		t.Fatalf("after preset removal: %+v", pv)
+	}
+
+	var l projectLayers
+	decodeInto(call("GET", "/api/projects/"+pid+"/layers", ""), &l)
+	if len(l.Layers) != 3 || l.Layers[0].ID != "global" || l.Layers[1].ID != "repo" || l.Layers[2].ID != "project" {
+		t.Fatalf("layers: %+v", l)
+	}
+	found := map[string][]string{}
+	for _, ly := range l.Layers {
+		for _, r := range ly.Rows {
+			found[ly.ID+"/"+r.Name] = r.Values
+		}
+	}
+	if v := found["repo/.mvn/maven.config"]; strings.Join(v, " ") != "-ntp -Dstyle.color=never" {
+		t.Fatalf("maven.config: %v (%v)", v, found)
+	}
+	if v := found["project/Profiles"]; len(v) != 1 || v[0] != "-P fast,ci" {
+		t.Fatalf("profiles: %v", v)
+	}
+	if _, ok := found["repo/Maven wrapper"]; !ok {
+		t.Fatalf("wrapper missing: %v", found)
+	}
+}
