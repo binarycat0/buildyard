@@ -1221,6 +1221,30 @@ document.addEventListener('alpine:init', () => {
       this.refreshPreview();
     },
 
+    // A copy of a saved task named "<name> (copy)", "<name> (copy 2)", …
+    async duplicateTask(t) {
+      const names = new Set(this.profiles.map((x) => x.name));
+      let name = `${t.name} (copy)`;
+      for (let i = 2; names.has(name); i++) name = `${t.name} (copy ${i})`;
+      try {
+        await api('POST', `/projects/${this.proj.id}/profiles`, { name, spec: t.spec });
+        await this.reloadTasks();
+      } catch (e) {
+        this.runError = `${t.name}: ${e.message}`;
+      }
+    },
+
+    // Copy or show a saved task's command without opening it.
+    async taskCommand(t, action) {
+      try {
+        const pv = await api('POST', `/projects/${this.proj.id}/preview`, { spec: t.spec });
+        if (action === 'copy') await this.copyCommand(pv.argv);
+        else this.showCommand(pv);
+      } catch (e) {
+        this.runError = `${t.name}: ${e.message}`;
+      }
+    },
+
     async deleteTask(t) {
       if (!confirm(`Delete task "${t.name}"? Its past runs stay in the history.`)) return;
       try {

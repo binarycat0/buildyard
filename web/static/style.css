@@ -326,3 +326,5 @@ input.profile-filter { width: 220px; }
   .seg.tiny button.on.active { background: #2b7a47; }
   .seg.tiny button.off.active { background: #a83c3c; }
 }
+.row-actions { display: inline-flex; gap: 4px; align-items: center; }
+.card.flush.tasks-card { overflow: visible; }
