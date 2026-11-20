@@ -209,3 +209,42 @@ func TestMigrateFlatSettingsToMaven(t *testing.T) {
 		t.Fatalf("old keys left: %d", n)
 	}
 }
+
+// A database where a development build applied another migration under number 10
+// (an unmerged branch) still gets job.trace_id.
+func TestColumnsAddedDespiteForeignMigrationNumber(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "by.db")
+	s, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE job DROP COLUMN trace_id`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE project ADD COLUMN task_defaults_json TEXT`); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+
+	s, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	p, err := s.CreateProject(ctx, Project{Name: "p", RootPath: "/tmp/p", BuildTool: "maven"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, err := s.CreateJob(ctx, Job{ProjectID: p.ID, Argv: []string{"mvn"}}, func(int64) string { return "/tmp/x.log" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetJobTrace(ctx, j.ID, "abc"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetJob(ctx, j.ID)
+	if err != nil || got.TraceID == nil || *got.TraceID != "abc" {
+		t.Fatalf("trace id: %v %v", got.TraceID, err)
+	}
+}
