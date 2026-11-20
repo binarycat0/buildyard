@@ -10,13 +10,29 @@
 </head>
 <body x-data="app">
   <header class="top">
-    <a href="#/" class="brand">Buildyard</a>
+    <a href="#/" class="brand" title="Projects (home)">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </span>
+      <span class="brand-text">
+        <strong>Buildyard</strong>
+        <span class="version" x-show="health" x-text="versionLabel()"></span>
+      </span>
+    </a>
     <nav>
-      <a href="#/" :class="{active: view === 'projects' || view === 'project' || view === 'job' || view === 'compare'}">Projects</a>
-      <a href="#/settings" :class="{active: view === 'settings'}">Settings</a>
       <a href="#/activity" :class="{active: view === 'activity'}" title="Background work: JDK and tool detection, module discovery">Activity<span class="nav-dot" :class="activityDot()" x-show="activityDot()"></span></a>
     </nav>
-    <span class="muted grow-right" x-text="health ? 'v' + health.version : ''"></span>
+    <div class="top-actions">
+      <a class="icon-btn" href="https://github.com/binarycat0/buildyard" target="_blank" rel="noopener" title="Buildyard on GitHub" aria-label="Buildyard on GitHub">
+        <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+      </a>
+      <a class="icon-btn" href="#/settings" :class="{active: view === 'settings'}" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <g stroke-width="3"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(45 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(90 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(135 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(180 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(225 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(270 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(315 12 12)"/></g>
+          <circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.5"/>
+        </svg>
+      </a>
+    </div>
   </header>
 
   <main>
@@ -28,24 +44,10 @@
     <section x-show="view === 'projects'">
       <div class="toolbar">
         <h1>Projects</h1>
-        <button class="primary" @click="openAdd()" x-show="!adding">Add project</button>
+        <button class="primary" @click="openAdd()">Add project</button>
       </div>
 
-      <form class="card add" x-show="adding" x-cloak @submit.prevent="add()">
-        <label>Project root path
-          <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
-        </label>
-        <label><span>Name <span class="muted">(optional, defaults to the folder name)</span></span>
-          <input x-model="form.name">
-        </label>
-        <p class="error" x-show="formError" x-text="formError"></p>
-        <div class="row">
-          <button class="primary" type="submit" :disabled="busy">Add</button>
-          <button type="button" @click="adding = false">Cancel</button>
-        </div>
-      </form>
-
-      <p class="muted" x-show="loaded && projects.length === 0 && !adding">
+      <p class="muted" x-show="loaded && projects.length === 0">
         No projects yet. Add a folder with a pom.xml.
       </p>
 
@@ -83,68 +85,117 @@
       <template x-if="proj">
         <div class="stack">
           <div class="projhead">
-            <div class="toolbar">
+            <div class="row">
               <h1 x-text="proj.name"></h1>
-              <code class="path" x-text="proj.rootPath"></code>
+              <button type="button" class="icon" @click="openProjectSettings()" title="Edit the project" aria-label="Edit the project"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
             </div>
-            <div class="uses small" x-show="runtime">
-              <span class="muted">Runs with</span>
-              <span x-show="runtime?.executable" :title="runtime?.executable?.reason + (runtime?.executableFrom === 'default' ? ', global Maven default' : '')">
-                <strong x-text="runtime?.executable?.kind === 'wrapper' ? './mvnw' : runtime?.executable?.kind"></strong>
-                <code class="muted" x-text="runtime?.executable?.path"></code></span>
-              <span class="error" x-show="runtime?.executableError" x-text="runtime?.executableError"></span>
-              <span class="muted">·</span>
-              <span x-show="runtime?.jdk" :title="runtime?.jdk?.home"><strong x-text="runtime?.jdk && jdkLabel(runtime.jdk)"></strong>
-                <span class="muted" x-text="'(' + jdkFromText(runtime?.jdkFrom) + ')'"></span></span>
-              <span x-show="runtime && !runtime.jdk" class="muted" x-text="'Daemon JAVA_HOME' + (tools.javaHome ? ': ' + tools.javaHome : ' (not set)')"></span>
-              <a class="small" :href="'#/projects/' + proj.id + '/settings'" x-show="pview !== 'settings'">change</a>
+            <div class="facts small">
+              <code class="path" :title="proj.rootPath" x-text="proj.rootPath"></code>
+              <span class="fact" title="Build tool"><span class="badge" x-text="proj.buildTool"></span>
+                <strong x-show="runtime?.executable" x-text="runtime?.executable?.kind === 'wrapper' ? './mvnw' : runtime?.executable?.kind"></strong>
+                <span class="error" x-show="runtime?.executableError" x-text="runtime?.executableError"></span>
+                <span class="menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+                  <button type="button" class="icon tiny" @click="open = !open" :aria-expanded="open" title="Build tool settings" aria-label="Build tool settings"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+                  <div class="menu-list popover" x-show="open" x-cloak>
+                    <dl class="kv-list">
+                      <dt>Executable</dt><dd><code x-text="runtime?.executable?.path || '—'"></code>
+                        <div class="muted" x-text="(runtime?.executable?.reason || '') + (runtime?.executableFrom === 'default' ? ' (global Maven default)' : runtime?.executableFrom === 'project' ? ' (set on the project)' : '')"></div></dd>
+                      <dt x-show="runtime?.wrapper">Wrapper</dt><dd x-show="runtime?.wrapper" x-text="runtime?.wrapper?.mavenVersion ? 'Maven ' + runtime.wrapper.mavenVersion : './mvnw'"></dd>
+                      <dt>JDK</dt><dd><span x-text="runtime?.jdk ? jdkLabel(runtime.jdk) + ' (' + jdkFromText(runtime?.jdkFrom) + ')' : 'Daemon JAVA_HOME' + (tools.javaHome ? ': ' + tools.javaHome : ' (not set)')"></span>
+                        <div class="muted"><code x-text="runtime?.jdk?.home || ''"></code></div></dd>
+                      <dt>CPU</dt><dd x-text="projectDefault('cpu').replace(/^Project default \((.*)\)$/, '$1')"></dd>
+                      <dt>Memory</dt><dd x-text="projectDefault('heap').replace(/^Project default \((.*)\)$/, '$1')"></dd>
+                      <dt>Test JVMs</dt><dd x-text="projectDefault('forks').replace(/^Project default \((.*)\)$/, '$1')"></dd>
+                      <dt>Env</dt><dd><template x-for="(v, k) in proj.env || {}" :key="k"><div><code x-text="k + '=' + v"></code></div></template>
+                        <span class="muted" x-show="!Object.keys(proj.env || {}).length">none</span></dd>
+                      <dt>Skips</dt><dd x-text="skipPresets.map((sp) => sp.label || sp.id).join(', ') || 'none'"></dd>
+                    </dl>
+                    <div class="row">
+                      <button type="button" class="small" @click="open = false; openProjectSettings('maven')">Edit project</button>
+                      <a class="button small" href="#/settings/maven">Global Maven settings</a>
+                    </div>
+                  </div>
+                </span>
+              </span>
+              <span class="fact" :title="runtime?.jdk?.home || 'JDK'">JDK
+                <strong x-text="runtime?.jdk ? (runtime.jdk.version || '?') : 'JAVA_HOME'"></strong>
+                <span class="muted" x-show="runtime?.jdk" x-text="runtime?.jdk && (runtime.jdk.name || runtime.jdk.vendor || '')"></span></span>
             </div>
           </div>
+          <div class="card flush active-jobs" x-show="activeJobs().length">
+            <table class="list">
+              <tbody>
+                <template x-for="j in activeJobs()" :key="j.id">
+                  <tr>
+                    <td class="nowrap"><a :href="'#/jobs/' + j.id" class="status-link"><span class="status" :class="j.status" x-text="j.status"></span></a></td>
+                    <td class="nowrap"><a :href="'#/jobs/' + j.id" x-text="'#' + j.id"></a></td>
+                    <td class="grow-cell"><a :href="'#/jobs/' + j.id" class="plain" x-text="jobTaskName(j)"></a></td>
+                    <td class="nowrap muted small" x-text="j.startedAt ? 'started ' + when(j.startedAt) : 'queued ' + when(j.queuedAt)"></td>
+                    <td class="nowrap small" x-text="duration(j)"></td>
+                    <td class="actions nowrap">
+                      <a class="button small" :href="'#/jobs/' + j.id">Log</a>
+                      <button class="small" x-show="j.status === 'queued'" @click="controlJob('stop', j)">Cancel</button>
+                      <button class="small" x-show="j.status === 'running' && !j.stopRequestedAt" @click="controlJob('stop', j)" title="Graceful, like Ctrl+C">Stop</button>
+                      <button class="small danger" x-show="j.status === 'running'" @click="controlJob('kill', j)" title="SIGKILL at once">Kill</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
           <nav class="tabs page-tabs">
-            <a :href="'#/projects/' + proj.id" :class="{active: pview === 'run'}">Run</a>
+            <a :href="'#/projects/' + proj.id" :class="{active: pview === 'run'}">Tasks<span class="count" x-show="profiles.length" x-text="profiles.length"></span></a>
             <a :href="'#/projects/' + proj.id + '/history'" :class="{active: pview === 'history'}">History</a>
-            <a :href="'#/projects/' + proj.id + '/settings'" :class="{active: pview === 'settings'}">Settings</a>
           </nav>
 
           <!-- Run -->
-          <div class="run-layout" x-show="pview === 'run'">
-            <aside class="card tasks">
-              <h2>Tasks</h2>
-              <p class="muted small" x-show="!profiles.length">No saved tasks yet. Set up a run on the right and save it as a task.</p>
-              <template x-for="t in profiles" :key="t.id">
-                <div class="task" :class="{active: editingTask?.id === t.id}">
-                  <div class="row spread">
-                    <button type="button" class="link pin" :class="{on: t.pinned}" @click="togglePin(t)" :title="t.pinned ? 'Unpin' : 'Pin to the top'">★</button>
-                    <a href="javascript:void 0" class="grow" @click="editTask(t)" x-text="t.name" title="Load into the form"></a>
-                    <button type="button" class="small primary" @click="runTask(t)" :disabled="busy">Run</button>
-                  </div>
-                  <div class="tags">
-                    <template x-for="(g, i) in taskTags(t.spec)" :key="i">
-                      <span class="tag" :class="g.cls" :title="g.title || ''" x-text="g.text"></span>
-                    </template>
-                  </div>
-                  <div class="row small" x-show="t.lastJob">
-                    <a :href="'#/jobs/' + t.lastJob?.id"><span class="status" :class="t.lastJob?.status" x-text="t.lastJob?.status"></span></a>
-                    <span class="muted" x-text="t.lastJob && when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt)"></span>
-                  </div>
-                </div>
-              </template>
-            </aside>
+          <div class="stack" x-show="pview === 'run'">
+            <div class="row">
+              <button type="button" class="primary" @click="openNewTask()">New task</button>
+              <span class="error small" x-show="runError && !$refs.taskDialog?.open" x-text="runError"></span>
+            </div>
+            <p class="muted" x-show="!profiles.length">No saved tasks yet. Create one with New task, then run it from this list.</p>
+            <div class="card flush" x-show="profiles.length">
+              <table class="list tasks">
+                <thead><tr><th></th><th></th><th>Task</th><th>Command</th><th>Last run</th><th></th></tr></thead>
+                <tbody>
+                  <template x-for="t in profiles" :key="t.id">
+                    <tr>
+                      <td class="pin-cell"><button type="button" class="link pin" :class="{on: t.pinned}" @click="togglePin(t)" :title="t.pinned ? 'Unpin' : 'Pin to the top'">★</button></td>
+                      <td class="run-cell"><button type="button" class="small primary runbtn" @click="runTask(t)" :disabled="busy" :title="'Run ' + t.name"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg> Run</button></td>
+                      <td class="nowrap"><a href="javascript:void 0" @click="openEditTask(t)" x-text="t.name" title="Edit the task"></a></td>
+                      <td><div class="tags">
+                        <template x-for="(g, i) in taskTags(t.spec)" :key="i">
+                          <span class="tag" :class="g.cls" :title="g.title || ''" x-text="g.text"></span>
+                        </template></div></td>
+                      <td class="nowrap">
+                        <template x-if="t.lastJob"><a :href="'#/jobs/' + t.lastJob.id" class="status-link"><span class="status" :class="t.lastJob.status" x-text="t.lastJob.status"></span></a></template>
+                        <span class="muted small" x-text="t.lastJob ? when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt) : 'never'"></span>
+                      </td>
+                      <td class="actions nowrap">
+                        <button type="button" class="icon small" @click="openEditTask(t)" title="Edit the task" aria-label="Edit the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-            <form class="card runform" @submit.prevent="runJob()">
+          <dialog class="modal wide" x-ref="taskDialog" @close="stopEditing()">
+            <form class="card runform" @submit.prevent="editingTask ? updateTask() : createTask()">
               <div class="runbar">
-                <button class="primary runbtn" type="submit" :disabled="busy || !!rpreview?.error" title="Run this build"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg> Run</button>
                 <div class="runtitle">
                   <template x-if="editingTask">
                     <span class="row" title="Editing a saved task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> <strong x-text="editingTask?.name"></strong></span>
                   </template>
-                  <span class="muted" x-show="!editingTask">New run</span>
+                  <strong x-show="!editingTask">New task</strong>
                 </div>
                 <span class="grow"></span>
-                <button type="button" class="icon" @click="editingTask ? updateTask() : (saveAsNew = true)" :disabled="busy || !!rpreview?.error"
+                <button type="button" class="icon" x-show="editingTask" @click="updateTask()" :disabled="busy || !!rpreview?.error"
                   :title="editingTask ? 'Save changes to this task' : 'Save as a task'" :aria-label="editingTask ? 'Save task' : 'Save as task'"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9l2 2v9h-11z M5 2.5v3.5h5V2.5 M4.5 13.5V9h7v4.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
                 <button type="button" class="icon danger" x-show="editingTask" @click="deleteTask(editingTask)" title="Delete this task" aria-label="Delete task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                <button type="button" class="icon" x-show="editingTask" @click="stopEditing()" title="Close the task (keep the form)" aria-label="Close task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+                <button type="button" class="icon" @click="$refs.taskDialog.close()" title="Close" aria-label="Close"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
                 <div class="menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
                   <button type="button" class="icon" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
                   <div class="menu-list" x-show="open" x-cloak @click="open = false">
@@ -155,10 +206,10 @@
                   </div>
                 </div>
               </div>
-              <div class="row" x-show="saveAsNew">
+              <div class="row" x-show="saveAsNew || !editingTask">
                 <input class="grow" x-model="taskName" placeholder="Task name, e.g. Fast core build" @keydown.enter.prevent="createTask()" @keydown.escape="saveAsNew = false" x-effect="saveAsNew && $nextTick(() => $el.focus())">
                 <button type="button" class="primary" @click="createTask()">Save</button>
-                <button type="button" @click="saveAsNew = false">Cancel</button>
+                <button type="button" x-show="editingTask" @click="saveAsNew = false">Cancel</button>
               </div>
               <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
 
@@ -354,7 +405,7 @@
               </label>
               </div>
             </form>
-          </div>
+          </dialog>
 
           <!-- History -->
           <div class="card" x-show="pview === 'history'">
@@ -386,8 +437,12 @@
             </table>
           </div>
 
-          <div class="stack" x-show="pview === 'settings'">
-          <form class="card" @submit.prevent="saveProject()">
+          <dialog class="modal wide" x-ref="projDialog" @close="if (pview === 'settings') location.hash = '#/projects/' + proj.id">
+          <form class="stack" @submit.prevent="saveProject()">
+            <div class="row spread">
+              <h2>Project settings</h2>
+              <button type="button" class="icon" @click="$refs.projDialog.close()" title="Close" aria-label="Close"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+            </div>
             <nav class="tabs" role="tablist">
               <button type="button" role="tab" :class="{active: ptab === 'general'}" @click="ptab = 'general'">General</button>
               <button type="button" role="tab" :class="{active: ptab === 'jdk'}" @click="ptab = 'jdk'">JDK</button>
@@ -496,12 +551,12 @@
             </div>
 
             <p class="error" x-show="pformError" x-text="pformError"></p>
-            <div class="row">
+            <div class="row end">
+              <button type="button" @click="$refs.projDialog.close()">Cancel</button>
               <button class="primary" type="submit" :disabled="busy">Save</button>
-              <span class="muted" x-show="saved">Saved</span>
             </div>
           </form>
-          </div>
+          </dialog>
         </div>
       </template>
     </section>
@@ -999,6 +1054,23 @@
       </template>
     </section>
   </main>
+
+  <dialog class="modal narrow" x-ref="addDialog" @close="adding = false" @click="if ($event.target === $el) $el.close()">
+    <form class="stack" @submit.prevent="add()">
+      <h2>Add project</h2>
+      <label>Project root path
+        <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
+      </label>
+      <label><span>Name <span class="muted">(optional, defaults to the folder name)</span></span>
+        <input x-model="form.name">
+      </label>
+      <p class="error" x-show="formError" x-text="formError"></p>
+      <div class="row end">
+        <button type="button" @click="$refs.addDialog.close()">Cancel</button>
+        <button class="primary" type="submit" :disabled="busy">Add</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog class="modal" x-ref="cmdDialog" @close="cmdShown = null" @click="if ($event.target === $el) $el.close()">
     <div class="stack" x-show="cmdShown">
