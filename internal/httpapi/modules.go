@@ -84,7 +84,7 @@ func (s *Server) refreshModules(w http.ResponseWriter, r *http.Request) {
 func (s *Server) SubmitModuleDiscovery(p store.Project, spec maven.RunSpec) (any, error) {
 	key := TaskModulesDiscover + ":" + strconv.FormatInt(p.ID, 10)
 	return s.Tasks.Submit(TaskModulesDiscover, key, func(ctx context.Context) (any, error) {
-		return s.discover(ctx, p, spec.Normalize().WithTaskDefaults(taskDefaultsFor(p)))
+		return s.discover(ctx, p, spec.Normalize())
 	})
 }
 

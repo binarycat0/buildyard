@@ -303,20 +303,3 @@ dialog .card.runform { border: 0; padding: 0; background: none; }
 .active-jobs tr:last-child td { border-bottom: 0; }
 a.plain { color: var(--fg); text-decoration: none; }
 a.plain:hover { text-decoration: underline; }
-
-/* Project configuration layers */
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
-td.center { text-align: center; }
-table.layers th.layer-name { vertical-align: top; text-align: left; font-weight: normal; width: 210px; border-right: 1px solid var(--border); }
-table.layers tbody + tbody { border-top: 2px solid var(--border); }
-table.layers td { vertical-align: top; }
-table.layers code.path { font-size: .85em; overflow-wrap: anywhere; }
-table.layers tr.overridden .c-val code, table.layers tr.overridden .c-name { text-decoration: line-through; color: var(--muted); }
-table.layers tr.unused td { color: var(--muted); }
-.layer-step { display: inline-block; width: 1.4em; height: 1.4em; line-height: 1.4em; text-align: center; border-radius: 50%; border: 1px solid var(--border); font-size: .8em; color: var(--muted); }
-code.tok.proj { border-style: dashed; color: #7a5a00; border-color: #c9a227; }
-@media (prefers-color-scheme: dark) { code.tok.proj { color: #e2c46b; border-color: #a8872a; } }
-label.inherited { color: var(--muted); }
-.inherited-line { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; margin: 0; }
-table.layers .c-val code { font-size: .85em; }

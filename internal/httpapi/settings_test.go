@@ -149,12 +149,12 @@ func TestJDKDetectSettingsAndRuntime(t *testing.T) {
 		t.Fatalf("project jdk: %+v", info)
 	}
 
-	// A tool JDK left from before projects had one JDK still wins.
+	// The build tool's own JDK beats the project JDK.
 	j17p := strconv.FormatInt(jdks[1].ID, 10)
 	call("PATCH", "/api/projects/"+strconv.FormatInt(p.ID, 10), `{"toolJdkId":`+j17p+`}`)
 	info = runtimeInfo{}
 	decodeInto(call("GET", rt, ""), &info)
-	if info.JDK == nil || info.JDK.Major != 17 || info.JDKFrom != "project" {
+	if info.JDK == nil || info.JDK.Major != 17 || info.JDKFrom != "tool" || info.ProjectJDK == nil || info.ProjectJDK.Major != 21 {
 		t.Fatalf("tool jdk: %+v", info)
 	}
 	if w := call("PATCH", "/api/projects/"+strconv.FormatInt(p.ID, 10), `{"toolJdkId":99999}`); w.Code != 400 {

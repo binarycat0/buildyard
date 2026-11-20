@@ -75,11 +75,6 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	p0, err := s.Store.GetProject(r.Context(), id)
-	if err != nil {
-		s.respondProject(w, p0, err)
-		return
-	}
 	var patch store.ProjectPatch
 	if err := decode(r, &patch); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON: "+err.Error())
@@ -110,28 +105,6 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 			return
 		}
-	}
-	if patch.TaskDefaults != nil {
-		var d maven.TaskDefaults
-		if json.Unmarshal(*patch.TaskDefaults, &d) != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "taskDefaults must be {profiles, properties, skips}")
-			return
-		}
-		// Checked against the presets the same request saves, if any.
-		presets := presetsFor(p0)
-		if patch.SkipPresets != nil {
-			var own []maven.SkipPreset
-			_ = json.Unmarshal(*patch.SkipPresets, &own)
-			presets = maven.MergePresets(own)
-		}
-		d = d.Normalize()
-		if err := d.Validate(presets); err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-			return
-		}
-		b, _ := json.Marshal(d)
-		raw := json.RawMessage(b)
-		patch.TaskDefaults = &raw
 	}
 	if patch.Executable != nil && *patch.Executable != "" && !maven.ValidMode(*patch.Executable) {
 		writeError(w, http.StatusBadRequest, "bad_request", "executable must be auto, wrapper, mvnd, mvn or an absolute path")
