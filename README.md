@@ -4,26 +4,28 @@ A personal build manager for Maven projects: a local daemon with a web UI.
 
 Documentation: https://tools.binaryc.at/buildyard
 
-## Install
+## Quick start
 
 macOS or Linux, from a release (no Go needed):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/binarycat0/buildyard/main/install.sh | sh
-```
-
-Quick start
-
-```sh
 buildyard service install   # launchd agent (macOS) or systemd --user unit (Linux)
-buildyard service start     # then open http://127.0.0.1:7777/
+buildyard service start
+buildyard open              # http://127.0.0.1:7777/
 ```
 
-The script checks the release's SHA-256, installs the binary to `~/.buildyard/bin` and links it from `~/.local/bin` (no sudo). Run it again to upgrade; a running service is restarted. `BUILDYARD_VERSION=v0.1.0` pins a release, `BUILDYARD_BIN_DIR` changes where the link goes. From a checkout, `make install` does the same with a local build.
+In the UI, **Add project** with the path to a project root, create a task with **New task** (modules, skips, arguments, resources) and press **Run** next to it.
 
-The service runs `buildyard serve --service` with the `PATH`, `JAVA_HOME` and `BUILDYARD_HOME` of the shell that ran `service install`, so it finds mvn, mvnd and java the way that shell does; run `service install` again after changing them. Its output goes to `~/.buildyard/daemon.log`. `buildyard service stop|restart|status|uninstall` manage it; stopping it interrupts running builds.
+## Install
 
-To uninstall: `make uninstall`, or `buildyard service uninstall` and then delete `~/.local/bin/buildyard` and `~/.buildyard`.
+The install script checks the release's SHA-256, installs the binary to `~/.buildyard/bin` and links it from `~/.local/bin` (no sudo). Run it again to upgrade; a running service is restarted. `BUILDYARD_VERSION=v0.1.0` pins a release, `BUILDYARD_BIN_DIR` changes where the link goes.
+
+The service runs `buildyard serve --service` with the `PATH`, `JAVA_HOME` and `BUILDYARD_HOME` of the shell that ran `service install`, so it finds mvn, mvnd and java the way that shell does; run `service install` again after changing them. `buildyard service stop|restart|status|uninstall` manage it; stopping it interrupts running builds.
+
+Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db` and `daemon.log` (the service's output). Settings → General edits `maxConcurrentJobs` and `retention.jobsPerProject` in `config.toml` and applies them at once (saving drops comments in the file); after editing the file by hand, `kill -HUP <pid>` reloads it. The port needs a restart.
+
+To uninstall: `buildyard service uninstall`, then delete `~/.local/bin/buildyard` and `~/.buildyard`.
 
 ## CLI
 
@@ -44,23 +46,26 @@ buildyard cancel 42
 
 ### Prerequisites
 
+- Go 1.26+
+- Maven, only for `make ext` (the extension jar is committed)
+- Docker or Podman, only for the docs site
 
 ### Build and run
 
-Requires Go 1.26+.
-
 ```sh
-make build              # bin/buildyard (no cgo needed)
-make test               # go vet, go test -race
-./bin/buildyard serve   # listens on 127.0.0.1:7777, open http://127.0.0.1:7777/
-./bin/buildyard open    # open the UI in the browser
+make build    # bin/buildyard (no cgo needed)
+make test     # go vet, go test -race
+make install  # like the install script, from this checkout
+make uninstall
 ```
 
-A second instance for development: `BUILDYARD_HOME=/tmp/by-test ./bin/buildyard serve --port 7790`.
+Run a second instance next to the installed service, with its own data: `BUILDYARD_HOME=/tmp/by-test ./bin/buildyard serve --port 7790`.
 
-Releases: push a `v*` tag, or run the **Release** workflow on `main` with a version such as `v0.1.0`. It builds darwin and linux binaries (amd64, arm64) with checksums. CI runs gofmt, vet and race tests on every pull request.
+`make ext` rebuilds the Maven extension in `maven-ext/`. `make docs` builds the docs site into `site/` and `make docs-serve` previews it on http://127.0.0.1:8000; the home page is generated from this README.
 
-Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db`, `daemon.log`. Settings → General edits `maxConcurrentJobs` and `retention.jobsPerProject` in `config.toml` and applies them at once (saving drops comments in the file); after editing the file by hand, `kill -HUP <pid>` reloads it. The port needs a restart.
+### CI and releases
+
+CI runs gofmt, vet and race tests on every pull request. To release, push a `v*` tag or run the **Release** workflow on `main` with a version such as `v0.1.0`; it builds darwin and linux binaries (amd64, arm64) with checksums. The docs site deploys when a push to `main` changes the README, `install.sh` or the docs setup.
 
 ## License
 
