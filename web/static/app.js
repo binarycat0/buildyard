@@ -374,6 +374,11 @@ document.addEventListener('alpine:init', () => {
     pformError: '',
 
     ptab: 'general',
+    buildTools: [
+      { id: 'maven', label: 'Maven', supported: true },
+      { id: 'gradle', label: 'Gradle', supported: false },
+      { id: 'bazel', label: 'Bazel', supported: false },
+    ],
     pview: 'run',
     pjobs: [],
     commonGoals: ['clean', 'compile', 'test', 'package', 'verify', 'install'],
@@ -608,8 +613,9 @@ document.addEventListener('alpine:init', () => {
         name: p.name,
         execChoice: known ? exe : 'custom',
         customPath: known ? '' : exe,
-        jdkId: p.jdkId ?? 0,
-        toolJdkId: p.toolJdkId ?? 0,
+        buildTool: p.buildTool,
+        // One JDK per project: a Maven JDK set before is the one runs used, so it is shown.
+        jdkId: p.toolJdkId ?? p.jdkId ?? 0,
         presets: this.skipPresets.map((sp) => ({
           id: sp.id, label: sp.label, argsText: sp.args.join(' '),
           builtin: this.defaultPresets.some((d) => d.id === sp.id),
@@ -622,7 +628,7 @@ document.addEventListener('alpine:init', () => {
 
     openProjectSettings(tab) {
       this.resetProjectForm();
-      if (tab) this.ptab = tab;
+      this.ptab = tab || 'general';
       this.$refs.projDialog.showModal();
     },
 
@@ -635,7 +641,7 @@ document.addEventListener('alpine:init', () => {
         const executable = f.execChoice === 'custom' ? f.customPath.trim() : f.execChoice;
         if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Enter an absolute path to the executable');
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
-          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: Number(f.toolJdkId) || 0,
+          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: 0,
           env: textToEnv(f.envText), skipPresets: this.presetDiff(f.presets),
           resources: {
             threads: joinChoice('cpu', f.cpu, f.cpuCustom),
@@ -1829,15 +1835,8 @@ document.addEventListener('alpine:init', () => {
       return j ? this.jdkLabel(j) : fallback;
     },
 
-    // What "JDK for Maven: use the project JDK" resolves to in the project form.
-    toolJdkFallbackText() {
-      const pid = Number(this.pform.jdkId) || 0;
-      if (pid) return 'Project JDK: ' + this.jdkText(pid, '?');
-      return 'Global Maven default: ' + this.jdkText(this.maven().jdkId, 'daemon JAVA_HOME');
-    },
-
     jdkFromText(from) {
-      return { tool: 'Maven tab', project: 'project JDK', default: 'global Maven default' }[from] ?? '';
+      return { tool: 'set on the project', project: 'set on the project', default: 'global default' }[from] ?? '';
     },
 
     jdkLabel(j) {

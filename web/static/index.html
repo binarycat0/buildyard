@@ -85,9 +85,12 @@
       <template x-if="proj">
         <div class="stack">
           <div class="projhead">
-            <div class="row">
+            <div class="row spread">
               <h1 x-text="proj.name"></h1>
-              <button type="button" class="icon" @click="openProjectSettings()" title="Edit the project" aria-label="Edit the project"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
+              <button type="button" class="icon" @click="openProjectSettings()" title="Project settings" aria-label="Project settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <g stroke-width="3"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(45 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(90 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(135 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(180 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(225 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(270 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(315 12 12)"/></g>
+                <circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.5"/>
+              </svg></button>
             </div>
             <div class="facts small">
               <code class="path" :title="proj.rootPath" x-text="proj.rootPath"></code>
@@ -111,7 +114,7 @@
                       <dt>Skips</dt><dd x-text="skipPresets.map((sp) => sp.label || sp.id).join(', ') || 'none'"></dd>
                     </dl>
                     <div class="row">
-                      <button type="button" class="small" @click="open = false; openProjectSettings('maven')">Edit project</button>
+                      <button type="button" class="small" @click="open = false; openProjectSettings('tool')">Edit project</button>
                       <a class="button small" href="#/settings/maven">Global Maven settings</a>
                     </div>
                   </div>
@@ -323,7 +326,7 @@
                 </div>
               </div>
               <div class="stack tabbody" x-show="rtab === 'skip'">
-                <p class="muted small" x-show="!skipPresets.length">No skip presets. Add them in Settings → Maven.</p>
+                <p class="muted small" x-show="!skipPresets.length">No skip presets. Add them in the project settings, Build tool tab.</p>
                 <div class="row wrap">
                   <template x-for="sp in skipPresets" :key="sp.id">
                     <label class="radio" :title="sp.args.join(' ') + (sp.note ? ' — ' + sp.note : '')">
@@ -445,30 +448,33 @@
             </div>
             <nav class="tabs" role="tablist">
               <button type="button" role="tab" :class="{active: ptab === 'general'}" @click="ptab = 'general'">General</button>
-              <button type="button" role="tab" :class="{active: ptab === 'jdk'}" @click="ptab = 'jdk'">JDK</button>
-              <button type="button" role="tab" :class="{active: ptab === 'maven'}" @click="ptab = 'maven'">Maven</button>
+              <button type="button" role="tab" :class="{active: ptab === 'tool'}" @click="ptab = 'tool'">Build tool</button>
             </nav>
 
             <div class="stack" x-show="ptab === 'general'">
               <label>Name <input x-model="pform.name" required></label>
-              <label><span>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span></span>
-                <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
-              </label>
-            </div>
-
-            <div class="stack" x-show="ptab === 'jdk'">
-              <label>Project JDK
+              <label>JDK
                 <select x-model.number="pform.jdkId">
-                  <option value="0" x-text="'Not set (use the build tool default: ' + jdkText(maven().jdkId, 'daemon JAVA_HOME') + ')'"></option>
+                  <option value="0" x-text="'Global default (' + jdkText(maven().jdkId, 'daemon JAVA_HOME') + ')'"></option>
                   <template x-for="j in jdks" :key="j.id">
                     <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.jdkId"></option>
                   </template>
                 </select>
               </label>
-              <p class="muted small">Build tools run on the project JDK unless their own tab picks a different one.</p>
+              <label><span>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span></span>
+                <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
+              </label>
             </div>
 
-            <div class="stack" x-show="ptab === 'maven'">
+            <div class="stack" x-show="ptab === 'tool'">
+              <label>Build tool
+                <select x-model="pform.buildTool">
+                  <template x-for="t in buildTools" :key="t.id">
+                    <option :value="t.id" :disabled="!t.supported" :selected="t.id === pform.buildTool" x-text="t.label + (t.supported ? '' : ' (not supported yet)')"></option>
+                  </template>
+                </select>
+              </label>
+              <template x-if="pform.buildTool === 'maven'"><div class="stack">
               <fieldset>
                 <legend>Executable</legend>
                 <label class="radio"><input type="radio" value="" x-model="pform.execChoice">
@@ -540,14 +546,7 @@
                 </div>
               </fieldset>
 
-              <label>JDK for Maven
-                <select x-model.number="pform.toolJdkId">
-                  <option value="0" x-text="toolJdkFallbackText()"></option>
-                  <template x-for="j in jdks" :key="j.id">
-                    <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.toolJdkId"></option>
-                  </template>
-                </select>
-              </label>
+              </div></template>
             </div>
 
             <p class="error" x-show="pformError" x-text="pformError"></p>
