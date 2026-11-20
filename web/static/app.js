@@ -319,6 +319,7 @@ const SETTINGS_TABS = [
   { id: 'mvnd', name: 'mvnd' },
   { id: 'gradle', name: 'Gradle' },
   { id: 'bazel', name: 'Bazel' },
+  { id: 'observability', name: 'Observability' },
 ];
 
 // key=value / key: value / key value; comments (# or !) do not match.
@@ -442,6 +443,10 @@ document.addEventListener('alpine:init', () => {
     btasks: [],
     cform: null,
     cfgSaved: false,
+    oform: null, // Observability tab: telemetry settings being edited
+    otel: null, // saved telemetry settings and export status
+    otelMsg: '',
+    otelTesting: false,
     stab: 'maven', // Settings tab
     settingsTabs: SETTINGS_TABS,
     cfgs: [], // config files of the build tools, with editor state
@@ -1424,6 +1429,7 @@ document.addEventListener('alpine:init', () => {
       closeStream();
       const job = await api('GET', `/jobs/${id}`);
       this.job = job;
+      if (job.traceId && !this.otel) api('GET', '/telemetry').then((t) => { this.otel = t; }).catch(() => {});
       this.setMods([]);
       this.jobProblems = [];
       this.probOpen = {};
@@ -1919,6 +1925,9 @@ document.addEventListener('alpine:init', () => {
       Object.assign(this, { settings, tools, jdks, managers });
       this.cform = await api('GET', '/config');
       this.cfgSaved = false;
+      this.otel = await api('GET', '/telemetry');
+      this.oform = this.otelForm(this.otel);
+      this.otelMsg = '';
       const mv = settings.tools?.maven ?? {};
       this.sform = { maven: { executable: mv.executable || 'auto', jdkId: mv.jdkId ?? 0 } };
       await this.loadCfgs();
@@ -1999,6 +2008,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     tabDirty(tab) {
+      if (tab === 'observability') return this.otelDirty();
       return this.cfgs.some((f) => f.tool === tab && this.cfgDirty(f));
     },
 
@@ -2117,6 +2127,87 @@ document.addEventListener('alpine:init', () => {
       } finally {
         this.busy = false;
       }
+    },
+
+    // ---------- observability ----------
+    otelForm(t) {
+      const headers = Object.entries(t.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n');
+      return { enabled: t.enabled, endpoint: t.endpoint, traces: t.traces, logs: t.logs, parseLogs: t.parseLogs,
+        serviceName: t.serviceName, grafanaUrl: t.grafanaUrl, headers };
+    },
+
+    otelBody() {
+      const f = this.oform;
+      const headers = {};
+      for (const line of f.headers.split('\n')) {
+        const i = line.indexOf(':');
+        if (i > 0) headers[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      }
+      return { enabled: f.enabled, endpoint: f.endpoint.trim(), traces: f.traces, logs: f.logs, parseLogs: f.parseLogs,
+        serviceName: f.serviceName.trim(), grafanaUrl: f.grafanaUrl.trim(), headers };
+    },
+
+    otelDirty() {
+      return !!this.oform && !!this.otel && JSON.stringify(this.otelForm(this.otel)) !== JSON.stringify(this.oform);
+    },
+
+    async saveTelemetry() {
+      this.busy = true;
+      this.otelMsg = '';
+      try {
+        this.otel = await api('PUT', '/telemetry', this.otelBody());
+        this.oform = this.otelForm(this.otel);
+        this.otelMsg = 'Saved. Builds that start from now on use these settings.';
+      } catch (e) {
+        this.otelMsg = e.message;
+      } finally {
+        this.busy = false;
+      }
+    },
+
+    async testTelemetry() {
+      this.otelTesting = true;
+      this.otelMsg = '';
+      try {
+        const task = await api('POST', '/telemetry/test', this.otelBody());
+        const t = await waitTask(task.id, { timeout: 30000 });
+        this.otelMsg = t.status === 'failed' ? 'Test failed: ' + t.error
+          : 'The collector accepted a test span and log record (service "' + (this.oform.serviceName || 'buildyard') + '").';
+      } catch (e) {
+        this.otelMsg = e.message;
+      } finally {
+        this.otelTesting = false;
+      }
+    },
+
+    async refreshTelemetryStatus() {
+      try {
+        const t = await api('GET', '/telemetry');
+        this.otel = { ...this.otel, status: t.status };
+      } catch (e) {
+        this.otelMsg = e.message;
+      }
+    },
+
+    otelStatusText() {
+      const s = this.otel?.status;
+      if (!s) return '';
+      const parts = [`Sent ${s.sentSpans} spans and ${s.sentLogs} log records since the daemon started`];
+      if (s.queuedSpans || s.queuedLogs) parts.push(`queued ${s.queuedSpans} spans, ${s.queuedLogs} logs`);
+      if (s.droppedSpans || s.droppedLogs) parts.push(`dropped ${s.droppedSpans} spans, ${s.droppedLogs} logs`);
+      if (s.lastOk) parts.push('last export ' + this.when(s.lastOk));
+      return parts.join(' · ');
+    },
+
+    // Grafana Explore with the job's trace (Tempo data source "tempo", as in grafana/otel-lgtm).
+    traceLink(job) {
+      const base = this.otel?.grafanaUrl;
+      if (!base || !job?.traceId) return '';
+      const from = job.queuedAt ? new Date(job.queuedAt).getTime() - 60000 : 'now-7d';
+      const to = job.finishedAt ? new Date(job.finishedAt).getTime() + 60000 : 'now';
+      const panes = { t: { datasource: 'tempo', queries: [{ refId: 'A', datasource: { type: 'tempo', uid: 'tempo' }, queryType: 'traceql', query: job.traceId }],
+        range: { from: String(from), to: String(to) } } };
+      return `${base}/explore?schemaVersion=1&orgId=1&panes=${encodeURIComponent(JSON.stringify(panes))}`;
     },
 
     async detect() {

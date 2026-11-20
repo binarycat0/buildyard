@@ -51,8 +51,34 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	_, err = p.Up(ctx)
-	return err
+	if _, err = p.Up(ctx); err != nil {
+		return err
+	}
+	return ensureColumns(ctx, db)
+}
+
+// columns are added by migrations, listed again here so a database whose version
+// table already counts that migration number gets them anyway. That happens when a
+// development build applied a different migration under the same number (a branch
+// that was never merged): goose then skips the real one.
+var columns = []struct{ table, column, ddl string }{
+	{"job", "trace_id", "ALTER TABLE job ADD COLUMN trace_id TEXT"},
+}
+
+func ensureColumns(ctx context.Context, db *sql.DB) error {
+	for _, c := range columns {
+		var n int
+		err := db.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info(?) WHERE name = ?`, c.table, c.column).Scan(&n)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			if _, err := db.ExecContext(ctx, c.ddl); err != nil {
+				return fmt.Errorf("add %s.%s: %w", c.table, c.column, err)
+			}
+		}
+	}
+	return nil
 }
 
 // Close closes the database.

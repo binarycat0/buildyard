@@ -31,6 +31,7 @@ type Job struct {
 	StartedAt  *time.Time      `json:"startedAt"`
 	FinishedAt *time.Time      `json:"finishedAt"`
 	GitHead    *string         `json:"gitHead"`
+	TraceID    *string         `json:"traceId"` // OpenTelemetry trace, when the job was exported
 	LogPath    string          `json:"-"`
 	LogLines   int             `json:"logLines"`
 }
@@ -45,7 +46,7 @@ func (j Job) Finished() bool {
 }
 
 const jobCols = `id, project_id, profile_id, spec_json, argv_json, status, exit_code,
-	queued_at, started_at, finished_at, git_head, log_path, log_lines`
+	queued_at, started_at, finished_at, git_head, log_path, log_lines, trace_id`
 
 // nowNano uses fixed-width fractions so job times sort correctly as text.
 func nowNano() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000000000Z07:00") }
@@ -80,6 +81,12 @@ func (s *Store) CreateJob(ctx context.Context, j Job, logPathFor func(id int64) 
 func (s *Store) StartJob(ctx context.Context, id int64, gitHead string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE job SET status = ?, started_at = ?, git_head = ? WHERE id = ?`,
 		JobRunning, nowNano(), nullIfEmpty(gitHead), id)
+	return err
+}
+
+// SetJobTrace records the OpenTelemetry trace a job was exported as.
+func (s *Store) SetJobTrace(ctx context.Context, id int64, traceID string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE job SET trace_id = ? WHERE id = ?`, nullIfEmpty(traceID), id)
 	return err
 }
 
@@ -163,10 +170,11 @@ func scanJob(r scanner) (Job, error) {
 		j                          Job
 		spec, argv, queued         string
 		started, finished, gitHead sql.NullString
+		traceID                    sql.NullString
 		exit                       sql.NullInt64
 	)
 	if err := r.Scan(&j.ID, &j.ProjectID, &j.ProfileID, &spec, &argv, &j.Status, &exit,
-		&queued, &started, &finished, &gitHead, &j.LogPath, &j.LogLines); err != nil {
+		&queued, &started, &finished, &gitHead, &j.LogPath, &j.LogLines, &traceID); err != nil {
 		return Job{}, err
 	}
 	j.Spec = json.RawMessage(spec)
@@ -180,6 +188,9 @@ func scanJob(r scanner) (Job, error) {
 	j.FinishedAt = parseNullTime(finished)
 	if gitHead.Valid {
 		j.GitHead = &gitHead.String
+	}
+	if traceID.Valid {
+		j.TraceID = &traceID.String
 	}
 	return j, nil
 }

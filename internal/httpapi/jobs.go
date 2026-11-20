@@ -90,7 +90,7 @@ func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpe
 			env = append(env, "MAVEN_OPTS="+opts) // later entries win in exec
 		}
 	}
-	cmd := runner.Command{Argv: pv.Argv, Dir: p.RootPath, Env: env}
+	cmd := runner.Command{Argv: pv.Argv, Dir: p.RootPath, Env: env, Labels: runner.Labels{Project: p.Name, Tool: filepath.Base(exe)}}
 	cmd.SignalLeaderOnly = info.Executable != nil && info.Executable.Kind == maven.ModeMvnd
 	cmd.Parser = func() runner.OutputParser { return &mavenOutput{p: maven.NewLogParser()} }
 	if jar := s.ExtJar; jar != "" {
@@ -251,6 +251,11 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request, p store.Project, 
 	if pv.Error != "" {
 		writeError(w, http.StatusBadRequest, "bad_request", pv.Error)
 		return
+	}
+	if profileID != nil {
+		if prof, err := s.Store.GetProfile(r.Context(), *profileID); err == nil {
+			cmd.Labels.Task = prof.Name
+		}
 	}
 	specJSON, _ := json.Marshal(spec.Normalize())
 	job, err := s.Runner.Enqueue(r.Context(), store.Job{ProjectID: p.ID, ProfileID: profileID, Spec: specJSON}, cmd)

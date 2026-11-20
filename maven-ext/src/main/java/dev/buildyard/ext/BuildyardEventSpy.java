@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -28,7 +29,12 @@ import org.apache.maven.project.MavenProject;
 @Singleton
 public class BuildyardEventSpy extends AbstractEventSpy {
     private Writer out;
-    private final Map<String, Long> started = new HashMap<>();
+    // Builds can run modules in parallel (-T, mvnd): all maps are touched from many threads.
+    private final Map<String, Long> started = new ConcurrentHashMap<>();
+    private final Map<String, Long> mojoStarted = new ConcurrentHashMap<>();
+    // The module each builder thread works on, so a download can name the module it is for.
+    private final Map<Thread, String> threadProject = new ConcurrentHashMap<>();
+    private volatile Downloads downloads;
 
     @Override
     public void init(Context context) throws Exception {
@@ -49,12 +55,27 @@ public class BuildyardEventSpy extends AbstractEventSpy {
                 f.getParentFile().mkdirs();
             }
             out = new OutputStreamWriter(new FileOutputStream(f, true), StandardCharsets.UTF_8);
+            try {
+                downloads = new Downloads(this);
+            } catch (LinkageError e) {
+                downloads = null; // no resolver API visible: no download events, the rest works
+            }
         }
     }
 
     @Override
     public void onEvent(Object event) throws Exception {
-        if (out == null || !(event instanceof ExecutionEvent)) {
+        if (out == null) {
+            return;
+        }
+        if (!(event instanceof ExecutionEvent)) {
+            if (downloads != null) {
+                try {
+                    downloads.onEvent(event);
+                } catch (LinkageError e) {
+                    downloads = null;
+                }
+            }
             return;
         }
         ExecutionEvent e = (ExecutionEvent) event;
@@ -64,6 +85,7 @@ public class BuildyardEventSpy extends AbstractEventSpy {
                 break;
             case ProjectStarted:
                 started.put(key(e.getProject()), System.currentTimeMillis());
+                threadProject.put(Thread.currentThread(), key(e.getProject()));
                 write("{\"t\":\"project_start\",\"key\":" + str(key(e.getProject())) + ",\"ts\":" + System.currentTimeMillis() + "}");
                 break;
             case ProjectSucceeded:
@@ -76,12 +98,16 @@ public class BuildyardEventSpy extends AbstractEventSpy {
                 projectEnd(e.getProject(), "skipped");
                 break;
             case MojoStarted:
-                MojoExecution m = e.getMojoExecution();
-                if (m != null && e.getProject() != null) {
-                    write("{\"t\":\"mojo_start\",\"key\":" + str(key(e.getProject())) + ",\"mojo\":"
-                            + str(m.getArtifactId() + ":" + m.getGoal()) + ",\"id\":" + str(m.getExecutionId())
-                            + ",\"ts\":" + System.currentTimeMillis() + "}");
-                }
+                mojoStart(e);
+                break;
+            case MojoSucceeded:
+                mojoEnd(e, "succeeded");
+                break;
+            case MojoFailed:
+                mojoEnd(e, "failed");
+                break;
+            case MojoSkipped:
+                mojoEnd(e, "skipped");
                 break;
             case SessionEnded:
                 MavenSession s = e.getSession();
@@ -95,7 +121,7 @@ public class BuildyardEventSpy extends AbstractEventSpy {
     }
 
     @Override
-    public void close() throws Exception {
+    public synchronized void close() throws Exception {
         if (out != null) {
             out.close();
             out = null;
@@ -166,7 +192,42 @@ public class BuildyardEventSpy extends AbstractEventSpy {
         write(b.toString());
     }
 
+    private void mojoStart(ExecutionEvent e) throws IOException {
+        MojoExecution m = e.getMojoExecution();
+        if (m == null || e.getProject() == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        mojoStarted.put(mojoKey(e.getProject(), m), now);
+        write("{\"t\":\"mojo_start\",\"key\":" + str(key(e.getProject())) + ",\"mojo\":"
+                + str(m.getArtifactId() + ":" + m.getGoal()) + ",\"id\":" + str(m.getExecutionId())
+                + ",\"plugin\":" + str(m.getGroupId() + ":" + m.getArtifactId() + ":" + m.getVersion())
+                + ",\"phase\":" + str(m.getLifecyclePhase()) + ",\"ts\":" + now + "}");
+    }
+
+    private void mojoEnd(ExecutionEvent e, String status) throws IOException {
+        MojoExecution m = e.getMojoExecution();
+        if (m == null || e.getProject() == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long t0 = mojoStarted.remove(mojoKey(e.getProject(), m));
+        write("{\"t\":\"mojo_end\",\"key\":" + str(key(e.getProject())) + ",\"mojo\":"
+                + str(m.getArtifactId() + ":" + m.getGoal()) + ",\"id\":" + str(m.getExecutionId())
+                + ",\"status\":" + str(status) + ",\"ms\":" + (t0 == null ? 0 : now - t0) + ",\"ts\":" + now + "}");
+    }
+
+    private static String mojoKey(MavenProject p, MojoExecution m) {
+        return key(p) + "|" + m.getGroupId() + ":" + m.getArtifactId() + ":" + m.getGoal() + "|" + m.getExecutionId();
+    }
+
+    /** The module the calling thread builds, or null outside a module (e.g. while loading the reactor). */
+    String currentProject() {
+        return threadProject.get(Thread.currentThread());
+    }
+
     private void projectEnd(MavenProject p, String status) throws IOException {
+        threadProject.remove(Thread.currentThread());
         String k = key(p);
         Long t0 = started.remove(k);
         long ms = t0 == null ? 0 : System.currentTimeMillis() - t0;
@@ -174,7 +235,10 @@ public class BuildyardEventSpy extends AbstractEventSpy {
                 + ",\"ts\":" + System.currentTimeMillis() + "}");
     }
 
-    private synchronized void write(String line) throws IOException {
+    synchronized void write(String line) throws IOException {
+        if (out == null) {
+            return;
+        }
         out.write(line);
         out.write('\n');
         out.flush();

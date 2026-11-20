@@ -26,6 +26,7 @@ import (
 	"github.com/binarycat0/buildyard/internal/runner"
 	"github.com/binarycat0/buildyard/internal/store"
 	"github.com/binarycat0/buildyard/internal/tasks"
+	"github.com/binarycat0/buildyard/internal/telemetry"
 	"github.com/binarycat0/buildyard/web"
 )
 
@@ -199,10 +200,21 @@ func serve(args []string) error {
 		log.Info("jobs left by the previous run marked interrupted", "count", n)
 	}
 	jobs := runner.New(st, e.paths.Logs, e.cfg.MaxConcurrentJobs, e.cfg.Retention.JobsPerProject, log)
+	otel := telemetry.New(e.cfg.Telemetry, version, log)
+	otelCtx, otelStop := context.WithCancel(context.Background())
+	otelDone := make(chan struct{})
+	go func() { defer close(otelDone); otel.Run(otelCtx) }()
+	jobs.Tracer = func(j store.Job, l runner.Labels, head string) runner.Trace {
+		if t := otel.StartJob(j, telemetry.Labels{Project: l.Project, Task: l.Task, Tool: l.Tool, GitHead: head}, j.Argv); t != nil {
+			return t
+		}
+		return nil
+	}
 	// Limits edited in the UI, or in config.toml followed by SIGHUP, apply without a restart.
 	live := config.NewLive(e.paths.Config, e.cfg)
 	live.OnChange(func(c config.Config) {
 		jobs.SetLimits(c.MaxConcurrentJobs, c.Retention.JobsPerProject)
+		otel.Configure(c.Telemetry)
 		log.Info("config applied", "maxConcurrentJobs", c.MaxConcurrentJobs, "jobsPerProject", c.Retention.JobsPerProject)
 	})
 	hup := make(chan os.Signal, 1)
@@ -223,7 +235,7 @@ func serve(args []string) error {
 
 	home, _ := os.UserHomeDir()
 	httpapi.Version = version
-	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, Config: live, ExtJar: extJar, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, Config: live, Telemetry: otel, ExtJar: extJar, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
 	if _, err := srv.SubmitJDKDetect(); err != nil {
 		log.Warn("JDK detection not started", "err", err)
 	}
@@ -239,6 +251,8 @@ func serve(args []string) error {
 	shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	jobs.Shutdown(shut) // running builds are stopped and marked interrupted
 	cancel()
+	otelStop() // sends what is still queued, for a few seconds at most
+	<-otelDone
 	log.Info("buildyard stopped")
 	if errors.Is(err, context.Canceled) {
 		return nil

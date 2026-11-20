@@ -32,6 +32,10 @@ Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `bu
 
 To uninstall: `buildyard service uninstall`, then delete `~/.local/bin/buildyard` and `~/.buildyard`.
 
+## Observability (optional)
+
+Builds can also be sent to an OpenTelemetry stack you run yourself (Grafana, Loki, Tempo): a trace per run with startup, modules, goals and downloads, and the build output as logs. See [Observability](doc/observability.md) for setup with Docker.
+
 ## CLI
 
 With the daemon running, the CLI drives it (see `buildyard help`):

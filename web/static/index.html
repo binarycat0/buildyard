@@ -635,6 +635,9 @@
           <div class="muted small">
             <span x-text="'Queued ' + when(job.queuedAt)"></span>
             <span x-show="job.gitHead" x-text="'· commit ' + (job.gitHead || '').slice(0, 10)"></span>
+            <span x-show="job.traceId">· trace
+              <a x-show="traceLink(job)" :href="traceLink(job)" target="_blank" rel="noopener" title="Open the trace in Grafana" x-text="(job.traceId || '').slice(0, 12)"></a>
+              <code x-show="!traceLink(job)" x-text="job.traceId"></code></span>
             <span x-show="job.exitCode !== null && job.exitCode !== undefined" x-text="'· exit code ' + job.exitCode"></span>
             <span x-text="'· ' + logCount + ' lines'"></span>
           </div>
@@ -879,6 +882,46 @@
           <div class="row">
             <button class="primary" type="submit" :disabled="busy">Save</button>
             <span class="muted" x-show="cfgSaved">Saved</span>
+          </div>
+        </form>
+      </template>
+
+      <template x-if="oform && stab === 'observability'">
+        <form class="card" @submit.prevent="saveTelemetry()">
+          <h2>OpenTelemetry export</h2>
+          <p class="muted small">Send runs to your own Grafana stack: a timeline per run and the build output.
+            <a href="https://tools.binaryc.at/buildyard/observability/" target="_blank" rel="noopener">Setup with Docker</a></p>
+          <label class="radio"><input type="checkbox" x-model="oform.enabled"> Send builds to OpenTelemetry</label>
+          <div class="row wrap">
+            <label class="grow">OTLP endpoint
+              <input type="url" x-model="oform.endpoint" placeholder="http://localhost:4318" :required="oform.enabled"
+                title="OTLP/HTTP base URL (JSON); /v1/traces and /v1/logs are appended">
+            </label>
+            <label>Service name
+              <input x-model="oform.serviceName" placeholder="buildyard" title="service.name of traces and logs (service_name label in Loki)">
+            </label>
+          </div>
+          <div class="row wrap" x-show="oform.enabled">
+            <label class="radio" title="One trace per run: startup, modules, goals and downloads as spans"><input type="checkbox" x-model="oform.traces"> Timeline (traces → Tempo)</label>
+            <label class="radio" title="The run's output as log records, linked to its trace"><input type="checkbox" x-model="oform.logs"> Build output (logs → Loki)</label>
+            <label class="radio" x-show="oform.logs" title="Severity from [ERROR]/[WARNING]/… (prefix removed), maven.module and maven.goal attributes, a stack trace as one record. Off: every line as it is."><input type="checkbox" x-model="oform.parseLogs"> Parse Maven output</label>
+          </div>
+          <label>Grafana URL <span class="muted small">for the trace link on a run's page; empty hides it</span>
+            <input type="url" x-model="oform.grafanaUrl" placeholder="http://localhost:3000">
+          </label>
+          <label>Headers <span class="muted small">one <code>Name: value</code> per line, e.g. for a hosted backend</span>
+            <textarea rows="2" x-model="oform.headers" placeholder="Authorization: Basic …"></textarea>
+          </label>
+          <p class="muted small">Saved to <code :title="otel.path">config.toml</code>; applies to builds started after saving.</p>
+          <div class="row wrap">
+            <button class="primary" type="submit" :disabled="busy">Save</button>
+            <button type="button" @click="testTelemetry()" :disabled="otelTesting || !oform.endpoint" title="Send a test span and log record with the settings above">Test</button>
+            <span class="muted small" x-text="otelMsg"></span>
+          </div>
+          <div class="row wrap small muted" x-show="otel.enabled">
+            <span x-text="otelStatusText()"></span>
+            <span class="error" x-show="otel.status.lastError" x-text="'Last error ' + when(otel.status.lastErrorAt) + ': ' + otel.status.lastError"></span>
+            <button type="button" class="link small" @click="refreshTelemetryStatus()">Refresh</button>
           </div>
         </form>
       </template>
