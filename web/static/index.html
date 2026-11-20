@@ -336,30 +336,6 @@
                 </div>
                 <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
               </div>
-              <div class="stack tabbody" x-show="rtab === 'options'">
-                <div class="row wrap">
-                  <label class="radio" title="-o"><input type="checkbox" x-model="rform.offline" @change="refreshPreview()"> Offline</label>
-                  <label class="radio" title="-nsu"><input type="checkbox" x-model="rform.nsu" @change="refreshPreview()"> No snapshot updates</label>
-                  <label class="radio" title="-ntp"><input type="checkbox" x-model="rform.ntp" @change="refreshPreview()"> No transfer progress</label>
-                  <label class="radio" title="-e"><input type="checkbox" x-model="rform.errors" @change="refreshPreview()"> Error details</label>
-                </div>
-                <div class="row wrap">
-                  <label class="inline">On failure
-                    <select x-model="rform.failMode" @change="refreshPreview()">
-                      <option value="">Maven default</option>
-                      <option value="fast">Stop at once (-ff)</option>
-                      <option value="end">Fail at end (-fae)</option>
-                      <option value="never">Never fail (-fn)</option>
-                    </select></label>
-                  <label class="inline">Log
-                    <select x-model="rform.logLevel" @change="refreshPreview()">
-                      <option value="default">Normal</option>
-                      <option value="warn">Warnings and errors (hides progress)</option>
-                      <option value="quiet">Errors only (-q, hides progress)</option>
-                      <option value="debug">Debug (-X)</option>
-                    </select></label>
-                </div>
-              </div>
               <div class="stack tabbody" x-show="rtab === 'resources'">
                 <div class="row wrap">
                   <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
@@ -401,7 +377,30 @@
               <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
                 <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
               </label>
-              <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
+              <span class="label">Flags</span>
+                <div class="row wrap">
+                  <label class="radio" title="-o: use only the local repository, download nothing"><input type="checkbox" x-model="rform.offline" @change="refreshPreview()"> Offline</label>
+                  <label class="radio" title="-nsu: do not check remote repositories for newer SNAPSHOTs"><input type="checkbox" x-model="rform.nsu" @change="refreshPreview()"> No snapshot updates</label>
+                  <label class="radio" title="-ntp: hide the Downloading… progress lines"><input type="checkbox" x-model="rform.ntp" @change="refreshPreview()"> No transfer progress</label>
+                  <label class="radio" title="-e: print stack traces on failure"><input type="checkbox" x-model="rform.errors" @change="refreshPreview()"> Error details</label>
+                </div>
+                <div class="row wrap">
+                  <label class="inline" title="What happens after a module fails">On failure
+                    <select x-model="rform.failMode" @change="refreshPreview()">
+                      <option value="">Maven default</option>
+                      <option value="fast">Stop at once (-ff)</option>
+                      <option value="end">Fail at end (-fae)</option>
+                      <option value="never">Never fail (-fn)</option>
+                    </select></label>
+                  <label class="inline" title="Quieter levels hide per-module progress, which is read from INFO lines">Log
+                    <select x-model="rform.logLevel" @change="refreshPreview()">
+                      <option value="default">Normal</option>
+                      <option value="warn">Warnings and errors (hides progress)</option>
+                      <option value="quiet">Errors only (-q, hides progress)</option>
+                      <option value="debug">Debug (-X)</option>
+                    </select></label>
+                </div>
+                            <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
                 <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
               </label>
               </div>
