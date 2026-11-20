@@ -374,6 +374,11 @@ document.addEventListener('alpine:init', () => {
     pformError: '',
 
     ptab: 'general',
+    buildTools: [
+      { id: 'maven', label: 'Maven', supported: true },
+      { id: 'gradle', label: 'Gradle', supported: false },
+      { id: 'bazel', label: 'Bazel', supported: false },
+    ],
     pview: 'run',
     pjobs: [],
     commonGoals: ['clean', 'compile', 'test', 'package', 'verify', 'install'],
@@ -383,12 +388,14 @@ document.addEventListener('alpine:init', () => {
     skipPresets: [],
     defaultPresets: [],
     moduleFilter: '',
+    profFilter: '',
+    profDraft: '',
     moduleInfo: null,
     openState: {},
     filterOpen: null, // open/closed folders while filtering: { q, map }
     modScroll: 0,
     modHeight: 360,
-    rtab: loadPref('runTab', 'modules'),
+    rtab: ((t) => (t === 'extra' || t === 'options' ? 'properties' : t))(loadPref('runTab', 'modules')),
     goalDraft: '',
     discoverTask: null,
     discoverError: '',
@@ -608,8 +615,9 @@ document.addEventListener('alpine:init', () => {
         name: p.name,
         execChoice: known ? exe : 'custom',
         customPath: known ? '' : exe,
-        jdkId: p.jdkId ?? 0,
-        toolJdkId: p.toolJdkId ?? 0,
+        buildTool: p.buildTool,
+        // One JDK per project: a Maven JDK set before is the one runs used, so it is shown.
+        jdkId: p.toolJdkId ?? p.jdkId ?? 0,
         presets: this.skipPresets.map((sp) => ({
           id: sp.id, label: sp.label, argsText: sp.args.join(' '),
           builtin: this.defaultPresets.some((d) => d.id === sp.id),
@@ -622,7 +630,7 @@ document.addEventListener('alpine:init', () => {
 
     openProjectSettings(tab) {
       this.resetProjectForm();
-      if (tab) this.ptab = tab;
+      this.ptab = tab || 'general';
       this.$refs.projDialog.showModal();
     },
 
@@ -635,7 +643,7 @@ document.addEventListener('alpine:init', () => {
         const executable = f.execChoice === 'custom' ? f.customPath.trim() : f.execChoice;
         if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Enter an absolute path to the executable');
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
-          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: Number(f.toolJdkId) || 0,
+          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: 0,
           env: textToEnv(f.envText), skipPresets: this.presetDiff(f.presets),
           resources: {
             threads: joinChoice('cpu', f.cpu, f.cpuCustom),
@@ -1057,6 +1065,47 @@ document.addEventListener('alpine:init', () => {
       return [...new Set(this.modules.flatMap((m) => m.profiles))].sort();
     },
 
+    // The task's -P entries: "id" (or "?id") turns a profile on, "!id" turns it off.
+    profList() {
+      return this.rform.profiles.split(/[\s,]+/).filter(Boolean);
+    },
+
+    profState(id) {
+      const list = this.profList();
+      if (list.includes('!' + id)) return 'off';
+      if (list.includes(id) || list.includes('?' + id)) return 'on';
+      return '';
+    },
+
+    setProfile(id, state) {
+      const list = this.profList().filter((p) => p.replace(/^[!?]/, '') !== id);
+      if (state === 'on') list.push(id);
+      if (state === 'off') list.push('!' + id);
+      this.rform.profiles = list.join(',');
+      this.refreshPreview();
+    },
+
+    addProfile() {
+      for (const id of this.profDraft.split(/[\s,]+/).map((p) => p.replace(/^[!?]/, '')).filter(Boolean)) {
+        if (!this.profState(id)) this.setProfile(id, 'on');
+      }
+      this.profDraft = '';
+    },
+
+    // Known profiles (with how many modules had them active at discovery) plus any the
+    // task names; all = true ignores the filter.
+    profileRows(all) {
+      const count = new Map();
+      for (const m of this.modules) for (const p of m.profiles) count.set(p, (count.get(p) || 0) + 1);
+      for (const p of this.profList()) {
+        const id = p.replace(/^[!?]/, '');
+        if (!count.has(id)) count.set(id, 0);
+      }
+      const q = all ? '' : this.profFilter.trim().toLowerCase();
+      return [...count].filter(([id]) => !q || id.toLowerCase().includes(q))
+        .sort(([a], [b]) => a.localeCompare(b)).map(([id, modules]) => ({ id, modules }));
+    },
+
     async discover() {
       const id = this.proj.id;
       this.discoverError = '';
@@ -1172,6 +1221,30 @@ document.addEventListener('alpine:init', () => {
       this.refreshPreview();
     },
 
+    // A copy of a saved task named "<name> (copy)", "<name> (copy 2)", …
+    async duplicateTask(t) {
+      const names = new Set(this.profiles.map((x) => x.name));
+      let name = `${t.name} (copy)`;
+      for (let i = 2; names.has(name); i++) name = `${t.name} (copy ${i})`;
+      try {
+        await api('POST', `/projects/${this.proj.id}/profiles`, { name, spec: t.spec });
+        await this.reloadTasks();
+      } catch (e) {
+        this.runError = `${t.name}: ${e.message}`;
+      }
+    },
+
+    // Copy or show a saved task's command without opening it.
+    async taskCommand(t, action) {
+      try {
+        const pv = await api('POST', `/projects/${this.proj.id}/preview`, { spec: t.spec });
+        if (action === 'copy') await this.copyCommand(pv.argv);
+        else this.showCommand(pv);
+      } catch (e) {
+        this.runError = `${t.name}: ${e.message}`;
+      }
+    },
+
     async deleteTask(t) {
       if (!confirm(`Delete task "${t.name}"? Its past runs stay in the history.`)) return;
       try {
@@ -1279,10 +1352,9 @@ document.addEventListener('alpine:init', () => {
       return [
         { id: 'modules', label: 'Modules', count: f.modulesMode === 'selected' ? n(f.selected.length) : f.modulesMode === 'exclude' ? (f.selected.length ? '−' + f.selected.length : '') : '' },
         { id: 'skip', label: 'Skip', count: n(f.skips.length) },
-        { id: 'options', label: 'Options', count: n([f.offline, f.nsu, f.errors, f.failMode, f.logLevel !== 'default'].filter(Boolean).length) },
+        { id: 'properties', label: 'Arguments', count: n(props + profiles + splitArgs(f.args).length
+          + [f.offline, f.nsu, f.errors, f.failMode, f.logLevel !== 'default'].filter(Boolean).length) },
         { id: 'resources', label: 'Resources', count: n([f.cpu, f.heap, f.forks].filter(Boolean).length) },
-        { id: 'properties', label: 'Profiles & properties', count: n(props + profiles) },
-        { id: 'extra', label: 'Extra args', count: n(splitArgs(f.args).length) },
       ];
     },
 
@@ -1829,15 +1901,8 @@ document.addEventListener('alpine:init', () => {
       return j ? this.jdkLabel(j) : fallback;
     },
 
-    // What "JDK for Maven: use the project JDK" resolves to in the project form.
-    toolJdkFallbackText() {
-      const pid = Number(this.pform.jdkId) || 0;
-      if (pid) return 'Project JDK: ' + this.jdkText(pid, '?');
-      return 'Global Maven default: ' + this.jdkText(this.maven().jdkId, 'daemon JAVA_HOME');
-    },
-
     jdkFromText(from) {
-      return { tool: 'Maven tab', project: 'project JDK', default: 'global Maven default' }[from] ?? '';
+      return { tool: 'set on the project', project: 'set on the project', default: 'global default' }[from] ?? '';
     },
 
     jdkLabel(j) {

@@ -303,3 +303,28 @@ dialog .card.runform { border: 0; padding: 0; background: none; }
 .active-jobs tr:last-child td { border-bottom: 0; }
 a.plain { color: var(--fg); text-decoration: none; }
 a.plain:hover { text-decoration: underline; }
+.reslist { display: flex; flex-direction: column; gap: 8px; }
+label.resrow { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 12px; }
+label.resrow select { width: 360px; max-width: 100%; }
+label.resrow input.short { width: 110px; }
+.profiles { max-height: 260px; overflow-y: auto; }
+.profile-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+.profile-row:last-child { border-bottom: none; }
+.seg.tiny button { padding: 2px 8px; font-size: .8em; }
+input.profile-filter { width: 220px; }
+.profile-row code { font-size: .85em; }
+:root { --on: #1f8a46; --on-bg: #e6f4ea; --off: #c23b3b; --off-bg: #fbeaea; }
+@media (prefers-color-scheme: dark) { :root { --on: #4cc27a; --on-bg: #17301f; --off: #e06a6a; --off-bg: #3a1c1c; } }
+.seg.tiny button.neutral.active { background: var(--border); color: var(--fg); }
+.seg.tiny button.on.active { background: var(--on); color: #fff; }
+.seg.tiny button.off.active { background: var(--off); color: #fff; }
+.profile-row.on { background: var(--on-bg); box-shadow: inset 3px 0 0 var(--on); }
+.profile-row.off { background: var(--off-bg); box-shadow: inset 3px 0 0 var(--off); }
+.profile-row.on code { color: var(--on); font-weight: 600; }
+.profile-row.off code { color: var(--off); font-weight: 600; text-decoration: line-through; }
+@media (prefers-color-scheme: dark) {
+  .seg.tiny button.on.active { background: #2b7a47; }
+  .seg.tiny button.off.active { background: #a83c3c; }
+}
+.row-actions { display: inline-flex; gap: 4px; align-items: center; }
+.card.flush.tasks-card { overflow: visible; }

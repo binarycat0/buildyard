@@ -85,9 +85,12 @@
       <template x-if="proj">
         <div class="stack">
           <div class="projhead">
-            <div class="row">
+            <div class="row spread">
               <h1 x-text="proj.name"></h1>
-              <button type="button" class="icon" @click="openProjectSettings()" title="Edit the project" aria-label="Edit the project"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
+              <button type="button" class="icon" @click="openProjectSettings()" title="Project settings" aria-label="Project settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <g stroke-width="3"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(45 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(90 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(135 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(180 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(225 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(270 12 12)"/><line x1="12" y1="2.5" x2="12" y2="5" transform="rotate(315 12 12)"/></g>
+                <circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2.5"/>
+              </svg></button>
             </div>
             <div class="facts small">
               <code class="path" :title="proj.rootPath" x-text="proj.rootPath"></code>
@@ -111,7 +114,7 @@
                       <dt>Skips</dt><dd x-text="skipPresets.map((sp) => sp.label || sp.id).join(', ') || 'none'"></dd>
                     </dl>
                     <div class="row">
-                      <button type="button" class="small" @click="open = false; openProjectSettings('maven')">Edit project</button>
+                      <button type="button" class="small" @click="open = false; openProjectSettings('tool')">Edit project</button>
                       <a class="button small" href="#/settings/maven">Global Maven settings</a>
                     </div>
                   </div>
@@ -153,9 +156,10 @@
             <div class="row">
               <button type="button" class="primary" @click="openNewTask()">New task</button>
               <span class="error small" x-show="runError && !$refs.taskDialog?.open" x-text="runError"></span>
+              <span class="muted small" x-show="copied && !$refs.taskDialog?.open" x-cloak>Command copied</span>
             </div>
             <p class="muted" x-show="!profiles.length">No saved tasks yet. Create one with New task, then run it from this list.</p>
-            <div class="card flush" x-show="profiles.length">
+            <div class="card flush tasks-card" x-show="profiles.length">
               <table class="list tasks">
                 <thead><tr><th></th><th></th><th>Task</th><th>Command</th><th>Last run</th><th></th></tr></thead>
                 <tbody>
@@ -173,7 +177,18 @@
                         <span class="muted small" x-text="t.lastJob ? when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt) : 'never'"></span>
                       </td>
                       <td class="actions nowrap">
+                        <div class="row-actions">
                         <button type="button" class="icon small" @click="openEditTask(t)" title="Edit the task" aria-label="Edit the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
+                        <button type="button" class="icon small" @click="duplicateTask(t)" title="Duplicate the task" aria-label="Duplicate the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5h8v8h-8z M3 10.5H2.5v-8h8V3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
+                        <button type="button" class="icon small danger" @click="deleteTask(t)" title="Delete the task" aria-label="Delete the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        <div class="menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+                          <button type="button" class="icon small" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
+                          <div class="menu-list" x-show="open" x-cloak @click="open = false">
+                            <button type="button" @click="taskCommand(t, 'copy')">Copy command</button>
+                            <button type="button" @click="taskCommand(t, 'show')">Show full command</button>
+                          </div>
+                        </div>
+                        </div>
                       </td>
                     </tr>
                   </template>
@@ -323,7 +338,6 @@
                 </div>
               </div>
               <div class="stack tabbody" x-show="rtab === 'skip'">
-                <p class="muted small" x-show="!skipPresets.length">No skip presets. Add them in Settings → Maven.</p>
                 <div class="row wrap">
                   <template x-for="sp in skipPresets" :key="sp.id">
                     <label class="radio" :title="sp.args.join(' ') + (sp.note ? ' — ' + sp.note : '')">
@@ -331,24 +345,56 @@
                     </label>
                   </template>
                 </div>
+                <p class="muted small row">
+                  <span x-text="skipPresets.length ? 'Skip presets are defined per project.' : 'No skip presets yet.'"></span>
+                  <a href="javascript:void 0" @click="openProjectSettings('tool'); $nextTick(() => $refs.presetsBox?.scrollIntoView({block: 'start'}))">Add or edit them in the project settings</a>
+                </p>
                 <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
               </div>
-              <div class="stack tabbody" x-show="rtab === 'options'">
+              <div class="stack tabbody" x-show="rtab === 'properties'">
+              <div class="stack tight">
+                <div class="row">
+                  <span class="label grow">Maven profiles <code>-P</code></span>
+                  <input class="profile-filter" x-show="profileRows(true).length > 8" x-model="profFilter" placeholder="Filter profiles">
+                </div>
+                <div class="profiles card flush" x-show="profileRows().length">
+                  <template x-for="r in profileRows()" :key="r.id">
+                    <div class="profile-row" :class="profState(r.id)">
+                      <code x-text="r.id"></code>
+                      <span class="tag dim" x-show="r.modules" :title="'Active in ' + plural(r.modules, 'module') + ' at the last module discovery (by default, or turned on by the task then)'" x-text="'active · ' + plural(r.modules, 'module')"></span>
+                      <span class="grow"></span>
+                      <div class="seg tiny" :title="'-P ' + r.id + ' turns it on, -P !' + r.id + ' turns it off'">
+                        <button type="button" class="neutral" :class="{active: profState(r.id) === ''}" @click="setProfile(r.id, '')">Default</button>
+                        <button type="button" class="on" :class="{active: profState(r.id) === 'on'}" @click="setProfile(r.id, 'on')">On</button>
+                        <button type="button" class="off" :class="{active: profState(r.id) === 'off'}" @click="setProfile(r.id, 'off')">Off</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <p class="muted small" x-show="!profileRows(true).length">No profiles known yet. Discover the modules, or add one by id.</p>
+                <p class="muted small" x-show="profileRows(true).length && !profileRows().length">No profile matches the filter.</p>
+                <input class="profile-add" x-model="profDraft" placeholder="+ profile id, e.g. fast (Enter turns it on)" aria-label="Add a profile"
+                  @keydown.enter.prevent="addProfile()" @blur="addProfile()">
+              </div>
+              <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
+                <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
+              </label>
+              <span class="label">Flags</span>
                 <div class="row wrap">
-                  <label class="radio" title="-o"><input type="checkbox" x-model="rform.offline" @change="refreshPreview()"> Offline</label>
-                  <label class="radio" title="-nsu"><input type="checkbox" x-model="rform.nsu" @change="refreshPreview()"> No snapshot updates</label>
-                  <label class="radio" title="-ntp"><input type="checkbox" x-model="rform.ntp" @change="refreshPreview()"> No transfer progress</label>
-                  <label class="radio" title="-e"><input type="checkbox" x-model="rform.errors" @change="refreshPreview()"> Error details</label>
+                  <label class="radio" title="-o: use only the local repository, download nothing"><input type="checkbox" x-model="rform.offline" @change="refreshPreview()"> Offline</label>
+                  <label class="radio" title="-nsu: do not check remote repositories for newer SNAPSHOTs"><input type="checkbox" x-model="rform.nsu" @change="refreshPreview()"> No snapshot updates</label>
+                  <label class="radio" title="-ntp: hide the Downloading… progress lines"><input type="checkbox" x-model="rform.ntp" @change="refreshPreview()"> No transfer progress</label>
+                  <label class="radio" title="-e: print stack traces on failure"><input type="checkbox" x-model="rform.errors" @change="refreshPreview()"> Error details</label>
                 </div>
                 <div class="row wrap">
-                  <label class="inline">On failure
+                  <label class="inline" title="What happens after a module fails">On failure
                     <select x-model="rform.failMode" @change="refreshPreview()">
                       <option value="">Maven default</option>
                       <option value="fast">Stop at once (-ff)</option>
                       <option value="end">Fail at end (-fae)</option>
                       <option value="never">Never fail (-fn)</option>
                     </select></label>
-                  <label class="inline">Log
+                  <label class="inline" title="Quieter levels hide per-module progress, which is read from INFO lines">Log
                     <select x-model="rform.logLevel" @change="refreshPreview()">
                       <option value="default">Normal</option>
                       <option value="warn">Warnings and errors (hides progress)</option>
@@ -356,18 +402,21 @@
                       <option value="debug">Debug (-X)</option>
                     </select></label>
                 </div>
+                            <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
+                <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
+              </label>
               </div>
               <div class="stack tabbody" x-show="rtab === 'resources'">
-                <div class="row wrap">
-                  <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
+                <div class="reslist">
+                  <label class="resrow" title="Parallel module builds: Maven -T"><span>CPU</span><span class="row">
                     <select x-model="rform.cpu" @change="refreshPreview()">
                       <option value="" x-text="projectDefault('cpu')"></option>
                       <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.cpu"></option></template>
                       <option value="custom">Custom…</option>
                     </select>
                     <input class="short" x-show="rform.cpu === 'custom'" x-model="rform.cpuCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
-                  </label>
-                  <label class="inline" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span>
+                  </span></label>
+                  <label class="resrow" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span><span class="row">
                     <select x-model="rform.heap" @change="refreshPreview()">
                       <option value="" x-text="projectDefault('heap')"></option>
                       <option value="-1">JVM default (a quarter of the RAM)</option>
@@ -376,8 +425,8 @@
                     </select>
                     <input class="short" x-show="rform.heap === 'custom'" x-model="rform.heapCustom" @input.debounce.250ms="refreshPreview()" placeholder="GB" >
                     <span class="muted" x-show="rform.heap === 'custom'">GB</span>
-                  </label>
-                  <label class="inline" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span>
+                  </span></label>
+                  <label class="resrow" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span><span class="row">
                     <select x-model="rform.forks" @change="refreshPreview()">
                       <option value="" x-text="projectDefault('forks')"></option>
                       <option value="none">Test plugin default (1 JVM)</option>
@@ -385,24 +434,8 @@
                       <option value="custom">Custom…</option>
                     </select>
                     <input class="short" x-show="rform.forks === 'custom'" x-model="rform.forksCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
-                  </label>
+                  </span></label>
                 </div>
-              </div>
-              <div class="stack tabbody" x-show="rtab === 'properties'">
-              <label><span>Maven profiles <code>-P</code> <span class="muted">(comma or space separated; !id turns one off)</span></span>
-                <input x-model="rform.profiles" list="known-profiles" placeholder="fast,!slow" @input.debounce.250ms="refreshPreview()">
-              </label>
-              <datalist id="known-profiles">
-                <template x-for="p in knownProfiles()" :key="p"><option :value="p"></option></template>
-              </datalist>
-              <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
-                <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
-              </label>
-              </div>
-              <div class="stack tabbody" x-show="rtab === 'extra'">
-              <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
-                <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
-              </label>
               </div>
             </form>
           </dialog>
@@ -445,30 +478,33 @@
             </div>
             <nav class="tabs" role="tablist">
               <button type="button" role="tab" :class="{active: ptab === 'general'}" @click="ptab = 'general'">General</button>
-              <button type="button" role="tab" :class="{active: ptab === 'jdk'}" @click="ptab = 'jdk'">JDK</button>
-              <button type="button" role="tab" :class="{active: ptab === 'maven'}" @click="ptab = 'maven'">Maven</button>
+              <button type="button" role="tab" :class="{active: ptab === 'tool'}" @click="ptab = 'tool'">Build tool</button>
             </nav>
 
             <div class="stack" x-show="ptab === 'general'">
               <label>Name <input x-model="pform.name" required></label>
-              <label><span>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span></span>
-                <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
-              </label>
-            </div>
-
-            <div class="stack" x-show="ptab === 'jdk'">
-              <label>Project JDK
+              <label>JDK
                 <select x-model.number="pform.jdkId">
-                  <option value="0" x-text="'Not set (use the build tool default: ' + jdkText(maven().jdkId, 'daemon JAVA_HOME') + ')'"></option>
+                  <option value="0" x-text="'Global default (' + jdkText(maven().jdkId, 'daemon JAVA_HOME') + ')'"></option>
                   <template x-for="j in jdks" :key="j.id">
                     <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.jdkId"></option>
                   </template>
                 </select>
               </label>
-              <p class="muted small">Build tools run on the project JDK unless their own tab picks a different one.</p>
+              <label><span>Environment variables <span class="muted">(KEY=VALUE, one per line, e.g. MAVEN_OPTS)</span></span>
+                <textarea rows="4" x-model="pform.envText" placeholder="MAVEN_OPTS=-Xmx8g"></textarea>
+              </label>
             </div>
 
-            <div class="stack" x-show="ptab === 'maven'">
+            <div class="stack" x-show="ptab === 'tool'">
+              <label>Build tool
+                <select x-model="pform.buildTool">
+                  <template x-for="t in buildTools" :key="t.id">
+                    <option :value="t.id" :disabled="!t.supported" :selected="t.id === pform.buildTool" x-text="t.label + (t.supported ? '' : ' (not supported yet)')"></option>
+                  </template>
+                </select>
+              </label>
+              <template x-if="pform.buildTool === 'maven'"><div class="stack">
               <fieldset>
                 <legend>Executable</legend>
                 <label class="radio"><input type="radio" value="" x-model="pform.execChoice">
@@ -486,7 +522,7 @@
                 <input x-show="pform.execChoice === 'custom'" x-model="pform.customPath" placeholder="/opt/maven/bin/mvn">
               </fieldset>
 
-              <fieldset>
+              <fieldset x-ref="presetsBox">
                 <legend>Skip presets</legend>
                 <p class="muted small">Checkboxes in the run form. Change the built-in ones or add project flags such as <code>-Dskip.ui</code>.</p>
                 <table class="list presets">
@@ -540,14 +576,7 @@
                 </div>
               </fieldset>
 
-              <label>JDK for Maven
-                <select x-model.number="pform.toolJdkId">
-                  <option value="0" x-text="toolJdkFallbackText()"></option>
-                  <template x-for="j in jdks" :key="j.id">
-                    <option :value="j.id" x-text="jdkLabel(j)" :selected="j.id === pform.toolJdkId"></option>
-                  </template>
-                </select>
-              </label>
+              </div></template>
             </div>
 
             <p class="error" x-show="pformError" x-text="pformError"></p>
