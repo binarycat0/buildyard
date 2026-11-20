@@ -2132,7 +2132,7 @@ document.addEventListener('alpine:init', () => {
     // ---------- observability ----------
     otelForm(t) {
       const headers = Object.entries(t.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n');
-      return { enabled: t.enabled, endpoint: t.endpoint, traces: t.traces, logs: t.logs,
+      return { enabled: t.enabled, endpoint: t.endpoint, traces: t.traces, logs: t.logs, parseLogs: t.parseLogs,
         serviceName: t.serviceName, grafanaUrl: t.grafanaUrl, headers };
     },
 
@@ -2143,7 +2143,7 @@ document.addEventListener('alpine:init', () => {
         const i = line.indexOf(':');
         if (i > 0) headers[line.slice(0, i).trim()] = line.slice(i + 1).trim();
       }
-      return { enabled: f.enabled, endpoint: f.endpoint.trim(), traces: f.traces, logs: f.logs,
+      return { enabled: f.enabled, endpoint: f.endpoint.trim(), traces: f.traces, logs: f.logs, parseLogs: f.parseLogs,
         serviceName: f.serviceName.trim(), grafanaUrl: f.grafanaUrl.trim(), headers };
     },
 

@@ -6,8 +6,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/binarycat0/buildyard/internal/config"
 	"github.com/binarycat0/buildyard/internal/store"
@@ -101,7 +103,7 @@ func TestJobExport(t *testing.T) {
 	if root["status"] == nil || byName["a"]["status"] == nil {
 		t.Error("failed job and module must have an error status")
 	}
-	if len(col.logs) != 1 || col.logs[0]["severityText"] != "ERROR" || col.logs[0]["body"].(map[string]any)["stringValue"] != "[ERROR] boom" {
+	if len(col.logs) != 1 || col.logs[0]["severityText"] != "ERROR" || col.logs[0]["body"].(map[string]any)["stringValue"] != "boom" {
 		t.Errorf("log record: %v", col.logs)
 	}
 	if col.logs[0]["traceId"] != root["traceId"] {
@@ -139,5 +141,100 @@ func TestSendErrorIsCounted(t *testing.T) {
 	}
 	if err := e.Test(context.Background(), cfg); err == nil {
 		t.Fatal("Test must report the collector's error")
+	}
+}
+
+func body(r map[string]any) string { return r["body"].(map[string]any)["stringValue"].(string) }
+
+func attr(r map[string]any, key string) string {
+	for _, a := range r["attributes"].([]any) {
+		m := a.(map[string]any)
+		if m["key"] == key {
+			for _, v := range m["value"].(map[string]any) {
+				return v.(string)
+			}
+		}
+	}
+	return ""
+}
+
+func logJob(t *testing.T, parse bool) (*Exporter, *Job, *collector, func()) {
+	col := &collector{}
+	srv := httptest.NewServer(col)
+	cfg := config.DefaultTelemetry()
+	cfg.Enabled, cfg.Endpoint, cfg.Traces, cfg.ParseLogs = true, srv.URL, false, parse
+	e := New(cfg, "test", nil)
+	return e, e.StartJob(store.Job{ID: 1}, Labels{Project: "p"}, nil), col, srv.Close
+}
+
+func TestLogRecordsAreShaped(t *testing.T) {
+	e, j, col, done := logJob(t, true)
+	defer done()
+	j.Event([]byte(`{"t":"session","ts":1,"projects":[{"key":"demo:a","name":"A"}]}`))
+	lines := []string{
+		"[INFO] -------------------------< demo:a >-------------------------",
+		"[INFO] Building A 1",
+		"[INFO] --- compiler:3.13.0:compile (default-compile) @ a ---",
+		"[ERROR] Failed to run",
+		"java.lang.IllegalStateException: bad",
+		"/src/B.java:[1,37] illegal start",
+		"",
+		"\tat x.Y.z(Y.java:1)",
+		"Caused by: java.io.IOException: io",
+		"\t... 3 more",
+		"[INFO] BUILD FAILURE",
+		"raw output from a forked test",
+		"[WARNING] careful",
+	}
+	for i, l := range lines {
+		j.Line(i+1, strings.ReplaceAll(l, "\\t", "\t"))
+	}
+	j.End(store.JobFailed, nil)
+	e.flush(context.Background())
+	if len(col.logs) != 7 {
+		for _, r := range col.logs {
+			t.Log(body(r))
+		}
+		t.Fatalf("got %d records, want 7", len(col.logs))
+	}
+	errRec := col.logs[3]
+	if errRec["severityText"] != "ERROR" || !strings.HasPrefix(body(errRec), "Failed to run\njava.lang.IllegalStateException: bad\n/src/B.java:[1,37] illegal start\n\n\tat x.Y.z") ||
+		!strings.HasSuffix(body(errRec), "... 3 more") || attr(errRec, "buildyard.log.lines") != "7" {
+		t.Errorf("stack trace record: %q %v", body(errRec), errRec["attributes"])
+	}
+	if attr(errRec, "maven.module") != "demo:a" || attr(errRec, "maven.goal") != "compiler:compile (default-compile)" {
+		t.Errorf("module/goal: %v", errRec["attributes"])
+	}
+	if attr(col.logs[4], "maven.module") != "" {
+		t.Error("the build summary is about no module")
+	}
+	if raw := col.logs[5]; body(raw) != "raw output from a forked test" || raw["severityText"] != "" && raw["severityNumber"].(float64) != 0 {
+		t.Errorf("plain line: %v", raw)
+	}
+	if w := col.logs[6]; w["severityText"] != "WARN" || body(w) != "careful" {
+		t.Errorf("warning: %v", w)
+	}
+}
+
+func TestLogRecordWaitsAtMostFlushDelay(t *testing.T) {
+	e, j, col, done := logJob(t, true)
+	defer done()
+	j.Line(1, "[ERROR] boom")
+	time.Sleep(3 * logFlushDelay)
+	e.flush(context.Background())
+	if len(col.logs) != 1 {
+		t.Fatalf("the last record must go out without a following line, got %d", len(col.logs))
+	}
+}
+
+func TestRawLogs(t *testing.T) {
+	e, j, col, done := logJob(t, false)
+	defer done()
+	j.Line(1, "[ERROR] boom")
+	j.Line(2, "\tat x")
+	j.End(store.JobFailed, nil)
+	e.flush(context.Background())
+	if len(col.logs) != 2 || body(col.logs[0]) != "[ERROR] boom" {
+		t.Fatalf("raw mode sends lines as they are: %v", col.logs)
 	}
 }

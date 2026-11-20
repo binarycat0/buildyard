@@ -32,6 +32,7 @@ type Telemetry struct {
 	Endpoint    string            `toml:"endpoint" json:"endpoint"` // OTLP/HTTP base URL; /v1/traces and /v1/logs are appended
 	Traces      bool              `toml:"traces" json:"traces"`
 	Logs        bool              `toml:"logs" json:"logs"`
+	ParseLogs   bool              `toml:"parseLogs" json:"parseLogs"` // levels, module/goal, multi-line records
 	ServiceName string            `toml:"serviceName" json:"serviceName"`
 	Headers     map[string]string `toml:"headers" json:"headers"`       // e.g. Authorization for a hosted backend
 	GrafanaURL  string            `toml:"grafanaUrl" json:"grafanaUrl"` // for "open trace" links; empty = no links
@@ -40,7 +41,7 @@ type Telemetry struct {
 // DefaultTelemetry is the telemetry config before the user changes it: off, and
 // pointing at a collector on this machine.
 func DefaultTelemetry() Telemetry {
-	return Telemetry{Endpoint: "http://localhost:4318", Traces: true, Logs: true, ServiceName: "buildyard", GrafanaURL: "http://localhost:3000"}
+	return Telemetry{Endpoint: "http://localhost:4318", Traces: true, Logs: true, ParseLogs: true, ServiceName: "buildyard", GrafanaURL: "http://localhost:3000"}
 }
 
 // Validate checks the telemetry settings; endpoints only matter when export is on.
@@ -178,6 +179,9 @@ func Load(path string) (Config, error) {
 	}
 	if md.IsDefined("telemetry", "logs") {
 		t.Logs = file.Telemetry.Logs
+	}
+	if md.IsDefined("telemetry", "parseLogs") {
+		t.ParseLogs = file.Telemetry.ParseLogs
 	}
 	if md.IsDefined("telemetry", "serviceName") {
 		t.ServiceName = file.Telemetry.ServiceName

@@ -96,6 +96,7 @@ func (l *Live) SetTelemetry(t Telemetry) error {
 		sec["endpoint"] = t.Endpoint
 		sec["traces"] = t.Traces
 		sec["logs"] = t.Logs
+		sec["parseLogs"] = t.ParseLogs
 		sec["serviceName"] = t.ServiceName
 		sec["grafanaUrl"] = t.GrafanaURL
 		if len(t.Headers) > 0 {

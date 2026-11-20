@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - README.md
+      - doc/**
       - install.sh
       - utils/mkdocs/**
       - mkdocs.yml

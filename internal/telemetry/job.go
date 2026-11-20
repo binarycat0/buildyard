@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"encoding/json"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +32,7 @@ type Labels struct {
 type Job struct {
 	e              *Exporter
 	traces, logs   bool
+	parseLogs      bool // levels, module/goal attributes, multi-line records
 	traceID        string
 	rootID         string
 	startupID      string
@@ -49,6 +49,10 @@ type Job struct {
 	modulesFailed  int
 	dl             dlStats
 	lastLineAtNano int64
+	pending        *pendingLog // multi-line record still collecting lines
+	logTimer       *time.Timer
+	logModule      string // module and goal the output is about, from Maven's own markers
+	logGoal        string
 	rootAttrs      []kv // only on the root span
 }
 
@@ -107,7 +111,7 @@ func (e *Exporter) StartJob(j store.Job, l Labels, argv []string) *Job {
 	if l.GitHead != "" {
 		rootAttrs = append(rootAttrs, str("vcs.ref.head.revision", l.GitHead))
 	}
-	return &Job{e: e, traces: cfg.Traces, logs: cfg.Logs, traceID: newTraceID(), rootID: newSpanID(),
+	return &Job{e: e, traces: cfg.Traces, logs: cfg.Logs, parseLogs: cfg.ParseLogs, traceID: newTraceID(), rootID: newSpanID(),
 		startupID: newSpanID(), start: time.Now(), name: name, attrs: attrs, rootAttrs: rootAttrs,
 		names: map[string]string{}, modules: map[string]*open{}, mojos: map[string]*open{}}
 }
@@ -141,8 +145,8 @@ type event struct {
 
 // Event applies one build tool event line.
 func (j *Job) Event(line []byte) {
-	if j == nil || !j.traces {
-		return
+	if j == nil {
+		return // events are followed even without traces: log records use the reactor
 	}
 	var ev event
 	if json.Unmarshal(line, &ev) != nil {
@@ -242,37 +246,11 @@ func (j *Job) Event(line []byte) {
 }
 
 func (j *Job) span(s span) {
-	s.TraceID, s.Kind = j.traceID, 1
-	j.e.addSpan(s)
-}
-
-var ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
-
-// Line exports output line n.
-func (j *Job) Line(n int, text string) {
-	if j == nil || !j.logs {
+	if !j.traces {
 		return
 	}
-	text = ansi.ReplaceAllString(text, "")
-	sev := sevInfo
-	switch {
-	case strings.HasPrefix(text, "[ERROR]"), strings.HasPrefix(text, "[FATAL]"):
-		sev = sevError
-	case strings.HasPrefix(text, "[WARNING]"), strings.HasPrefix(text, "[WARN]"):
-		sev = sevWarn
-	case strings.HasPrefix(text, "[DEBUG]"):
-		sev = sevDebug
-	}
-	attrs := append(append(make([]kv, 0, len(j.attrs)+1), j.attrs...), num("buildyard.log.line", int64(n)))
-	// Lines arriving in the same nanosecond keep their order in Loki only if their times differ.
-	now := time.Now().UnixNano()
-	j.mu.Lock()
-	if now <= j.lastLineAtNano {
-		now = j.lastLineAtNano + 1
-	}
-	j.lastLineAtNano = now
-	j.mu.Unlock()
-	j.e.addLog(logRecord{Time: time.Unix(0, now), Severity: sev, Body: text, TraceID: j.traceID, SpanID: j.rootID, Attrs: attrs})
+	s.TraceID, s.Kind = j.traceID, 1
+	j.e.addSpan(s)
 }
 
 // End closes what is still open and exports the job's root span.
@@ -286,6 +264,10 @@ func (j *Job) End(status string, exit *int) {
 		return
 	}
 	j.ended = true
+	j.flushLogLocked()
+	if j.logTimer != nil {
+		j.logTimer.Stop()
+	}
 	if !j.traces {
 		return
 	}
