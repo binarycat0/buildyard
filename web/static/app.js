@@ -388,6 +388,8 @@ document.addEventListener('alpine:init', () => {
     skipPresets: [],
     defaultPresets: [],
     moduleFilter: '',
+    profFilter: '',
+    profDraft: '',
     moduleInfo: null,
     openState: {},
     filterOpen: null, // open/closed folders while filtering: { q, map }
@@ -1061,6 +1063,47 @@ document.addEventListener('alpine:init', () => {
 
     knownProfiles() {
       return [...new Set(this.modules.flatMap((m) => m.profiles))].sort();
+    },
+
+    // The task's -P entries: "id" (or "?id") turns a profile on, "!id" turns it off.
+    profList() {
+      return this.rform.profiles.split(/[\s,]+/).filter(Boolean);
+    },
+
+    profState(id) {
+      const list = this.profList();
+      if (list.includes('!' + id)) return 'off';
+      if (list.includes(id) || list.includes('?' + id)) return 'on';
+      return '';
+    },
+
+    setProfile(id, state) {
+      const list = this.profList().filter((p) => p.replace(/^[!?]/, '') !== id);
+      if (state === 'on') list.push(id);
+      if (state === 'off') list.push('!' + id);
+      this.rform.profiles = list.join(',');
+      this.refreshPreview();
+    },
+
+    addProfile() {
+      for (const id of this.profDraft.split(/[\s,]+/).map((p) => p.replace(/^[!?]/, '')).filter(Boolean)) {
+        if (!this.profState(id)) this.setProfile(id, 'on');
+      }
+      this.profDraft = '';
+    },
+
+    // Known profiles (with how many modules had them active at discovery) plus any the
+    // task names; all = true ignores the filter.
+    profileRows(all) {
+      const count = new Map();
+      for (const m of this.modules) for (const p of m.profiles) count.set(p, (count.get(p) || 0) + 1);
+      for (const p of this.profList()) {
+        const id = p.replace(/^[!?]/, '');
+        if (!count.has(id)) count.set(id, 0);
+      }
+      const q = all ? '' : this.profFilter.trim().toLowerCase();
+      return [...count].filter(([id]) => !q || id.toLowerCase().includes(q))
+        .sort(([a], [b]) => a.localeCompare(b)).map(([id, modules]) => ({ id, modules }));
     },
 
     async discover() {

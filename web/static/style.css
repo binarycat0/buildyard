@@ -307,3 +307,9 @@ a.plain:hover { text-decoration: underline; }
 label.resrow { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 12px; }
 label.resrow select { width: 360px; max-width: 100%; }
 label.resrow input.short { width: 110px; }
+.profiles { max-height: 260px; overflow-y: auto; }
+.profile-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+.profile-row:last-child { border-bottom: none; }
+.seg.tiny button { padding: 2px 8px; font-size: .8em; }
+input.profile-filter { width: 220px; }
+.profile-row code { font-size: .85em; }

@@ -337,12 +337,30 @@
                 <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
               </div>
               <div class="stack tabbody" x-show="rtab === 'properties'">
-              <label><span>Maven profiles <code>-P</code> <span class="muted">(comma or space separated; !id turns one off)</span></span>
-                <input x-model="rform.profiles" list="known-profiles" placeholder="fast,!slow" @input.debounce.250ms="refreshPreview()">
-              </label>
-              <datalist id="known-profiles">
-                <template x-for="p in knownProfiles()" :key="p"><option :value="p"></option></template>
-              </datalist>
+              <div class="stack tight">
+                <div class="row">
+                  <span class="label grow">Maven profiles <code>-P</code></span>
+                  <input class="profile-filter" x-show="profileRows(true).length > 8" x-model="profFilter" placeholder="Filter profiles">
+                </div>
+                <div class="profiles card flush" x-show="profileRows().length">
+                  <template x-for="r in profileRows()" :key="r.id">
+                    <div class="profile-row">
+                      <code x-text="r.id"></code>
+                      <span class="tag dim" x-show="r.modules" :title="'Active in ' + plural(r.modules, 'module') + ' at the last module discovery (by default, or turned on by the task then)'" x-text="'active · ' + plural(r.modules, 'module')"></span>
+                      <span class="grow"></span>
+                      <div class="seg tiny" :title="'-P ' + r.id + ' turns it on, -P !' + r.id + ' turns it off'">
+                        <button type="button" :class="{active: profState(r.id) === ''}" @click="setProfile(r.id, '')">Default</button>
+                        <button type="button" :class="{active: profState(r.id) === 'on'}" @click="setProfile(r.id, 'on')">On</button>
+                        <button type="button" :class="{active: profState(r.id) === 'off'}" @click="setProfile(r.id, 'off')">Off</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <p class="muted small" x-show="!profileRows(true).length">No profiles known yet. Discover the modules, or add one by id.</p>
+                <p class="muted small" x-show="profileRows(true).length && !profileRows().length">No profile matches the filter.</p>
+                <input class="profile-add" x-model="profDraft" placeholder="+ profile id, e.g. fast (Enter turns it on)" aria-label="Add a profile"
+                  @keydown.enter.prevent="addProfile()" @blur="addProfile()">
+              </div>
               <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
                 <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
               </label>
