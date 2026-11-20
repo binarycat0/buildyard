@@ -168,9 +168,9 @@
                       <td class="pin-cell"><button type="button" class="link pin" :class="{on: t.pinned}" @click="togglePin(t)" :title="t.pinned ? 'Unpin' : 'Pin to the top'">★</button></td>
                       <td class="run-cell"><button type="button" class="small primary runbtn" @click="runTask(t)" :disabled="busy" :title="'Run ' + t.name"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg> Run</button></td>
                       <td class="nowrap"><a href="javascript:void 0" @click="openEditTask(t)" x-text="t.name" title="Edit the task"></a></td>
-                      <td><div class="tags">
+                      <td class="cmd"><div class="tags">
                         <template x-for="(g, i) in taskTags(t.spec)" :key="i">
-                          <span class="tag" :class="g.cls" :title="g.title || ''" x-text="g.text"></span>
+                          <span class="tag" :class="g.cls" :title="g.title || g.text" x-text="g.text"></span>
                         </template></div></td>
                       <td class="nowrap">
                         <template x-if="t.lastJob"><a :href="'#/jobs/' + t.lastJob.id" class="status-link"><span class="status" :class="t.lastJob.status" x-text="t.lastJob.status"></span></a></template>

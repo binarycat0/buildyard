@@ -347,3 +347,6 @@ select { -webkit-appearance: none; appearance: none; padding-right: 28px;
 input[type=checkbox], input[type=radio] { margin: 0; flex: none; }
 label.radio { align-items: center; }
 svg.ic { display: block; }
+/* Tasks table: the command column takes the free space and shrinks first, long tags end with … (full text on hover) */
+table.list.tasks td.cmd { width: 100%; max-width: 0; }
+table.list.tasks .tags .tag { min-width: 0; }
