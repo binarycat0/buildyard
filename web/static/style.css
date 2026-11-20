@@ -116,11 +116,11 @@ tr.clickable:hover td { background: var(--bg); }
 .log .l-ok { color: #7fdc9a; font-weight: 600; }
 a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 
-.run-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; align-items: start; }
-@media (max-width: 820px) { .run-layout { grid-template-columns: 1fr; } }
-.tasks .task { border-top: 1px solid var(--border); padding: 8px 0 4px; display: flex; flex-direction: column; gap: 4px; }
-.tasks .task.active a.grow { font-weight: 600; }
-.tasks .task code { word-break: break-word; }
+table.list.tasks .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+table.list.tasks td.pin-cell { width: 1%; padding-right: 0; }
+table.list.tasks td.actions { width: 1%; text-align: right; }
+table.list.tasks td.actions > * { vertical-align: middle; }
+button.icon.small { width: 28px; height: 28px; }
 .grow { flex: 1; min-width: 0; }
 button.pin { color: var(--muted); opacity: .5; font-size: 1.1em; }
 button.pin.on { color: #e3a008; opacity: 1; }
@@ -188,14 +188,16 @@ code.tok { padding: 1px 7px; border: 1px solid var(--border); border-radius: 4px
 code.tok.exe { font-weight: 600; }
 code.tok.goal { border-color: var(--accent); color: var(--accent); }
 dialog.modal { border: 1px solid var(--border); border-radius: 10px; padding: 16px; width: min(900px, calc(100vw - 32px)); background: var(--card); color: var(--fg); }
+dialog.modal.wide { width: min(1000px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
 dialog.modal.narrow { width: min(560px, calc(100vw - 32px)); }
-dialog.modal input { width: 100%; }
+dialog.modal :where(input:not([type=checkbox], [type=radio])) { width: 100%; }
+dialog.modal input.short { width: auto; }
+dialog.modal input.goal-add { width: 220px; }
 .row.end { justify-content: flex-end; }
 dialog.modal::backdrop { background: rgba(0, 0, 0, .4); }
 pre.cmd.full { max-height: 60vh; overflow: auto; }
 
 /* Saved task summary in the Tasks list */
-.task .tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .tag { font-size: .78em; padding: 0 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .tag.goal { border-color: var(--accent); color: var(--accent); }
 .tag.prof { border-color: #b08bd9; color: #7d4fb3; }
@@ -222,9 +224,17 @@ input.goal-add { width: 220px; padding: 3px 10px; border-radius: 999px; font-siz
 .subtabs .count { margin-left: 5px; font-size: .78em; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-fg); font-weight: 600; }
 .tabbody { min-height: 90px; }
 .projhead { display: flex; flex-direction: column; gap: 6px; }
-.projhead .toolbar { margin-bottom: 0; }
-.uses { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
-.uses code { font-size: .9em; }
+.projhead button.icon { color: var(--muted); border-color: transparent; background: none; }
+.projhead button.icon:hover { color: var(--fg); background: var(--bg); }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+.fact { display: inline-flex; align-items: center; gap: 6px; }
+button.icon.tiny { width: 22px; height: 22px; }
+.menu-list.popover { left: 0; right: auto; min-width: 340px; max-width: min(520px, calc(100vw - 32px)); padding: 10px 12px; gap: 8px; cursor: default; }
+.menu-list.popover button, .menu-list.popover a.button { border: 1px solid var(--border); padding: 3px 10px; font-size: .85rem; }
+.kv-list { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
+.kv-list dt { color: var(--muted); }
+.kv-list dd { margin: 0; overflow-wrap: anywhere; }
+.page-tabs .count { margin-left: 6px; font-size: .78em; padding: 0 6px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
 
 /* Run form toolbar */
 .runbar { display: flex; align-items: center; gap: 8px; }
@@ -285,3 +295,4 @@ textarea.cfg-text { width: 100%; box-sizing: border-box; resize: vertical; min-h
   .cfg-keys .kv-row .muted { margin-bottom: 6px; }
 }
 .cfg select.small { width: auto; padding: 3px 6px; font-size: .85rem; }
+dialog .card.runform { border: 0; padding: 0; background: none; }

@@ -483,17 +483,24 @@ document.addEventListener('alpine:init', () => {
       this.error = '';
       this.saved = false;
       let m;
+      // A dialog left open (a run started from the task dialog) must not cover the next page.
+      document.querySelectorAll('dialog[open]').forEach((d) => d.close());
       try {
         if (!h.startsWith('/jobs/')) closeStream();
         if ((m = h.match(/^\/projects\/(\d+)(?:\/(history|settings))?$/))) {
           const id = Number(m[1]);
           const same = this.view === 'project' && this.proj?.id === id;
-          this.pview = m[2] || 'run';
+          this.pview = m[2] === 'history' ? 'history' : 'run';
           this.view = 'project';
           if (same) {
             if (this.pview === 'history') this.pjobs = await api('GET', `/projects/${id}/jobs`);
           } else {
             await this.loadProject(id);
+          }
+          // Project settings are a dialog over the task list; the old URL still opens it.
+          if (m[2] === 'settings') {
+            history.replaceState(null, '', `#/projects/${id}`);
+            this.$nextTick(() => this.openProjectSettings());
           }
         } else if ((m = h.match(/^\/compare\/(\d+)\/(\d+)$/))) {
           this.view = 'compare';
@@ -588,6 +595,12 @@ document.addEventListener('alpine:init', () => {
       this.refreshPreview();
       // First visit: list the modules in the background.
       if (!this.modules.length && !this.discoverTask) this.discover();
+      this.resetProjectForm();
+    },
+
+    // The project settings form, filled from the saved project.
+    resetProjectForm() {
+      const p = this.proj;
       const exe = p.executable ?? '';
       const known = ['', 'auto', 'wrapper', 'mvnd', 'mvn'].includes(exe);
       this.pform = {
@@ -604,6 +617,12 @@ document.addEventListener('alpine:init', () => {
         ...this.resourcesToForm(p.resources),
       };
       this.pformError = '';
+    },
+
+    openProjectSettings(tab) {
+      this.resetProjectForm();
+      if (tab) this.ptab = tab;
+      this.$refs.projDialog.showModal();
     },
 
     async saveProject() {
@@ -629,6 +648,7 @@ document.addEventListener('alpine:init', () => {
         this.rform.skips = this.rform.skips.filter((id) => this.skipPresets.some((sp) => sp.id === id));
         this.saved = true;
         this.refreshPreview();
+        this.$refs.projDialog.close();
       } catch (e) {
         this.pformError = e.message;
       } finally {
@@ -945,6 +965,10 @@ document.addEventListener('alpine:init', () => {
     fitModules() {
       const el = this.$refs.modlist;
       if (!el || !el.offsetParent) return;
+      if (el.closest('dialog')) { // the dialog scrolls; keep the list a comfortable size
+        this.modHeight = Math.max(220, Math.round(window.innerHeight * 0.45));
+        return;
+      }
       const top = el.getBoundingClientRect().top + window.scrollY;
       const info = el.parentElement.querySelector('.modinfo');
       const below = (info ? info.offsetHeight + 12 : 0) + 36; // card padding and page margin
@@ -1061,6 +1085,24 @@ document.addEventListener('alpine:init', () => {
       this.refreshPreview();
     },
 
+    // The task dialog: a new task starts from the last run's settings.
+    openNewTask() {
+      this.stopEditing();
+      const last = this.pjobs.find((j) => j.spec?.goals?.length);
+      this.rform = specToForm(last?.spec);
+      this.rform.selected = this.expandRefs(this.rform.selected);
+      this.runError = '';
+      this.saveAsNew = true;
+      this.refreshPreview();
+      this.$refs.taskDialog.showModal();
+    },
+
+    openEditTask(t) {
+      this.runError = '';
+      this.editTask(t);
+      this.$refs.taskDialog.showModal();
+    },
+
     stopEditing() {
       this.editingTask = null;
       this.saveAsNew = false;
@@ -1073,7 +1115,7 @@ document.addEventListener('alpine:init', () => {
         this.taskName = '';
         this.saveAsNew = false;
         await this.reloadTasks();
-        this.editingTask = this.profiles.find((x) => x.id === t.id) || t;
+        this.$refs.taskDialog.close();
       } catch (e) {
         this.runError = e.message;
       }
@@ -1085,7 +1127,7 @@ document.addEventListener('alpine:init', () => {
         const t = this.editingTask;
         await api('PUT', `/profiles/${t.id}`, { name: t.name, pinned: t.pinned, spec: this.spec() });
         await this.reloadTasks();
-        this.editingTask = this.profiles.find((x) => x.id === t.id) || null;
+        this.$refs.taskDialog.close();
       } catch (e) {
         this.runError = e.message;
       }
@@ -1109,7 +1151,7 @@ document.addEventListener('alpine:init', () => {
       if (!confirm(`Delete task "${t.name}"? Its past runs stay in the history.`)) return;
       try {
         await api('DELETE', `/profiles/${t.id}`);
-        this.stopEditing();
+        this.$refs.taskDialog.close();
         await this.reloadTasks();
       } catch (e) {
         this.runError = e.message;
