@@ -4,12 +4,17 @@ A personal build manager for Maven projects: a local daemon with a web UI.
 
 Documentation: https://tools.binaryc.at/buildyard
 
-## Quick start
+## Quick installation
 
 macOS or Linux, from a release (no Go needed):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/binarycat0/buildyard/main/install.sh | sh
+```
+
+### Quick start
+
+```sh
 buildyard service install   # launchd agent (macOS) or systemd --user unit (Linux)
 buildyard service start
 buildyard open              # http://127.0.0.1:7777/
