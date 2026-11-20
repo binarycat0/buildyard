@@ -44,24 +44,10 @@
     <section x-show="view === 'projects'">
       <div class="toolbar">
         <h1>Projects</h1>
-        <button class="primary" @click="openAdd()" x-show="!adding">Add project</button>
+        <button class="primary" @click="openAdd()">Add project</button>
       </div>
 
-      <form class="card add" x-show="adding" x-cloak @submit.prevent="add()">
-        <label>Project root path
-          <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
-        </label>
-        <label><span>Name <span class="muted">(optional, defaults to the folder name)</span></span>
-          <input x-model="form.name">
-        </label>
-        <p class="error" x-show="formError" x-text="formError"></p>
-        <div class="row">
-          <button class="primary" type="submit" :disabled="busy">Add</button>
-          <button type="button" @click="adding = false">Cancel</button>
-        </div>
-      </form>
-
-      <p class="muted" x-show="loaded && projects.length === 0 && !adding">
+      <p class="muted" x-show="loaded && projects.length === 0">
         No projects yet. Add a folder with a pom.xml.
       </p>
 
@@ -1015,6 +1001,23 @@
       </template>
     </section>
   </main>
+
+  <dialog class="modal narrow" x-ref="addDialog" @close="adding = false" @click="if ($event.target === $el) $el.close()">
+    <form class="stack" @submit.prevent="add()">
+      <h2>Add project</h2>
+      <label>Project root path
+        <input x-model="form.rootPath" x-ref="rootPath" placeholder="/Users/me/src/my-project" required>
+      </label>
+      <label><span>Name <span class="muted">(optional, defaults to the folder name)</span></span>
+        <input x-model="form.name">
+      </label>
+      <p class="error" x-show="formError" x-text="formError"></p>
+      <div class="row end">
+        <button type="button" @click="$refs.addDialog.close()">Cancel</button>
+        <button class="primary" type="submit" :disabled="busy">Add</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog class="modal" x-ref="cmdDialog" @close="cmdShown = null" @click="if ($event.target === $el) $el.close()">
     <div class="stack" x-show="cmdShown">

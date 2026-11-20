@@ -528,6 +528,7 @@ document.addEventListener('alpine:init', () => {
     openAdd() {
       this.adding = true;
       this.formError = '';
+      this.$refs.addDialog.showModal();
       this.$nextTick(() => this.$refs.rootPath.focus());
     },
 
@@ -537,7 +538,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const p = await api('POST', '/projects', { rootPath: this.form.rootPath, name: this.form.name });
         this.form = { rootPath: '', name: '' };
-        this.adding = false;
+        this.$refs.addDialog.close();
         location.hash = `#/projects/${p.id}`;
       } catch (e) {
         this.formError = e.message;
