@@ -350,3 +350,10 @@ svg.ic { display: block; }
 /* Tasks table: the command column takes the free space and shrinks first, long tags end with … (full text on hover) */
 table.list.tasks td.cmd { width: 100%; max-width: 0; }
 table.list.tasks .tags .tag { min-width: 0; }
+/* Skip tab: one preset per row */
+.skiplist { display: flex; flex-direction: column; }
+.skiprow { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.skiprow:last-child { border-bottom: none; }
+.skiprow:hover { background: var(--bg); }
+.skiprow .name { min-width: 9em; }
+.skiprow code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

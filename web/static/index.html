@@ -335,10 +335,12 @@
                 </div>
               </div>
               <div class="stack tabbody" x-show="rtab === 'skip'">
-                <div class="row wrap">
+                <div class="skiplist card flush" x-show="skipPresets.length">
                   <template x-for="sp in skipPresets" :key="sp.id">
-                    <label class="radio" :title="sp.args.join(' ') + (sp.note ? ' — ' + sp.note : '')">
-                      <input type="checkbox" :checked="rform.skips.includes(sp.id)" @change="toggleSkip(sp.id)"> <span x-text="sp.label || sp.id"></span>
+                    <label class="skiprow" :class="{on: rform.skips.includes(sp.id)}" :title="sp.note || ''">
+                      <input type="checkbox" :checked="rform.skips.includes(sp.id)" @change="toggleSkip(sp.id)">
+                      <span class="name" x-text="sp.label || sp.id"></span>
+                      <code class="muted small" x-text="sp.args.join(' ')"></code>
                     </label>
                   </template>
                 </div>
@@ -348,7 +350,7 @@
                 </p>
                 <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
               </div>
-              <div class="stack tabbody" x-show="rtab === 'properties'">
+              <div class="stack tabbody" x-show="rtab === 'profiles'">
               <div class="stack tight">
                 <div class="row">
                   <span class="label grow">Maven profiles <code>-P</code></span>
@@ -373,6 +375,8 @@
                 <input class="profile-add" x-model="profDraft" placeholder="+ profile id, e.g. fast (Enter turns it on)" aria-label="Add a profile"
                   @keydown.enter.prevent="addProfile()" @blur="addProfile()">
               </div>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'properties'">
               <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
                 <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
               </label>
@@ -399,7 +403,7 @@
                       <option value="debug">Debug (-X)</option>
                     </select></label>
                 </div>
-                            <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
+              <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
                 <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
               </label>
               </div>
