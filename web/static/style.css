@@ -328,3 +328,22 @@ input.profile-filter { width: 220px; }
 }
 .row-actions { display: inline-flex; gap: 4px; align-items: center; }
 .card.flush.tasks-card { overflow: visible; }
+
+/* Buttons: one hover and focus behaviour everywhere */
+button, a.button { transition: background-color .12s, border-color .12s, color .12s; }
+button:not(:disabled):not(.active):not(.primary):not(.link):hover, a.button:not(.primary):hover { background: var(--bg); border-color: var(--muted); }
+button.primary:not(:disabled):hover, a.button.primary:hover { filter: brightness(1.1); }
+button.link:hover { text-decoration: underline; }
+button.ghost { border-color: transparent; background: none; color: var(--muted); }
+button.ghost:not(:disabled):hover, button.ghost[aria-expanded="true"] { color: var(--fg); background: var(--bg); border-color: var(--border); }
+.menu-list button.danger { color: var(--danger); }
+button:focus-visible, a.button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Safari: same control metrics as Chromium */
+button, a.button, input, select, textarea { line-height: 1.25; }
+select { -webkit-appearance: none; appearance: none; padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; }
+input[type=checkbox], input[type=radio] { margin: 0; flex: none; }
+label.radio { align-items: center; }
+svg.ic { display: block; }
