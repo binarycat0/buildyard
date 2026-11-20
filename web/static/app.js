@@ -1701,6 +1701,12 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
+    // Release builds carry a tag such as 0.3.0 or v0.3.0; dev builds a commit or "dev".
+    versionLabel() {
+      const v = this.health?.version || '';
+      return /^\d/.test(v) ? 'v' + v : v;
+    },
+
     // The nav dot: red for a failure not seen on the Activity page yet, blue while something runs.
     activityDot() {
       if (this.btasks.some((t) => t.status === 'failed' && new Date(t.queuedAt) > new Date(this.seenTasksAt || 0))) return 'failed';
