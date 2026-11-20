@@ -25,11 +25,11 @@ const (
 )
 
 var (
-	ansi       = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
-	levelRe    = regexp.MustCompile(`^\[(ERROR|FATAL|WARNING|WARN|INFO|DEBUG|TRACE)\] ?`)
-	goalRe     = regexp.MustCompile(`^-{3,} (\S+?):\S+:(\S+) \((\S+)\) @ (\S+) -{3,}$`)
-	projectRe  = regexp.MustCompile(`^-+< (\S+:\S+) >-+$`) // "-----< group:artifact >-----" before "Building …"
-	excRe      = regexp.MustCompile(`^(?:[a-zA-Z_$][\w$]*\.)+[A-Z][\w$]*(?:Exception|Error|Throwable)\b`)
+	ansi      = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
+	levelRe   = regexp.MustCompile(`^\[(ERROR|FATAL|WARNING|WARN|INFO|DEBUG|TRACE)\] ?`)
+	goalRe    = regexp.MustCompile(`^-{3,} (\S+?):\S+:(\S+) \((\S+)\) @ (\S+) -{3,}$`)
+	projectRe = regexp.MustCompile(`^-+< (\S+:\S+) >-+$`) // "-----< group:artifact >-----" before "Building …"
+	excRe     = regexp.MustCompile(`^(?:[a-zA-Z_$][\w$]*\.)+[A-Z][\w$]*(?:Exception|Error|Throwable)\b`)
 )
 
 var levels = map[string]int{"ERROR": sevError, "FATAL": sevError, "WARNING": sevWarn, "WARN": sevWarn,
@@ -39,7 +39,7 @@ type pendingLog struct {
 	rec   logRecord
 	text  strings.Builder
 	rows  int
-	first int // first line number
+	first int  // first line number
 	trace bool // an exception header was seen: everything up to the next [LEVEL] line belongs here
 	last  time.Time
 }
