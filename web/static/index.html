@@ -326,7 +326,6 @@
                 </div>
               </div>
               <div class="stack tabbody" x-show="rtab === 'skip'">
-                <p class="muted small" x-show="!skipPresets.length">No skip presets. Add them in the project settings, Build tool tab.</p>
                 <div class="row wrap">
                   <template x-for="sp in skipPresets" :key="sp.id">
                     <label class="radio" :title="sp.args.join(' ') + (sp.note ? ' — ' + sp.note : '')">
@@ -334,6 +333,10 @@
                     </label>
                   </template>
                 </div>
+                <p class="muted small row">
+                  <span x-text="skipPresets.length ? 'Skip presets are defined per project.' : 'No skip presets yet.'"></span>
+                  <a href="javascript:void 0" @click="openProjectSettings('tool'); $nextTick(() => $refs.presetsBox?.scrollIntoView({block: 'start'}))">Add or edit them in the project settings</a>
+                </p>
                 <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
               </div>
               <div class="stack tabbody" x-show="rtab === 'properties'">
@@ -507,7 +510,7 @@
                 <input x-show="pform.execChoice === 'custom'" x-model="pform.customPath" placeholder="/opt/maven/bin/mvn">
               </fieldset>
 
-              <fieldset>
+              <fieldset x-ref="presetsBox">
                 <legend>Skip presets</legend>
                 <p class="muted small">Checkboxes in the run form. Change the built-in ones or add project flags such as <code>-Dskip.ui</code>.</p>
                 <table class="list presets">
