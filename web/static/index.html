@@ -401,8 +401,6 @@
               <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
                 <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
               </label>
-              </div>
-              <div class="stack tabbody" x-show="rtab === 'extra'">
               <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
                 <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
               </label>

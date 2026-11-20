@@ -393,7 +393,7 @@ document.addEventListener('alpine:init', () => {
     filterOpen: null, // open/closed folders while filtering: { q, map }
     modScroll: 0,
     modHeight: 360,
-    rtab: loadPref('runTab', 'modules'),
+    rtab: ((t) => (t === 'extra' ? 'properties' : t))(loadPref('runTab', 'modules')),
     goalDraft: '',
     discoverTask: null,
     discoverError: '',
@@ -1287,8 +1287,7 @@ document.addEventListener('alpine:init', () => {
         { id: 'skip', label: 'Skip', count: n(f.skips.length) },
         { id: 'options', label: 'Options', count: n([f.offline, f.nsu, f.errors, f.failMode, f.logLevel !== 'default'].filter(Boolean).length) },
         { id: 'resources', label: 'Resources', count: n([f.cpu, f.heap, f.forks].filter(Boolean).length) },
-        { id: 'properties', label: 'Profiles & properties', count: n(props + profiles) },
-        { id: 'extra', label: 'Extra args', count: n(splitArgs(f.args).length) },
+        { id: 'properties', label: 'Arguments', count: n(props + profiles + splitArgs(f.args).length) },
       ];
     },
 
