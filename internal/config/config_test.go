@@ -47,3 +47,26 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		})
 	}
 }
+
+func TestTelemetryConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	cfg, err := Load(path)
+	if err != nil || cfg.Telemetry.Enabled || cfg.Telemetry.Endpoint != "http://localhost:4318" || !cfg.Telemetry.Logs {
+		t.Fatalf("defaults: %+v %v", cfg.Telemetry, err)
+	}
+	live := NewLive(path, cfg)
+	if err := live.SetTelemetry(Telemetry{Enabled: true, Endpoint: "ftp://x"}); err == nil {
+		t.Fatal("a non-http endpoint must be rejected")
+	}
+	if err := live.SetTelemetry(Telemetry{Enabled: true, Endpoint: "http://collector:4318/", Traces: true}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tl := got.Telemetry
+	if !tl.Enabled || tl.Endpoint != "http://collector:4318" || !tl.Traces || tl.Logs || tl.ServiceName != "buildyard" {
+		t.Fatalf("reloaded: %+v", tl)
+	}
+}

@@ -35,7 +35,25 @@ type Command struct {
 	// Parser, when set, returns a parser for the job's output: it finds problems and,
 	// when the build tool sent no events, module progress.
 	Parser func() OutputParser
+	// Labels name the job for telemetry: project, task, tool.
+	Labels Labels
 }
+
+// Labels describe a job outside Buildyard (telemetry).
+type Labels struct {
+	Project, Task, Tool string
+}
+
+// Trace exports one job elsewhere (e.g. OpenTelemetry). Calls never block the build.
+type Trace interface {
+	TraceID() string
+	Line(n int, text string) // output line n
+	Event(line []byte)       // one build tool event (JSON Lines)
+	End(status string, exit *int)
+}
+
+// Tracer starts a Trace for a job that starts now, or returns nil when export is off.
+type Tracer func(j store.Job, l Labels, gitHead string) Trace
 
 // OutputParser reads a job's output one line at a time.
 type OutputParser interface {
@@ -57,6 +75,8 @@ type Runner struct {
 	keepJobs      int
 	// KillGrace is how long a cancelled job gets between SIGTERM and SIGKILL.
 	KillGrace time.Duration
+	// Tracer, when set, exports each job as it runs.
+	Tracer Tracer
 
 	mu      sync.Mutex
 	queue   []*run
@@ -302,6 +322,12 @@ func (r *Runner) execute(rn *run) {
 		}
 	}
 	lines := rn.closeLog()
+	rn.mu.Lock()
+	tr := rn.trace
+	rn.mu.Unlock()
+	if tr != nil {
+		tr.End(status, exit)
+	}
 	if err := r.store.FinishJob(ctx, id, status, exit, lines); err != nil {
 		r.log.Error("finish job", "job", id, "err", err)
 	}
@@ -333,8 +359,19 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 		r.log.Error("open job log", "job", id, "err", err)
 		return store.JobFailed, nil
 	}
-	if err := r.store.StartJob(ctx, id, gitHead(rn.cmd.Dir)); err != nil {
+	head := gitHead(rn.cmd.Dir)
+	if err := r.store.StartJob(ctx, id, head); err != nil {
 		r.log.Error("start job", "job", id, "err", err)
+	}
+	if r.Tracer != nil {
+		if tr := r.Tracer(rn.job, rn.cmd.Labels, head); tr != nil {
+			rn.mu.Lock()
+			rn.trace = tr
+			rn.mu.Unlock()
+			if err := r.store.SetJobTrace(ctx, id, tr.TraceID()); err != nil {
+				r.log.Error("set job trace", "job", id, "err", err)
+			}
+		}
 	}
 	if rn.cmd.Parser != nil {
 		rn.mu.Lock()

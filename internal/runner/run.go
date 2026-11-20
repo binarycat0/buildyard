@@ -66,6 +66,7 @@ type run struct {
 	prog        progress
 	parser      OutputParser
 	problems    []store.JobProblem
+	trace       Trace
 }
 
 func (rn *run) openLog(path string) error {
@@ -89,6 +90,9 @@ func (rn *run) writeLine(text string) {
 	}
 	rn.lines++
 	rn.publishLocked(Event{Type: "line", N: rn.lines, Text: text})
+	if rn.trace != nil {
+		rn.trace.Line(rn.lines, text)
+	}
 	if rn.parser != nil {
 		probs, changed := rn.parser.Line(rn.lines, text)
 		for i := range probs {

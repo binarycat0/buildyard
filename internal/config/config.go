@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -20,6 +21,47 @@ type Config struct {
 	MaxConcurrentJobs int       `toml:"maxConcurrentJobs"`
 	Retention         Retention `toml:"retention"`
 	Defaults          Defaults  `toml:"defaults"`
+	Telemetry         Telemetry `toml:"telemetry"`
+}
+
+// Telemetry is the optional OpenTelemetry export of builds: each job as a trace
+// (startup, modules, goals, downloads) and its output as log records, sent over
+// OTLP/HTTP to a collector such as grafana/otel-lgtm or Grafana Alloy.
+type Telemetry struct {
+	Enabled     bool              `toml:"enabled" json:"enabled"`
+	Endpoint    string            `toml:"endpoint" json:"endpoint"` // OTLP/HTTP base URL; /v1/traces and /v1/logs are appended
+	Traces      bool              `toml:"traces" json:"traces"`
+	Logs        bool              `toml:"logs" json:"logs"`
+	ServiceName string            `toml:"serviceName" json:"serviceName"`
+	Headers     map[string]string `toml:"headers" json:"headers"`       // e.g. Authorization for a hosted backend
+	GrafanaURL  string            `toml:"grafanaUrl" json:"grafanaUrl"` // for "open trace" links; empty = no links
+}
+
+// DefaultTelemetry is the telemetry config before the user changes it: off, and
+// pointing at a collector on this machine.
+func DefaultTelemetry() Telemetry {
+	return Telemetry{Endpoint: "http://localhost:4318", Traces: true, Logs: true, ServiceName: "buildyard", GrafanaURL: "http://localhost:3000"}
+}
+
+// Validate checks the telemetry settings; endpoints only matter when export is on.
+func (t Telemetry) Validate() error {
+	check := func(name, raw string, required bool) error {
+		if raw == "" {
+			if required {
+				return fmt.Errorf("%s is required", name)
+			}
+			return nil
+		}
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("%s must be an http(s) URL, got %q", name, raw)
+		}
+		return nil
+	}
+	if err := check("telemetry endpoint", t.Endpoint, t.Enabled); err != nil {
+		return err
+	}
+	return check("Grafana URL", t.GrafanaURL, false)
 }
 
 type Retention struct {
@@ -38,6 +80,7 @@ func Default() Config {
 		MaxConcurrentJobs: 1,
 		Retention:         Retention{JobsPerProject: 200, MaxLogBytes: "2GB"},
 		Defaults:          Defaults{Flags: []string{"-ntp"}},
+		Telemetry:         DefaultTelemetry(),
 	}
 }
 
@@ -123,6 +166,28 @@ func Load(path string) (Config, error) {
 	if md.IsDefined("defaults", "flags") {
 		cfg.Defaults.Flags = file.Defaults.Flags
 	}
+	t := &cfg.Telemetry
+	if md.IsDefined("telemetry", "enabled") {
+		t.Enabled = file.Telemetry.Enabled
+	}
+	if md.IsDefined("telemetry", "endpoint") {
+		t.Endpoint = file.Telemetry.Endpoint
+	}
+	if md.IsDefined("telemetry", "traces") {
+		t.Traces = file.Telemetry.Traces
+	}
+	if md.IsDefined("telemetry", "logs") {
+		t.Logs = file.Telemetry.Logs
+	}
+	if md.IsDefined("telemetry", "serviceName") {
+		t.ServiceName = file.Telemetry.ServiceName
+	}
+	if md.IsDefined("telemetry", "headers") {
+		t.Headers = file.Telemetry.Headers
+	}
+	if md.IsDefined("telemetry", "grafanaUrl") {
+		t.GrafanaURL = file.Telemetry.GrafanaURL
+	}
 	if err := cfg.Validate(); err != nil {
 		return cfg, fmt.Errorf("%s: %w", path, err)
 	}
@@ -137,5 +202,5 @@ func (c Config) Validate() error {
 	if c.MaxConcurrentJobs < 1 {
 		return fmt.Errorf("maxConcurrentJobs must be >= 1")
 	}
-	return nil
+	return c.Telemetry.Validate()
 }

@@ -32,6 +32,49 @@ Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `bu
 
 To uninstall: `buildyard service uninstall`, then delete `~/.local/bin/buildyard` and `~/.buildyard`.
 
+## Observability (optional)
+
+Buildyard can also send every build to an OpenTelemetry stack you run yourself, to see where the time goes (startup, each module, each plugin goal, artifact downloads) and to compare the same build on two machines. It is off by default; the local logs and the UI work the same either way.
+
+- **Traces** (Tempo): one trace per run. `startup` covers the JVM, POM loading and extensions; then a span per module, with a span per goal (`maven-compiler-plugin:compile (default-compile)`) and per download (`download g:a:jar:v`, with repository, size and whether it was found). Spans carry `host.name`, the project, task and tool (mvn, mvnd, mvnw) and download totals. Works with mvn, mvnd and ./mvnw through Buildyard's Maven extension.
+- **Logs** (Loki): every output line, under `service_name="buildyard"`, linked to the run's trace; the job id, project, task and line number are structured metadata.
+
+Start Grafana, Loki and Tempo in one container ([grafana/otel-lgtm](https://github.com/grafana/docker-otel-lgtm)):
+
+```sh
+docker run -d --name lgtm -p 3000:3000 -p 4318:4318 grafana/otel-lgtm
+```
+
+or with Compose (`docker compose up -d`), keeping data across restarts:
+
+```yaml
+services:
+  lgtm:
+    image: grafana/otel-lgtm
+    ports: ["3000:3000", "4318:4318"]   # Grafana, OTLP/HTTP
+    volumes: ["lgtm-data:/data"]
+volumes:
+  lgtm-data:
+```
+
+Then in Settings → Observability turn on **Export builds** (endpoint `http://localhost:4318`), press **Test** and **Save**. Runs started afterwards show a trace link on their page that opens Grafana Explore (the link assumes the Tempo data source uid `tempo`, as in otel-lgtm). In Grafana: Explore → Tempo for traces (TraceQL, e.g. `{resource.service.name="buildyard" && span.buildyard.project="my-app"}`), Explore → Loki for logs (`{service_name="buildyard"} | buildyard_project="my-app"`).
+
+The same settings live in `config.toml`:
+
+```toml
+[telemetry]
+enabled = true
+endpoint = "http://localhost:4318"   # OTLP/HTTP; /v1/traces and /v1/logs are appended
+traces = true
+logs = true
+serviceName = "buildyard"
+grafanaUrl = "http://localhost:3000"
+# [telemetry.headers]                # for a hosted backend
+# Authorization = "Basic ..."
+```
+
+Any OTLP/HTTP receiver that accepts JSON works, e.g. Grafana Alloy or an OpenTelemetry Collector in front of your own Loki and Tempo. Export never slows a build down: when the collector is down, records are dropped and counted on the Settings page.
+
 ## CLI
 
 With the daemon running, the CLI drives it (see `buildyard help`):

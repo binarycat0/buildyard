@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/BurntSushi/toml"
@@ -67,6 +68,41 @@ func (l *Live) SetLimits(v Limits) error {
 	err := updateFile(l.path, func(raw map[string]any) {
 		raw["maxConcurrentJobs"] = v.MaxConcurrentJobs
 		section(raw, "retention")["jobsPerProject"] = v.JobsPerProject
+	})
+	if err != nil {
+		l.mu.Unlock()
+		return err
+	}
+	return l.setLocked(next)
+}
+
+// SetTelemetry validates the telemetry settings, writes them to config.toml and applies them.
+func (l *Live) SetTelemetry(t Telemetry) error {
+	t.Endpoint = strings.TrimRight(strings.TrimSpace(t.Endpoint), "/")
+	t.GrafanaURL = strings.TrimRight(strings.TrimSpace(t.GrafanaURL), "/")
+	t.ServiceName = strings.TrimSpace(t.ServiceName)
+	if t.ServiceName == "" {
+		t.ServiceName = DefaultTelemetry().ServiceName
+	}
+	if err := t.Validate(); err != nil {
+		return err
+	}
+	l.mu.Lock()
+	next := l.cfg
+	next.Telemetry = t
+	err := updateFile(l.path, func(raw map[string]any) {
+		sec := section(raw, "telemetry")
+		sec["enabled"] = t.Enabled
+		sec["endpoint"] = t.Endpoint
+		sec["traces"] = t.Traces
+		sec["logs"] = t.Logs
+		sec["serviceName"] = t.ServiceName
+		sec["grafanaUrl"] = t.GrafanaURL
+		if len(t.Headers) > 0 {
+			sec["headers"] = t.Headers
+		} else {
+			delete(sec, "headers")
+		}
 	})
 	if err != nil {
 		l.mu.Unlock()

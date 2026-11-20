@@ -18,6 +18,7 @@ import (
 	"github.com/binarycat0/buildyard/internal/runner"
 	"github.com/binarycat0/buildyard/internal/store"
 	"github.com/binarycat0/buildyard/internal/tasks"
+	"github.com/binarycat0/buildyard/internal/telemetry"
 )
 
 // Version is set by main from build flags.
@@ -31,12 +32,14 @@ type Server struct {
 	JDKs    jdk.Detector // where to look for JDKs
 	Home    string       // user home, for finding mvn/mvnd outside PATH
 	DataDir string
-	Config  *config.Live        // daemon settings from config.toml; nil in tests that don't need them
-	ExtJar  string              // installed Maven extension; "" disables it
-	UI      fs.FS               // static files; index.html at the root
-	Getenv  func(string) string // env lookup for config file locations; nil = os.Getenv
-	Log     *slog.Logger
-	started time.Time
+	Config  *config.Live // daemon settings from config.toml; nil in tests that don't need them
+	ExtJar  string       // installed Maven extension; "" disables it
+	// Telemetry is the OpenTelemetry export; nil in tests that don't need it.
+	Telemetry *telemetry.Exporter
+	UI        fs.FS               // static files; index.html at the root
+	Getenv    func(string) string // env lookup for config file locations; nil = os.Getenv
+	Log       *slog.Logger
+	started   time.Time
 }
 
 // Handler returns the HTTP handler with the API and UI routes.
@@ -73,6 +76,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/jobs/{id}/stream", s.jobStream)
 	mux.HandleFunc("GET /api/config", s.getConfig)
 	mux.HandleFunc("PUT /api/config", s.putConfig)
+	mux.HandleFunc("GET /api/telemetry", s.getTelemetry)
+	mux.HandleFunc("PUT /api/telemetry", s.putTelemetry)
+	mux.HandleFunc("POST /api/telemetry/test", s.testTelemetry)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PUT /api/settings", s.putSettings)
 	mux.HandleFunc("GET /api/tools", s.getTools)

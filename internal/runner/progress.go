@@ -96,6 +96,9 @@ func (p *progress) finish(jobStatus string) []store.JobModule {
 
 // applyLocked applies one event line and publishes what changed. rn.mu must be held.
 func (rn *run) applyLocked(line []byte) {
+	if rn.trace != nil {
+		rn.trace.Event(line)
+	}
 	changed, session := rn.prog.apply(line)
 	if session {
 		rn.publishLocked(Event{Type: "modules", Modules: rn.prog.snapshot()})
