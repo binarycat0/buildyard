@@ -357,3 +357,6 @@ table.list.tasks .tags .tag { min-width: 0; }
 .skiprow:hover { background: var(--bg); }
 .skiprow .name { min-width: 9em; }
 .skiprow code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* Dialog footer: Delete and more on the left, Cancel and Save on the right; stays visible while the form scrolls */
+.modal-foot { position: sticky; bottom: -16px; margin: 4px -16px -16px; padding: 12px 16px; background: var(--card); border-top: 1px solid var(--border); z-index: 5; }
+.menu.up .menu-list { top: auto; bottom: calc(100% + 4px); left: 0; right: auto; }

@@ -204,23 +204,11 @@
                   <strong x-show="!editingTask">New task</strong>
                 </div>
                 <span class="grow"></span>
-                <button type="button" class="icon" x-show="editingTask" @click="updateTask()" :disabled="busy || !!rpreview?.error"
-                  :title="editingTask ? 'Save changes to this task' : 'Save as a task'" :aria-label="editingTask ? 'Save task' : 'Save as task'"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9l2 2v9h-11z M5 2.5v3.5h5V2.5 M4.5 13.5V9h7v4.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
-                <button type="button" class="icon danger" x-show="editingTask" @click="deleteTask(editingTask)" title="Delete this task" aria-label="Delete task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                <button type="button" class="icon" @click="$refs.taskDialog.close()" title="Close" aria-label="Close"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
-                <div class="menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-                  <button type="button" class="icon" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
-                  <div class="menu-list" x-show="open" x-cloak @click="open = false">
-                    <button type="button" @click="saveAsNew = true" :disabled="!!rpreview?.error" x-text="editingTask ? 'Save as new task…' : 'Save as task…'"></button>
-                    <button type="button" @click="copyCommand(rpreview?.argv)" :disabled="!rpreview">Copy command</button>
-                    <button type="button" @click="showCommand(rpreview)" :disabled="!rpreview">Show full command</button>
-                    <button type="button" @click="resetRunForm()">Reset the form</button>
-                  </div>
-                </div>
+                <button type="button" class="icon ghost" @click="$refs.taskDialog.close()" title="Close" aria-label="Close"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
               </div>
               <div class="row" x-show="saveAsNew || !editingTask">
                 <input class="grow" x-model="taskName" placeholder="Task name, e.g. Fast core build" @keydown.enter.prevent="createTask()" @keydown.escape="saveAsNew = false" x-effect="saveAsNew && $nextTick(() => $el.focus())">
-                <button type="button" class="primary" @click="createTask()">Save</button>
+                <button type="button" class="primary" x-show="editingTask" @click="createTask()">Save as new</button>
                 <button type="button" x-show="editingTask" @click="saveAsNew = false">Cancel</button>
               </div>
               <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
@@ -437,6 +425,21 @@
                     <input class="short" x-show="rform.forks === 'custom'" x-model="rform.forksCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
                   </span></label>
                 </div>
+              </div>
+              <div class="row modal-foot">
+                <button type="button" class="danger" x-show="editingTask" @click="deleteTask(editingTask)" title="Delete this task">Delete…</button>
+                <div class="menu up" x-show="editingTask" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="if (open) { open = false; $event.preventDefault(); $event.stopPropagation() }">
+                  <button type="button" class="icon" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
+                  <div class="menu-list" x-show="open" x-cloak @click="open = false">
+                    <button type="button" @click="saveAsNew = true" :disabled="!!rpreview?.error">Save as new task…</button>
+                    <button type="button" @click="copyCommand(rpreview?.argv)" :disabled="!rpreview">Copy command</button>
+                    <button type="button" @click="showCommand(rpreview)" :disabled="!rpreview">Show full command</button>
+                    <button type="button" @click="resetRunForm()">Reset the form</button>
+                  </div>
+                </div>
+                <span class="grow"></span>
+                <button type="button" @click="$refs.taskDialog.close()">Cancel</button>
+                <button type="submit" class="primary" :disabled="busy || !!rpreview?.error" :title="editingTask ? 'Save changes (Enter)' : 'Create the task (Enter)'" x-text="editingTask ? 'Save' : 'Create task'"></button>
               </div>
             </form>
           </dialog>
