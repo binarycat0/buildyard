@@ -461,7 +461,8 @@ document.addEventListener('alpine:init', () => {
       const poll = async () => {
         await this.loadActivity().catch(() => {});
         await this.checkRestart();
-        setTimeout(poll, this.view === 'activity' ? 2000 : 10000);
+        await this.refreshProjectJobs().catch(() => {});
+        setTimeout(poll, this.view === 'activity' ? 2000 : this.view === 'project' ? 3000 : 10000);
       };
       setTimeout(poll, 2000);
     },
@@ -1073,6 +1074,30 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ---------- saved tasks ----------
+    // Queued and running jobs of the open project, shown above its tabs.
+    activeJobs() {
+      const rank = { running: 0, queued: 1 };
+      return this.pjobs.filter((j) => j.status in rank).sort((a, b) => rank[a.status] - rank[b.status] || a.id - b.id);
+    },
+
+    jobTaskName(j) {
+      const t = j.profileId && this.profiles.find((x) => x.id === j.profileId);
+      return t ? t.name : this.specText(j);
+    },
+
+    // Keeps the project page current while builds run (also ones started from the CLI);
+    // the tasks' last runs follow when a job starts or ends.
+    async refreshProjectJobs() {
+      if (this.view !== 'project' || !this.proj) return;
+      const id = this.proj.id;
+      const before = this.activeJobs().map((j) => j.id + j.status).join();
+      const jobs = await api('GET', `/projects/${id}/jobs`);
+      if (this.view !== 'project' || this.proj?.id !== id) return;
+      this.pjobs = jobs;
+      this.now = Date.now();
+      if (this.activeJobs().map((j) => j.id + j.status).join() !== before) await this.reloadTasks();
+    },
+
     async reloadTasks() {
       this.profiles = await api('GET', `/projects/${this.proj.id}/profiles`);
     },

@@ -122,6 +122,27 @@
                 <span class="muted" x-show="runtime?.jdk" x-text="runtime?.jdk && (runtime.jdk.name || runtime.jdk.vendor || '')"></span></span>
             </div>
           </div>
+          <div class="card flush active-jobs" x-show="activeJobs().length">
+            <table class="list">
+              <tbody>
+                <template x-for="j in activeJobs()" :key="j.id">
+                  <tr>
+                    <td class="nowrap"><a :href="'#/jobs/' + j.id" class="status-link"><span class="status" :class="j.status" x-text="j.status"></span></a></td>
+                    <td class="nowrap"><a :href="'#/jobs/' + j.id" x-text="'#' + j.id"></a></td>
+                    <td class="grow-cell"><a :href="'#/jobs/' + j.id" class="plain" x-text="jobTaskName(j)"></a></td>
+                    <td class="nowrap muted small" x-text="j.startedAt ? 'started ' + when(j.startedAt) : 'queued ' + when(j.queuedAt)"></td>
+                    <td class="nowrap small" x-text="duration(j)"></td>
+                    <td class="actions nowrap">
+                      <a class="button small" :href="'#/jobs/' + j.id">Log</a>
+                      <button class="small" x-show="j.status === 'queued'" @click="controlJob('stop', j)">Cancel</button>
+                      <button class="small" x-show="j.status === 'running' && !j.stopRequestedAt" @click="controlJob('stop', j)" title="Graceful, like Ctrl+C">Stop</button>
+                      <button class="small danger" x-show="j.status === 'running'" @click="controlJob('kill', j)" title="SIGKILL at once">Kill</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
           <nav class="tabs page-tabs">
             <a :href="'#/projects/' + proj.id" :class="{active: pview === 'run'}">Tasks<span class="count" x-show="profiles.length" x-text="profiles.length"></span></a>
             <a :href="'#/projects/' + proj.id + '/history'" :class="{active: pview === 'history'}">History</a>
