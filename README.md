@@ -10,6 +10,11 @@ macOS or Linux, from a release (no Go needed):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/binarycat0/buildyard/main/install.sh | sh
+```
+
+Quick start
+
+```sh
 buildyard service install   # launchd agent (macOS) or systemd --user unit (Linux)
 buildyard service start     # then open http://127.0.0.1:7777/
 ```
@@ -20,7 +25,7 @@ The service runs `buildyard serve --service` with the `PATH`, `JAVA_HOME` and `B
 
 To uninstall: `make uninstall`, or `buildyard service uninstall` and then delete `~/.local/bin/buildyard` and `~/.buildyard`.
 
-## Command line
+## CLI
 
 With the daemon running, the CLI drives it (see `buildyard help`):
 
@@ -35,7 +40,12 @@ buildyard cancel 42
 
 `run` exits non-zero unless the build succeeded, so it works in scripts and git hooks. Ctrl-C stops following; the build keeps running.
 
-## Build and run
+## Development
+
+### Prerequisites
+
+
+### Build and run
 
 Requires Go 1.26+.
 
@@ -51,14 +61,6 @@ A second instance for development: `BUILDYARD_HOME=/tmp/by-test ./bin/buildyard 
 Releases: push a `v*` tag, or run the **Release** workflow on `main` with a version such as `v0.1.0`. It builds darwin and linux binaries (amd64, arm64) with checksums. CI runs gofmt, vet and race tests on every pull request.
 
 Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db`, `daemon.log`. Settings → General edits `maxConcurrentJobs` and `retention.jobsPerProject` in `config.toml` and applies them at once (saving drops comments in the file); after editing the file by hand, `kill -HUP <pid>` reloads it. The port needs a restart.
-
-## Status
-
-Phase 1 (skeleton): config, lock file, SQLite with migrations, projects CRUD and the projects screen.
-
-Settings: a JDK list (auto-detected as a background task, plus manual entries), default executable and JDK; per project — `./mvnw`, mvnd, mvn or a custom path, a JDK and environment variables.
-
-Settings has a tab per tool (General, JDK, Maven, mvnd, Gradle, Bazel). Each tool tab shows the detected installs and the versions projects pin, and edits the tool's user config files: `~/.m2/settings.xml`, `~/.m2/toolchains.xml` (can be generated from the JDK list), `~/.mavenrc`, `~/.m2/mvnd.properties` (`MVND_PROPERTIES_PATH`), `gradle.properties` in `GRADLE_USER_HOME`, `~/.bazelrc` and `~/.bazeliskrc`. Before every save the previous version is copied to `~/.buildyard/backups/<file>/` (the last 30 are kept); a file changed on disk since it was loaded is not overwritten. XML files must be well-formed. The mvnd tab can also show and stop running mvnd daemons.
 
 ## License
 
