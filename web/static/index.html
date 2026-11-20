@@ -344,14 +344,14 @@
                 </div>
                 <div class="profiles card flush" x-show="profileRows().length">
                   <template x-for="r in profileRows()" :key="r.id">
-                    <div class="profile-row">
+                    <div class="profile-row" :class="profState(r.id)">
                       <code x-text="r.id"></code>
                       <span class="tag dim" x-show="r.modules" :title="'Active in ' + plural(r.modules, 'module') + ' at the last module discovery (by default, or turned on by the task then)'" x-text="'active · ' + plural(r.modules, 'module')"></span>
                       <span class="grow"></span>
                       <div class="seg tiny" :title="'-P ' + r.id + ' turns it on, -P !' + r.id + ' turns it off'">
-                        <button type="button" :class="{active: profState(r.id) === ''}" @click="setProfile(r.id, '')">Default</button>
-                        <button type="button" :class="{active: profState(r.id) === 'on'}" @click="setProfile(r.id, 'on')">On</button>
-                        <button type="button" :class="{active: profState(r.id) === 'off'}" @click="setProfile(r.id, 'off')">Off</button>
+                        <button type="button" class="neutral" :class="{active: profState(r.id) === ''}" @click="setProfile(r.id, '')">Default</button>
+                        <button type="button" class="on" :class="{active: profState(r.id) === 'on'}" @click="setProfile(r.id, 'on')">On</button>
+                        <button type="button" class="off" :class="{active: profState(r.id) === 'off'}" @click="setProfile(r.id, 'off')">Off</button>
                       </div>
                     </div>
                   </template>
