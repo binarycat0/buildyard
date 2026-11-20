@@ -1285,9 +1285,9 @@ document.addEventListener('alpine:init', () => {
       return [
         { id: 'modules', label: 'Modules', count: f.modulesMode === 'selected' ? n(f.selected.length) : f.modulesMode === 'exclude' ? (f.selected.length ? '−' + f.selected.length : '') : '' },
         { id: 'skip', label: 'Skip', count: n(f.skips.length) },
-        { id: 'resources', label: 'Resources', count: n([f.cpu, f.heap, f.forks].filter(Boolean).length) },
         { id: 'properties', label: 'Arguments', count: n(props + profiles + splitArgs(f.args).length
           + [f.offline, f.nsu, f.errors, f.failMode, f.logLevel !== 'default'].filter(Boolean).length) },
+        { id: 'resources', label: 'Resources', count: n([f.cpu, f.heap, f.forks].filter(Boolean).length) },
       ];
     },
 

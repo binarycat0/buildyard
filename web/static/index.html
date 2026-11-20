@@ -336,37 +336,6 @@
                 </div>
                 <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
               </div>
-              <div class="stack tabbody" x-show="rtab === 'resources'">
-                <div class="row wrap">
-                  <label class="inline" title="Parallel module builds: Maven -T"><span>CPU</span>
-                    <select x-model="rform.cpu" @change="refreshPreview()">
-                      <option value="" x-text="projectDefault('cpu')"></option>
-                      <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.cpu"></option></template>
-                      <option value="custom">Custom…</option>
-                    </select>
-                    <input class="short" x-show="rform.cpu === 'custom'" x-model="rform.cpuCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
-                  </label>
-                  <label class="inline" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span>
-                    <select x-model="rform.heap" @change="refreshPreview()">
-                      <option value="" x-text="projectDefault('heap')"></option>
-                      <option value="-1">JVM default (a quarter of the RAM)</option>
-                      <template x-for="c in resChoices('heap')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.heap"></option></template>
-                      <option value="custom">Custom…</option>
-                    </select>
-                    <input class="short" x-show="rform.heap === 'custom'" x-model="rform.heapCustom" @input.debounce.250ms="refreshPreview()" placeholder="GB" >
-                    <span class="muted" x-show="rform.heap === 'custom'">GB</span>
-                  </label>
-                  <label class="inline" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span>
-                    <select x-model="rform.forks" @change="refreshPreview()">
-                      <option value="" x-text="projectDefault('forks')"></option>
-                      <option value="none">Test plugin default (1 JVM)</option>
-                      <template x-for="c in resChoices('forks')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.forks"></option></template>
-                      <option value="custom">Custom…</option>
-                    </select>
-                    <input class="short" x-show="rform.forks === 'custom'" x-model="rform.forksCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
-                  </label>
-                </div>
-              </div>
               <div class="stack tabbody" x-show="rtab === 'properties'">
               <label><span>Maven profiles <code>-P</code> <span class="muted">(comma or space separated; !id turns one off)</span></span>
                 <input x-model="rform.profiles" list="known-profiles" placeholder="fast,!slow" @input.debounce.250ms="refreshPreview()">
@@ -403,6 +372,37 @@
                             <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
                 <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
               </label>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'resources'">
+                <div class="reslist">
+                  <label class="resrow" title="Parallel module builds: Maven -T"><span>CPU</span><span class="row">
+                    <select x-model="rform.cpu" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('cpu')"></option>
+                      <template x-for="c in resChoices('cpu')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.cpu"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.cpu === 'custom'" x-model="rform.cpuCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
+                  </span></label>
+                  <label class="resrow" title="Maven heap: -Xmx in MAVEN_OPTS (mvnd: -Dmvnd.maxHeapSize)"><span>Maven memory</span><span class="row">
+                    <select x-model="rform.heap" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('heap')"></option>
+                      <option value="-1">JVM default (a quarter of the RAM)</option>
+                      <template x-for="c in resChoices('heap')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.heap"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.heap === 'custom'" x-model="rform.heapCustom" @input.debounce.250ms="refreshPreview()" placeholder="GB" >
+                    <span class="muted" x-show="rform.heap === 'custom'">GB</span>
+                  </span></label>
+                  <label class="resrow" title="Parallel test JVMs: -DforkCount for Surefire and Failsafe"><span>Test JVMs</span><span class="row">
+                    <select x-model="rform.forks" @change="refreshPreview()">
+                      <option value="" x-text="projectDefault('forks')"></option>
+                      <option value="none">Test plugin default (1 JVM)</option>
+                      <template x-for="c in resChoices('forks')" :key="c[0]"><option :value="c[0]" x-text="c[1]" :selected="c[0] === rform.forks"></option></template>
+                      <option value="custom">Custom…</option>
+                    </select>
+                    <input class="short" x-show="rform.forks === 'custom'" x-model="rform.forksCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
+                  </span></label>
+                </div>
               </div>
             </form>
           </dialog>

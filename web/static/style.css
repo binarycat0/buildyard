@@ -303,3 +303,7 @@ dialog .card.runform { border: 0; padding: 0; background: none; }
 .active-jobs tr:last-child td { border-bottom: 0; }
 a.plain { color: var(--fg); text-decoration: none; }
 a.plain:hover { text-decoration: underline; }
+.reslist { display: flex; flex-direction: column; gap: 8px; }
+label.resrow { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 12px; }
+label.resrow select { width: 360px; max-width: 100%; }
+label.resrow input.short { width: 110px; }
