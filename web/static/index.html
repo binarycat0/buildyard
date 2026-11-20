@@ -168,26 +168,23 @@
                       <td class="pin-cell"><button type="button" class="link pin" :class="{on: t.pinned}" @click="togglePin(t)" :title="t.pinned ? 'Unpin' : 'Pin to the top'">★</button></td>
                       <td class="run-cell"><button type="button" class="small primary runbtn" @click="runTask(t)" :disabled="busy" :title="'Run ' + t.name"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg> Run</button></td>
                       <td class="nowrap"><a href="javascript:void 0" @click="openEditTask(t)" x-text="t.name" title="Edit the task"></a></td>
-                      <td><div class="tags">
+                      <td class="cmd"><div class="tags">
                         <template x-for="(g, i) in taskTags(t.spec)" :key="i">
-                          <span class="tag" :class="g.cls" :title="g.title || ''" x-text="g.text"></span>
+                          <span class="tag" :class="g.cls" :title="g.title || g.text" x-text="g.text"></span>
                         </template></div></td>
                       <td class="nowrap">
                         <template x-if="t.lastJob"><a :href="'#/jobs/' + t.lastJob.id" class="status-link"><span class="status" :class="t.lastJob.status" x-text="t.lastJob.status"></span></a></template>
                         <span class="muted small" x-text="t.lastJob ? when(t.lastJob.finishedAt || t.lastJob.startedAt || t.lastJob.queuedAt) : 'never'"></span>
                       </td>
                       <td class="actions nowrap">
-                        <div class="row-actions">
-                        <button type="button" class="icon small" @click="openEditTask(t)" title="Edit the task" aria-label="Edit the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8H2.5v-3z M9 4l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
-                        <button type="button" class="icon small" @click="duplicateTask(t)" title="Duplicate the task" aria-label="Duplicate the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5h8v8h-8z M3 10.5H2.5v-8h8V3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
-                        <button type="button" class="icon small danger" @click="deleteTask(t)" title="Delete the task" aria-label="Delete the task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                         <div class="menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-                          <button type="button" class="icon small" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
+                          <button type="button" class="icon small ghost" @click="open = !open" title="Actions" aria-label="Task actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
                           <div class="menu-list" x-show="open" x-cloak @click="open = false">
+                            <button type="button" @click="duplicateTask(t)">Duplicate</button>
                             <button type="button" @click="taskCommand(t, 'copy')">Copy command</button>
                             <button type="button" @click="taskCommand(t, 'show')">Show full command</button>
+                            <button type="button" class="danger" @click="deleteTask(t)">Delete…</button>
                           </div>
-                        </div>
                         </div>
                       </td>
                     </tr>
@@ -207,23 +204,11 @@
                   <strong x-show="!editingTask">New task</strong>
                 </div>
                 <span class="grow"></span>
-                <button type="button" class="icon" x-show="editingTask" @click="updateTask()" :disabled="busy || !!rpreview?.error"
-                  :title="editingTask ? 'Save changes to this task' : 'Save as a task'" :aria-label="editingTask ? 'Save task' : 'Save as task'"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9l2 2v9h-11z M5 2.5v3.5h5V2.5 M4.5 13.5V9h7v4.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
-                <button type="button" class="icon danger" x-show="editingTask" @click="deleteTask(editingTask)" title="Delete this task" aria-label="Delete task"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                <button type="button" class="icon" @click="$refs.taskDialog.close()" title="Close" aria-label="Close"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
-                <div class="menu" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-                  <button type="button" class="icon" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
-                  <div class="menu-list" x-show="open" x-cloak @click="open = false">
-                    <button type="button" @click="saveAsNew = true" :disabled="!!rpreview?.error" x-text="editingTask ? 'Save as new task…' : 'Save as task…'"></button>
-                    <button type="button" @click="copyCommand(rpreview?.argv)" :disabled="!rpreview">Copy command</button>
-                    <button type="button" @click="showCommand(rpreview)" :disabled="!rpreview">Show full command</button>
-                    <button type="button" @click="resetRunForm()">Reset the form</button>
-                  </div>
-                </div>
+                <button type="button" class="icon ghost" @click="$refs.taskDialog.close()" title="Close" aria-label="Close"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
               </div>
               <div class="row" x-show="saveAsNew || !editingTask">
                 <input class="grow" x-model="taskName" placeholder="Task name, e.g. Fast core build" @keydown.enter.prevent="createTask()" @keydown.escape="saveAsNew = false" x-effect="saveAsNew && $nextTick(() => $el.focus())">
-                <button type="button" class="primary" @click="createTask()">Save</button>
+                <button type="button" class="primary" x-show="editingTask" @click="createTask()">Save as new</button>
                 <button type="button" x-show="editingTask" @click="saveAsNew = false">Cancel</button>
               </div>
               <p class="error" x-show="rpreview?.error || runError" x-text="runError || rpreview?.error"></p>
@@ -338,10 +323,12 @@
                 </div>
               </div>
               <div class="stack tabbody" x-show="rtab === 'skip'">
-                <div class="row wrap">
+                <div class="skiplist card flush" x-show="skipPresets.length">
                   <template x-for="sp in skipPresets" :key="sp.id">
-                    <label class="radio" :title="sp.args.join(' ') + (sp.note ? ' — ' + sp.note : '')">
-                      <input type="checkbox" :checked="rform.skips.includes(sp.id)" @change="toggleSkip(sp.id)"> <span x-text="sp.label || sp.id"></span>
+                    <label class="skiprow" :class="{on: rform.skips.includes(sp.id)}" :title="sp.note || ''">
+                      <input type="checkbox" :checked="rform.skips.includes(sp.id)" @change="toggleSkip(sp.id)">
+                      <span class="name" x-text="sp.label || sp.id"></span>
+                      <code class="muted small" x-text="sp.args.join(' ')"></code>
                     </label>
                   </template>
                 </div>
@@ -351,7 +338,7 @@
                 </p>
                 <template x-for="n in skipNotes()" :key="n"><p class="warn small" x-text="n"></p></template>
               </div>
-              <div class="stack tabbody" x-show="rtab === 'properties'">
+              <div class="stack tabbody" x-show="rtab === 'profiles'">
               <div class="stack tight">
                 <div class="row">
                   <span class="label grow">Maven profiles <code>-P</code></span>
@@ -376,6 +363,8 @@
                 <input class="profile-add" x-model="profDraft" placeholder="+ profile id, e.g. fast (Enter turns it on)" aria-label="Add a profile"
                   @keydown.enter.prevent="addProfile()" @blur="addProfile()">
               </div>
+              </div>
+              <div class="stack tabbody" x-show="rtab === 'properties'">
               <label><span>Properties <code>-D</code> <span class="muted">(KEY=VALUE or KEY, one per line)</span></span>
                 <textarea rows="2" x-model="rform.props" placeholder="maven.repo.local=/path/to/repo" @input.debounce.250ms="refreshPreview()"></textarea>
               </label>
@@ -402,7 +391,7 @@
                       <option value="debug">Debug (-X)</option>
                     </select></label>
                 </div>
-                            <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
+              <label><span>Extra arguments <span class="muted">(added at the end as is)</span></span>
                 <input x-model="rform.args" placeholder="-Dsurefire.failIfNoSpecifiedTests=false" @input.debounce.250ms="refreshPreview()">
               </label>
               </div>
@@ -436,6 +425,21 @@
                     <input class="short" x-show="rform.forks === 'custom'" x-model="rform.forksCustom" @input.debounce.250ms="refreshPreview()" placeholder="e.g. 3 or 0.75C" >
                   </span></label>
                 </div>
+              </div>
+              <div class="row modal-foot">
+                <button type="button" class="danger" x-show="editingTask" @click="deleteTask(editingTask)" title="Delete this task">Delete…</button>
+                <div class="menu up" x-show="editingTask" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="if (open) { open = false; $event.preventDefault(); $event.stopPropagation() }">
+                  <button type="button" class="icon" @click="open = !open" title="More" aria-label="More actions" :aria-expanded="open"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg></button>
+                  <div class="menu-list" x-show="open" x-cloak @click="open = false">
+                    <button type="button" @click="saveAsNew = true" :disabled="!!rpreview?.error">Save as new task…</button>
+                    <button type="button" @click="copyCommand(rpreview?.argv)" :disabled="!rpreview">Copy command</button>
+                    <button type="button" @click="showCommand(rpreview)" :disabled="!rpreview">Show full command</button>
+                    <button type="button" @click="resetRunForm()">Reset the form</button>
+                  </div>
+                </div>
+                <span class="grow"></span>
+                <button type="button" @click="$refs.taskDialog.close()">Cancel</button>
+                <button type="submit" class="primary" :disabled="busy || !!rpreview?.error" :title="editingTask ? 'Save changes (Enter)' : 'Create the task (Enter)'" x-text="editingTask ? 'Save' : 'Create task'"></button>
               </div>
             </form>
           </dialog>
