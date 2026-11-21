@@ -1,12 +1,12 @@
 # buildyard
 
-A personal build manager for Maven projects: a local daemon with a web UI.
+A personal build manager with a web UI for Java projects.
 
 Documentation: https://tools.binaryc.at/buildyard
 
 ## Quick installation
 
-macOS or Linux, from a release (no Go needed):
+Run script in your shell
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/binarycat0/buildyard/main/install.sh | sh
@@ -70,11 +70,18 @@ make uninstall
 
 Run a second instance next to the installed service, with its own data: `BUILDYARD_HOME=/tmp/by-test ./bin/buildyard serve --port 7790`.
 
-`make ext` rebuilds the Maven extension in `maven-ext/`. `make docs` builds the docs site into `site/` and `make docs-serve` previews it on http://127.0.0.1:8000; the home page is generated from this README.
+### maven-ext
+
+`make ext` rebuilds the Maven extension in `maven-ext/`. 
+
+### Docs site
+
+`make docs` builds the docs site into `site/` and `make docs-serve` previews it on http://127.0.0.1:8000; the home page is generated from this README.
 
 ### CI and releases
 
-CI runs gofmt, vet and race tests on every pull request. To release, push a `v*` tag or run the **Release** workflow on `main` with a version such as `v0.1.0`; it builds darwin and linux binaries (amd64, arm64) with checksums. The docs site deploys when a push to `main` changes the README, `install.sh` or the docs setup.
+CI runs gofmt, vet and race tests on every pull request. To release, push a `v*` tag or run the **Release** workflow on `main` with a version such as `v0.1.0`; it builds darwin and linux binaries (amd64, arm64) with checksums. 
+The docs site deploys when a push to `main` changes the README, `install.sh` or the docs setup.
 
 ## License
 
