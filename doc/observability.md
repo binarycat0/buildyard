@@ -11,13 +11,7 @@ Buildyard can send every build to an OpenTelemetry stack you run yourself, such 
 
 Spans and log records carry `host.name` and the project, task and tool (`mvn`, `mvnd`, `mvnw`). The root span also carries the exit code, the git commit and download totals (count, bytes, time). Download spans carry the repository, the size and whether the artifact was found. This works with mvn, mvnd and `./mvnw` through Buildyard's Maven extension.
 
-With **Parse Maven output** on (the default), log records are shaped this way:
-
-- `[ERROR] msg` becomes severity `ERROR` with the message `msg`. The same applies to `WARNING`, `INFO` and `DEBUG`.
-- A stack trace (`\tat …`, `Caused by: …`, `... 12 more`) becomes one record together with the line it belongs to.
-- Records get `maven.module` and `maven.goal` from Maven's `--- plugin:goal (id) @ module ---` markers, when modules build one at a time.
-
-Other output, such as forked tests or scripts, stays one record per line. With the option off, every line is sent as it is.
+Each output line is sent as it is, one log record per line, with the run's context: the trace, `buildyard.log.line` and, when modules build one at a time, `maven.module` and `maven.goal`. Buildyard doesn't parse the output: levels and stack traces are the observability stack's job, see [Parse Maven output](#parse-maven-output).
 
 ## Start a stack
 
@@ -39,7 +33,7 @@ volumes:
   lgtm-data:
 ```
 
-Grafana is at <http://localhost:3000> (admin / admin).
+Grafana is at <http://localhost:3000> (admin / admin). otel-lgtm runs Grafana, Loki, Tempo and Prometheus in one container: give Docker at least 4 GB of memory, or Grafana can crash.
 
 ## Configure Buildyard
 
@@ -53,7 +47,6 @@ enabled = true
 endpoint = "http://localhost:4318"   # OTLP/HTTP (JSON); /v1/traces and /v1/logs are appended
 traces = true
 logs = true
-parseLogs = true
 serviceName = "buildyard"
 grafanaUrl = "http://localhost:3000"
 # [telemetry.headers]                # for a hosted backend
@@ -67,37 +60,88 @@ Export never slows a build down. When the collector is down, records are dropped
 - Traces: Explore → Tempo, `{resource.service.name="buildyard" && span.buildyard.project="my-app"}`
 - Logs: Explore → Loki, `{service_name="buildyard"} | buildyard_project="my-app"`, or **Related logs** on a trace
 
-## Parsing in a collector instead
+## Parse Maven output
 
-Turn **Parse Maven output** off and send to [Grafana Alloy](https://grafana.com/docs/alloy/) (or an OpenTelemetry Collector with the same `transform` statements). Alloy then sets the severity in front of your backend:
+Put [Grafana Alloy](https://grafana.com/docs/alloy/) between Buildyard and the stack. It turns `[ERROR] msg` into level `ERROR` with the line `msg`, and joins a stack trace into one entry. Traces pass through unchanged. Save this as `config.alloy`:
 
 ```alloy
 otelcol.receiver.otlp "buildyard" {
   http { endpoint = "0.0.0.0:4318" }
   output {
-    logs   = [otelcol.processor.transform.maven.input]
-    traces = [otelcol.exporter.otlphttp.backend.input]
+    traces = [otelcol.exporter.otlphttp.lgtm.input]
+    logs   = [otelcol.exporter.loki.buildyard.input]
   }
 }
 
-otelcol.processor.transform "maven" {
-  error_mode = "ignore"
-  log_statements {
-    context    = "log"
-    statements = [
-      `set(severity_text, "ERROR") where IsMatch(body, "^\\[ERROR\\] ")`,
-      `set(severity_number, 17) where IsMatch(body, "^\\[ERROR\\] ")`,
-      `set(severity_text, "WARN") where IsMatch(body, "^\\[WARNING\\] ")`,
-      `set(severity_number, 13) where IsMatch(body, "^\\[WARNING\\] ")`,
-      `replace_pattern(body, "^\\[(ERROR|WARNING|INFO|DEBUG)\\] ", "")`,
-    ]
+otelcol.exporter.otlphttp "lgtm" {
+  client {
+    endpoint = "http://lgtm:4318"
+    tls { insecure = true }
   }
-  output { logs = [otelcol.exporter.otlphttp.backend.input] }
 }
 
-otelcol.exporter.otlphttp "backend" {
-  client { endpoint = "http://lgtm:4318" }   # your Loki/Tempo OTLP endpoint
+otelcol.exporter.loki "buildyard" {
+  forward_to = [loki.process.maven.receiver]
+}
+
+loki.process "maven" {
+  // Each entry arrives as JSON: the line is in body, the run's context around it.
+  stage.json {
+    expressions = {
+      body              = "body",
+      trace_id          = "traceid",
+      span_id           = "spanid",
+      buildyard_project = `attributes."buildyard.project"`,
+      buildyard_task    = `attributes."buildyard.task"`,
+      buildyard_job_id  = `attributes."buildyard.job.id"`,
+      maven_module      = `attributes."maven.module"`,
+      maven_goal        = `attributes."maven.goal"`,
+    }
+  }
+  stage.output { source = "body" }
+
+  // An entry starts at a [LEVEL] line. Other lines (stack frames, "Caused by:",
+  // unprefixed tool output) join the entry before them.
+  stage.multiline { firstline = `^\[[A-Z]+\]` }
+
+  // "[ERROR] msg" -> level ERROR, line "msg".
+  stage.regex { expression = `^\[(?P<level>[A-Z]+)\] ` }
+  stage.replace {
+    expression = `^(\[[A-Z]+\] )`
+    replace    = ""
+  }
+
+  stage.structured_metadata {
+    values = {
+      level = "", trace_id = "", span_id = "", maven_module = "", maven_goal = "",
+      buildyard_project = "", buildyard_task = "", buildyard_job_id = "",
+    }
+  }
+  forward_to = [loki.write.lgtm.receiver]
+}
+
+loki.write "lgtm" {
+  endpoint { url = "http://lgtm:3100/loki/api/v1/push" }
 }
 ```
 
-Collectors only join multi-line stack traces when they read log files themselves, not for logs that arrive over OTLP. That is why Buildyard does the grouping itself.
+And run it in front of otel-lgtm (`compose.yaml` next to it). Buildyard keeps sending to `http://localhost:4318`, which is Alloy now:
+
+```yaml
+services:
+  lgtm:
+    image: grafana/otel-lgtm
+    ports: ["3000:3000"]                 # Grafana
+    volumes: ["lgtm-data:/data"]
+  alloy:
+    image: grafana/alloy
+    command: ["run", "/etc/alloy/config.alloy"]
+    volumes: ["./config.alloy:/etc/alloy/config.alloy:ro"]
+    ports: ["4318:4318"]                 # OTLP/HTTP from Buildyard
+volumes:
+  lgtm-data:
+```
+
+Then filter by level: `{service_name="buildyard"} | level="ERROR"`.
+
+Without Alloy, parse at query time instead: `{service_name="buildyard"} | regexp "^\\[(?P<level>[A-Z]+)\\]" | level="ERROR"`.

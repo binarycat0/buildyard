@@ -32,7 +32,6 @@ type Labels struct {
 type Job struct {
 	e              *Exporter
 	traces, logs   bool
-	parseLogs      bool // levels, module/goal attributes, multi-line records
 	traceID        string
 	rootID         string
 	startupID      string
@@ -49,8 +48,6 @@ type Job struct {
 	modulesFailed  int
 	dl             dlStats
 	lastLineAtNano int64
-	pending        *pendingLog // multi-line record still collecting lines
-	logTimer       *time.Timer
 	logModule      string // module and goal the output is about, from Maven's own markers
 	logGoal        string
 	rootAttrs      []kv // only on the root span
@@ -111,7 +108,7 @@ func (e *Exporter) StartJob(j store.Job, l Labels, argv []string) *Job {
 	if l.GitHead != "" {
 		rootAttrs = append(rootAttrs, str("vcs.ref.head.revision", l.GitHead))
 	}
-	return &Job{e: e, traces: cfg.Traces, logs: cfg.Logs, parseLogs: cfg.ParseLogs, traceID: newTraceID(), rootID: newSpanID(),
+	return &Job{e: e, traces: cfg.Traces, logs: cfg.Logs, traceID: newTraceID(), rootID: newSpanID(),
 		startupID: newSpanID(), start: time.Now(), name: name, attrs: attrs, rootAttrs: rootAttrs,
 		names: map[string]string{}, modules: map[string]*open{}, mojos: map[string]*open{}}
 }
@@ -264,10 +261,6 @@ func (j *Job) End(status string, exit *int) {
 		return
 	}
 	j.ended = true
-	j.flushLogLocked()
-	if j.logTimer != nil {
-		j.logTimer.Stop()
-	}
 	if !j.traces {
 		return
 	}

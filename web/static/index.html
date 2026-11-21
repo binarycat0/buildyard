@@ -904,7 +904,6 @@
           <div class="row wrap" x-show="oform.enabled">
             <label class="radio" title="One trace per run: startup, modules, goals and downloads as spans"><input type="checkbox" x-model="oform.traces"> Timeline (traces → Tempo)</label>
             <label class="radio" title="The run's output as log records, linked to its trace"><input type="checkbox" x-model="oform.logs"> Build output (logs → Loki)</label>
-            <label class="radio" x-show="oform.logs" title="Severity from [ERROR]/[WARNING]/… (prefix removed), maven.module and maven.goal attributes, a stack trace as one record. Off: every line as it is."><input type="checkbox" x-model="oform.parseLogs"> Parse Maven output</label>
           </div>
           <label>Grafana URL <span class="muted small">for the trace link on a run's page; empty hides it</span>
             <input type="url" x-model="oform.grafanaUrl" placeholder="http://localhost:3000">

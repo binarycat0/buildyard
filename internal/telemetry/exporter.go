@@ -308,12 +308,7 @@ type span struct {
 	Error                     string // non-empty: status ERROR with this message
 }
 
-const (
-	sevDebug = 5
-	sevInfo  = 9
-	sevWarn  = 13
-	sevError = 17
-)
+const sevInfo = 9 // only Buildyard's own records have a severity
 
 type logRecord struct {
 	Time            time.Time
@@ -367,7 +362,7 @@ func (e *Exporter) tracesPayload(cfg config.Telemetry, spans []span) any {
 	}}}
 }
 
-var sevText = map[int]string{sevDebug: "DEBUG", sevInfo: "INFO", sevWarn: "WARN", sevError: "ERROR"}
+var sevText = map[int]string{sevInfo: "INFO"}
 
 func (e *Exporter) logsPayload(cfg config.Telemetry, logs []logRecord) any {
 	out := make([]map[string]any, len(logs))
@@ -375,10 +370,11 @@ func (e *Exporter) logsPayload(cfg config.Telemetry, logs []logRecord) any {
 		m := map[string]any{
 			"timeUnixNano":         nanos(r.Time),
 			"observedTimeUnixNano": nanos(r.Time),
-			"severityNumber":       r.Severity,
-			"severityText":         sevText[r.Severity],
 			"body":                 anyVal{S: &logs[i].Body},
 			"attributes":           r.Attrs,
+		}
+		if r.Severity != 0 { // output lines have none: the observability stack parses it
+			m["severityNumber"], m["severityText"] = r.Severity, sevText[r.Severity]
 		}
 		if r.TraceID != "" {
 			m["traceId"], m["spanId"] = r.TraceID, r.SpanID

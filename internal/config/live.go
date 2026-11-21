@@ -96,7 +96,7 @@ func (l *Live) SetTelemetry(t Telemetry) error {
 		sec["endpoint"] = t.Endpoint
 		sec["traces"] = t.Traces
 		sec["logs"] = t.Logs
-		sec["parseLogs"] = t.ParseLogs
+		delete(sec, "parseLogs") // option removed: parsing belongs to the observability stack
 		sec["serviceName"] = t.ServiceName
 		sec["grafanaUrl"] = t.GrafanaURL
 		if len(t.Headers) > 0 {
