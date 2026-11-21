@@ -1,6 +1,6 @@
 # Observability
 
-Buildyard can send every build to an OpenTelemetry stack you run yourself, such as Grafana, Loki and Tempo. You can see where a build spends its time and compare the same build on two machines. Export is off by default. Logs and the web UI work the same with or without it.
+Buildyard can send every build to an OpenTelemetry stack you run yourself, such as Grafana, Loki and Tempo. You can see where a build spends its time and compare the same build on two machines. Export is **off** by default. Logs and the web UI work the same with or without it.
 
 ## What is sent
 
