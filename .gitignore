@@ -1,6 +1,7 @@
 /bin/
 /dist/
 /maven-ext/target/
+/maven-log/*/target/
 # Local-only material, kept out of the public repository.
 /docs/
 /testdata/

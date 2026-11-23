@@ -29,9 +29,17 @@ type Command struct {
 	// group. Used for mvnd, whose client must not take the long-lived daemon down with it.
 	SignalLeaderOnly bool
 	// EventArgs, when set, returns the arguments that make the build tool write JSON Lines
-	// events to path (inserted right after the executable). The runner tails that file
-	// for per-module progress. The job's recorded argv leaves them out.
-	EventArgs func(path string) []string
+	// events to events and, with JSONLog, its log as JSON Lines to log (inserted right
+	// after the executable). The runner tails the events for per-module progress and the
+	// log for telemetry. The job's recorded argv leaves them out.
+	EventArgs func(events, log string) []string
+	// JSONLog: the build tool writes its log as JSON Lines too (Buildyard's Maven logger).
+	// The file is kept next to the job's log, and telemetry exports it instead of the
+	// output lines.
+	JSONLog bool
+	// ExecPath, when set, is run instead of Argv[0] (a stand-in launcher that loads
+	// Buildyard's logger); the job's recorded argv keeps Argv[0].
+	ExecPath string
 	// Parser, when set, returns a parser for the job's output: it finds problems and,
 	// when the build tool sent no events, module progress.
 	Parser func() OutputParser
@@ -42,6 +50,9 @@ type Command struct {
 // Labels describe a job outside Buildyard (telemetry).
 type Labels struct {
 	Project, Task, Tool string
+	// StructuredLogs: the job's log comes as JSON records (Trace.Record), so output
+	// lines are not exported as log records.
+	StructuredLogs bool
 }
 
 // Trace exports one job elsewhere (e.g. OpenTelemetry). Calls never block the build.
@@ -49,6 +60,7 @@ type Trace interface {
 	TraceID() string
 	Line(n int, text string) // output line n
 	Event(line []byte)       // one build tool event (JSON Lines)
+	Record(line []byte)      // one JSON log record from the build tool's logger
 	End(status string, exit *int)
 }
 
@@ -349,6 +361,7 @@ func (r *Runner) execute(rn *run) {
 		}
 		for _, p := range paths {
 			os.Remove(p)
+			os.Remove(JSONLogPath(p))
 		}
 	}
 }
@@ -387,14 +400,28 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 		return store.JobFailed, nil
 	}
 	argv := rn.cmd.Argv
-	var tail *eventTail
+	var tail, logTail *eventTail
 	if rn.cmd.EventArgs != nil {
 		path := filepath.Join(r.logsDir, strconv.FormatInt(id, 10)+".events.jsonl")
 		os.Remove(path)
 		tail = &eventTail{path: path}
-		argv = append(append([]string{argv[0]}, rn.cmd.EventArgs(path)...), argv[1:]...)
+		logPath := ""
+		if rn.cmd.JSONLog {
+			logPath = JSONLogPath(rn.job.LogPath)
+			os.Remove(logPath)
+			logTail = &eventTail{path: logPath, apply: func(rn *run, line []byte) {
+				if rn.trace != nil {
+					rn.trace.Record(line)
+				}
+			}}
+		}
+		argv = append(append([]string{argv[0]}, rn.cmd.EventArgs(path, logPath)...), argv[1:]...)
 	}
-	cmd := exec.Command(argv[0], argv[1:]...)
+	exe := argv[0]
+	if rn.cmd.ExecPath != "" {
+		exe = rn.cmd.ExecPath
+	}
+	cmd := exec.Command(exe, argv[1:]...)
 	cmd.Dir, cmd.Env = rn.cmd.Dir, rn.cmd.Env
 	cmd.Stdin = nil
 	cmd.Stdout, cmd.Stderr = pw, pw
@@ -425,6 +452,12 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 		go func() { defer close(tailed); tail.follow(rn, stopTail) }()
 		defer func() { close(stopTail); <-tailed; os.Remove(tail.path) }()
 	}
+	if logTail != nil { // the JSON log stays: it is the job's structured log
+		stopTail := make(chan struct{})
+		tailed := make(chan struct{})
+		go func() { defer close(tailed); logTail.follow(rn, stopTail) }()
+		defer func() { close(stopTail); <-tailed }()
+	}
 
 	copied := make(chan struct{})
 	go func() {
@@ -432,7 +465,7 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 		br := bufio.NewReaderSize(pr, 64*1024)
 		for {
 			line, err := br.ReadString('\n')
-			if line != "" {
+			if line != "" && !(rn.cmd.JSONLog && slf4jNoise(line)) {
 				rn.writeLine(strings.TrimRight(line, "\r\n"))
 			}
 			if err != nil {
@@ -465,6 +498,25 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 	default:
 		return store.JobFailed, &code
 	}
+}
+
+// slf4jNoise matches what SLF4J 1.7 prints on Maven 3 and mvnd 1 because Buildyard's
+// logger sits next to the build tool's own binding: it says nothing about the build.
+func slf4jNoise(line string) bool {
+	if !strings.HasPrefix(line, "SLF4J: ") {
+		return false
+	}
+	for _, s := range []string{"contains multiple SLF4J bindings", "Found binding in [", "codes.html#multiple_bindings", "Actual binding is of type [dev.buildyard.", "Actual binding is of type [org.slf4j.impl.BuildyardMvnd"} {
+		if strings.Contains(line, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// JSONLogPath is where a job's JSON log lives, next to its log file.
+func JSONLogPath(logPath string) string {
+	return strings.TrimSuffix(logPath, ".log") + ".jsonl"
 }
 
 func gitHead(dir string) string {

@@ -81,7 +81,7 @@ func findMavenVersion(bin string) string {
 
 func findMvndVersion(bin string) string {
 	for _, dir := range ancestors(bin) {
-		for _, lib := range []string{"lib", "mvn/lib", "mvn/lib/ext", "libexec/lib", "libexec/mvn/lib/ext"} {
+		for _, lib := range []string{"lib", "mvn/lib", "mvn/lib/mvnd", "mvn/lib/ext", "libexec/lib", "libexec/mvn/lib/mvnd", "libexec/mvn/lib/ext"} {
 			if v := matchJar(filepath.Join(dir, lib), mvndJar); v != "" {
 				return v
 			}

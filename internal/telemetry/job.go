@@ -15,6 +15,9 @@ type Labels struct {
 	Task    string // saved task name; empty for a one-off run
 	Tool    string // mvn, mvnd, mvnw
 	GitHead string // commit the project was at
+	// StructuredLogs: the job's log comes as JSON records from Buildyard's Maven logger
+	// (Record); output lines are then not exported.
+	StructuredLogs bool
 }
 
 // Job exports one build. Its trace looks like this:
@@ -27,7 +30,8 @@ type Labels struct {
 //	│  └─ download …               downloads made while building that module
 //	└─ download …                  downloads outside any module
 //
-// Every output line becomes a log record that points at the job's root span.
+// Every log line becomes a log record that points at the job's root span: the JSON
+// records of Buildyard's Maven logger (Record) when the build has it, else output lines.
 // Feed it the build tool events (Event) and output lines (Line), then call End.
 type Job struct {
 	e              *Exporter
@@ -51,6 +55,7 @@ type Job struct {
 	logModule      string // module and goal the output is about, from Maven's own markers
 	logGoal        string
 	rootAttrs      []kv // only on the root span
+	structured     bool // log records come from Record, not Line
 }
 
 type open struct {
@@ -110,7 +115,7 @@ func (e *Exporter) StartJob(j store.Job, l Labels, argv []string) *Job {
 	}
 	return &Job{e: e, traces: cfg.Traces, logs: cfg.Logs, traceID: newTraceID(), rootID: newSpanID(),
 		startupID: newSpanID(), start: time.Now(), name: name, attrs: attrs, rootAttrs: rootAttrs,
-		names: map[string]string{}, modules: map[string]*open{}, mojos: map[string]*open{}}
+		names: map[string]string{}, modules: map[string]*open{}, mojos: map[string]*open{}, structured: l.StructuredLogs}
 }
 
 // TraceID is the job's trace, as Tempo and Grafana show it.

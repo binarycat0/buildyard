@@ -2210,6 +2210,19 @@ document.addEventListener('alpine:init', () => {
       return `${base}/explore?schemaVersion=1&orgId=1&panes=${encodeURIComponent(JSON.stringify(panes))}`;
     },
 
+    // Grafana Explore with the job's log records (Loki data source "loki", as in grafana/otel-lgtm).
+    logsLink(job) {
+      const base = this.otel?.grafanaUrl;
+      if (!base || !job?.traceId || !this.otel?.logs) return '';
+      const from = job.queuedAt ? new Date(job.queuedAt).getTime() - 60000 : 'now-7d';
+      const to = job.finishedAt ? new Date(job.finishedAt).getTime() + 60000 : 'now';
+      const svc = (this.otel.serviceName || 'buildyard').replace(/["\\]/g, '');
+      const expr = `{service_name="${svc}"} | trace_id="${job.traceId}"`;
+      const panes = { l: { datasource: 'loki', queries: [{ refId: 'A', datasource: { type: 'loki', uid: 'loki' }, expr }],
+        range: { from: String(from), to: String(to) } } };
+      return `${base}/explore?schemaVersion=1&orgId=1&panes=${encodeURIComponent(JSON.stringify(panes))}`;
+    },
+
     async detect() {
       try {
         this.followDetect(await api('POST', '/jdks/detect'));

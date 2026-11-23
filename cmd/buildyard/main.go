@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -205,7 +206,7 @@ func serve(args []string) error {
 	otelDone := make(chan struct{})
 	go func() { defer close(otelDone); otel.Run(otelCtx) }()
 	jobs.Tracer = func(j store.Job, l runner.Labels, head string) runner.Trace {
-		if t := otel.StartJob(j, telemetry.Labels{Project: l.Project, Task: l.Task, Tool: l.Tool, GitHead: head}, j.Argv); t != nil {
+		if t := otel.StartJob(j, telemetry.Labels{Project: l.Project, Task: l.Task, Tool: l.Tool, GitHead: head, StructuredLogs: l.StructuredLogs}, j.Argv); t != nil {
 			return t
 		}
 		return nil
@@ -235,7 +236,7 @@ func serve(args []string) error {
 
 	home, _ := os.UserHomeDir()
 	httpapi.Version = version
-	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, Config: live, Telemetry: otel, ExtJar: extJar, JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
+	srv := &httpapi.Server{Store: st, Tasks: bg, Runner: jobs, Config: live, Telemetry: otel, ExtJar: extJar, MavenLogDir: filepath.Join(e.paths.Ext, "logging"), JDKs: jdk.NewDetector(), Home: home, DataDir: e.paths.Dir, UI: web.FS(), Log: log}
 	if _, err := srv.SubmitJDKDetect(); err != nil {
 		log.Warn("JDK detection not started", "err", err)
 	}

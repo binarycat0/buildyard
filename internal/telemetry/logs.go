@@ -1,17 +1,19 @@
 package telemetry
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 	"time"
 )
 
-// Log records. Every output line is sent as it is, one record per line: the level,
-// stack traces and other structure are for the observability stack to parse (see
-// doc/observability.md). Buildyard adds only what the stack can't know: the trace,
-// the job's attributes, the line number and, when modules build one at a time,
-// maven.module and maven.goal from Maven's "--- plugin:goal (id) @ module ---"
-// markers. The job's log file is never changed.
+// Log records. On the Maven versions Buildyard's logger supports, each log call arrives
+// as a JSON record (Record) and is sent with its severity, module, goal, thread, logger
+// and exception: nothing is left for the observability stack to parse. Otherwise every
+// output line is sent as it is, one record per line (Line), with the trace, the job's
+// attributes, the line number and, when modules build one at a time, maven.module and
+// maven.goal from Maven's "--- plugin:goal (id) @ module ---" markers. The job's log
+// file is never changed.
 
 var (
 	ansi      = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
@@ -22,7 +24,7 @@ var (
 
 // Line exports output line n.
 func (j *Job) Line(n int, text string) {
-	if j == nil || !j.logs {
+	if j == nil || !j.logs || j.structured {
 		return
 	}
 	text = ansi.ReplaceAllString(text, "")
@@ -69,6 +71,103 @@ func (j *Job) moduleKey(artifactID string) string {
 		}
 	}
 	return artifactID
+}
+
+// jsonRecord is one line of Buildyard's Maven logger (maven-log/).
+type jsonRecord struct {
+	Ts        int64             `json:"ts"` // ms
+	Level     string            `json:"level"`
+	Logger    string            `json:"logger"`
+	Thread    string            `json:"thread"`
+	Msg       string            `json:"msg"`
+	MDC       map[string]string `json:"mdc"`
+	Exception *struct {
+		Type       string `json:"type"`
+		Message    string `json:"message"`
+		Stacktrace string `json:"stacktrace"`
+	} `json:"exception"`
+}
+
+// OTLP severity numbers.
+var severities = map[string]int{"TRACE": 1, "DEBUG": 5, "INFO": 9, "WARN": 13, "ERROR": 17}
+
+// Record exports one JSON log record.
+func (j *Job) Record(line []byte) {
+	if j == nil || !j.logs {
+		return
+	}
+	var rec jsonRecord
+	if json.Unmarshal(line, &rec) != nil {
+		return
+	}
+	if rec.Logger == "stderr" && strings.HasPrefix(rec.Msg, "SLF4J: Actual binding is of type [") {
+		return // SLF4J naming Buildyard's own logger at startup
+	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.ended {
+		return
+	}
+	r := logRecord{Body: ansi.ReplaceAllString(rec.Msg, ""), Time: j.timeAt(rec.Ts), Severity: severities[rec.Level],
+		TraceID: j.traceID, SpanID: j.rootID}
+	r.Attrs = append(make([]kv, 0, len(j.attrs)+8), j.attrs...)
+	if m := j.recordModule(rec.MDC); m != "" {
+		r.Attrs = append(r.Attrs, str("maven.module", m))
+	}
+	if g := recordGoal(rec.MDC); g != "" {
+		r.Attrs = append(r.Attrs, str("maven.goal", g))
+	}
+	if rec.Logger != "" {
+		r.Attrs = append(r.Attrs, str("logger.name", rec.Logger))
+	}
+	if rec.Thread != "" {
+		r.Attrs = append(r.Attrs, str("thread.name", rec.Thread))
+	}
+	if x := rec.Exception; x != nil {
+		r.Attrs = append(r.Attrs, str("exception.type", x.Type))
+		if x.Message != "" {
+			r.Attrs = append(r.Attrs, str("exception.message", x.Message))
+		}
+		r.Attrs = append(r.Attrs, str("exception.stacktrace", x.Stacktrace))
+	}
+	j.e.addLog(r)
+}
+
+// recordModule is the module key a record is about: Buildyard's extension sets it on
+// every runtime; Maven 4 and mvnd also set the artifactId alone.
+func (j *Job) recordModule(mdc map[string]string) string {
+	if m := mdc["buildyard.module"]; m != "" {
+		return m
+	}
+	if id := mdc["maven.project.id"]; id != "" {
+		return j.moduleKey(id)
+	}
+	return ""
+}
+
+// recordGoal names the goal like the spans do: "compiler:compile (default-compile)".
+// Maven 4 writes "compiler:compile@default-compile".
+func recordGoal(mdc map[string]string) string {
+	if g := mdc["buildyard.goal"]; g != "" {
+		return g
+	}
+	if g, id, ok := strings.Cut(mdc["maven.mojo.id"], "@"); ok {
+		return g + " (" + id + ")"
+	}
+	return ""
+}
+
+// timeAt is a record's time made strictly increasing, like nextTime.
+func (j *Job) timeAt(ms int64) time.Time {
+	now := ms * int64(time.Millisecond)
+	if ms == 0 {
+		now = time.Now().UnixNano()
+	}
+	if now <= j.lastLineAtNano {
+		now = j.lastLineAtNano + 1
+	}
+	j.lastLineAtNano = now
+	return time.Unix(0, now)
 }
 
 // nextTime is now, made strictly increasing: Loki keeps the order of records only

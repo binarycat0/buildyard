@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/binarycat0/buildyard/internal/buildtool/maven"
+	"github.com/binarycat0/buildyard/internal/ext"
 	"github.com/binarycat0/buildyard/internal/runner"
 	"github.com/binarycat0/buildyard/internal/store"
 )
@@ -25,10 +26,16 @@ type jobView struct {
 	store.Job
 	LiveLines       int        `json:"liveLines"`       // lines so far while running; logLines once finished
 	StopRequestedAt *time.Time `json:"stopRequestedAt"` // set while a running job is being stopped
+	JSONLog         bool       `json:"jsonLog"`         // the job has a JSON log (log.jsonl)
 }
 
 func (s *Server) view(j store.Job) jobView {
 	v := jobView{Job: j, LiveLines: j.LogLines}
+	if j.LogPath != "" {
+		if _, err := os.Stat(runner.JSONLogPath(j.LogPath)); err == nil {
+			v.JSONLog = true
+		}
+	}
 	if s.Runner != nil {
 		if n := s.Runner.Lines(j.ID); n >= 0 {
 			v.LiveLines = n
@@ -48,7 +55,9 @@ type preview struct {
 	Env      map[string]string `json:"env"`      // project variables added to the daemon's environment
 	// MavenOpts is MAVEN_OPTS as the run gets it, when the memory setting changed it.
 	MavenOpts string `json:"mavenOpts,omitempty"`
-	Error     string `json:"error,omitempty"`
+	// JSONLog: the run gets Buildyard's JSON logger (a tested Maven or mvnd version).
+	JSONLog bool   `json:"jsonLog"`
+	Error   string `json:"error,omitempty"`
 }
 
 // presetsFor returns the default skip presets with the project's own applied.
@@ -94,9 +103,49 @@ func (s *Server) prepare(ctx context.Context, p store.Project, spec maven.RunSpe
 	cmd.SignalLeaderOnly = info.Executable != nil && info.Executable.Kind == maven.ModeMvnd
 	cmd.Parser = func() runner.OutputParser { return &mavenOutput{p: maven.NewLogParser()} }
 	if jar := s.ExtJar; jar != "" {
-		cmd.EventArgs = func(path string) []string { return maven.ExtArgs(jar, path) }
+		s.useJSONLog(&cmd, info, p.RootPath)
+		pv.JSONLog = cmd.JSONLog
+		cmd.EventArgs = func(events, log string) []string {
+			args := maven.ExtArgs(jar, events)
+			if log != "" {
+				args = append(args, "-Dbuildyard.log="+log)
+			}
+			return args
+		}
 	}
 	return pv, cmd, nil
+}
+
+// useJSONLog sets a command up to load Buildyard's JSON logger when the Maven or mvnd it
+// runs is a tested version: Maven gets -Dmaven.conf in MAVEN_OPTS pointing at a conf
+// copy with the logger in it, mvnd runs from a stand-in installation that does the same
+// for its daemon. Anything else runs as it is.
+func (s *Server) useJSONLog(cmd *runner.Command, info runtimeInfo, root string) {
+	if s.MavenLogDir == "" || info.Executable == nil {
+		return
+	}
+	rt, ok := maven.DetectLogRuntime(*info.Executable, root, s.Home)
+	if !ok {
+		return
+	}
+	if rt.Variant == maven.LogMvnd1 {
+		client, err := ext.MvndHome(s.MavenLogDir, rt.Variant, rt.Home)
+		if err != nil {
+			s.Log.Warn("JSON logger not set up for mvnd", "home", rt.Home, "err", err)
+			return
+		}
+		cmd.ExecPath = client
+	} else {
+		conf, err := ext.MavenConf(s.MavenLogDir, rt.Variant, rt.Home)
+		if err != nil {
+			s.Log.Warn("JSON logger not set up for Maven", "home", rt.Home, "err", err)
+			return
+		}
+		opts := strings.TrimSpace(lookupEnv(cmd.Env, "MAVEN_OPTS") + " -Dmaven.conf=" + conf)
+		cmd.Env = append(cmd.Env, "MAVEN_OPTS="+opts) // later entries win in exec
+	}
+	cmd.JSONLog = true
+	cmd.Labels.StructuredLogs = true
 }
 
 // mavenOutput adapts the Maven log parser to the runner.
@@ -439,6 +488,34 @@ func (s *Server) jobLog(w http.ResponseWriter, r *http.Request) {
 		lines = []string{}
 	}
 	writeJSON(w, http.StatusOK, logPage{From: from, Lines: lines, Total: total})
+}
+
+// jobLogFile serves a job's whole log file, or its JSON log, as plain text to open in
+// the browser.
+func (s *Server) jobLogFile(jsonl bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		j, ok := s.jobFor(w, r)
+		if !ok {
+			return
+		}
+		path := j.LogPath
+		if jsonl {
+			path = runner.JSONLogPath(path)
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "no such log file")
+			return
+		}
+		defer f.Close()
+		st, err := f.Stat()
+		if err != nil {
+			s.internal(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.ServeContent(w, r, "", st.ModTime(), f)
+	}
 }
 
 // jobStream streams a job's log as server-sent events: "log" events (id = line number),

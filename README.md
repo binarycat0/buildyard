@@ -56,7 +56,7 @@ buildyard cancel 42
 ### Prerequisites
 
 - Go 1.26+
-- Maven, only for `make ext` (the extension jar is committed)
+- Maven, only for `make ext` (the extension and logger jars are committed)
 - Docker or Podman, only for the docs site
 
 ### Build and run
@@ -70,9 +70,9 @@ make uninstall
 
 Run a second instance next to the installed service, with its own data: `BUILDYARD_HOME=/tmp/by-test ./bin/buildyard serve --port 7790`.
 
-### maven-ext
+### maven-ext and maven-log
 
-`make ext` rebuilds the Maven extension in `maven-ext/`. 
+`make ext` rebuilds the Maven extension in `maven-ext/` and the JSON loggers in `maven-log/` (one per runtime: Maven 3.9, Maven 4, mvnd 1; see [structured logs](doc/observability.md#structured-logs)).
 
 ### Docs site
 

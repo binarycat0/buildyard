@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -261,7 +262,7 @@ func TestStopAndKill(t *testing.T) {
 // evCmd runs script with $1 = the events file path the runner chose.
 func evCmd(dir, script string) Command {
 	return Command{Argv: []string{"/bin/sh"}, Dir: dir, Env: os.Environ(),
-		EventArgs: func(path string) []string { return []string{"-c", script, "sh", path} }}
+		EventArgs: func(path, log string) []string { return []string{"-c", script, "sh", path, log} }}
 }
 
 func TestModuleProgress(t *testing.T) {
@@ -417,4 +418,49 @@ func TestSetLimitsStartsQueuedJobs(t *testing.T) {
 	}
 	os.WriteFile(gate, nil, 0o600)
 	wait(t, st, first.ID)
+}
+
+type recTrace struct {
+	mu      sync.Mutex
+	records []string
+	lines   int
+}
+
+func (t *recTrace) TraceID() string  { return "t" }
+func (t *recTrace) Line(int, string) { t.mu.Lock(); t.lines++; t.mu.Unlock() }
+func (t *recTrace) Event([]byte)     {}
+func (t *recTrace) End(string, *int) {}
+func (t *recTrace) Record(line []byte) {
+	t.mu.Lock()
+	t.records = append(t.records, string(line))
+	t.mu.Unlock()
+}
+
+func TestJSONLog(t *testing.T) {
+	r, st, pid := setup(t, 1)
+	tr := &recTrace{}
+	var labels Labels
+	r.Tracer = func(j store.Job, l Labels, head string) Trace { labels = l; return tr }
+	// ExecPath runs instead of Argv[0]; $2 is the JSON log the runner chose.
+	cmd := Command{Argv: []string{"mvn"}, ExecPath: "/bin/sh", Dir: t.TempDir(), Env: os.Environ(), JSONLog: true,
+		Labels: Labels{Project: "p", StructuredLogs: true},
+		EventArgs: func(events, log string) []string {
+			return []string{"-c", `echo out; printf '{"level":"INFO","msg":"a"}\n{"level":"WARN"' >> "$2"; sleep 0.3; printf ',"msg":"b"}\n' >> "$2"`, "sh", events, log}
+		}}
+	j, err := r.Enqueue(context.Background(), store.Job{ProjectID: pid}, cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := wait(t, st, j.ID); got.Status != store.JobSucceeded || strings.Join(got.Argv, " ") != "mvn" {
+		t.Fatalf("job: %s %v", got.Status, got.Argv)
+	}
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	if len(tr.records) != 2 || tr.records[1] != `{"level":"WARN","msg":"b"}` || !labels.StructuredLogs {
+		t.Fatalf("records %q labels %+v", tr.records, labels)
+	}
+	data, err := os.ReadFile(JSONLogPath(j.LogPath))
+	if err != nil || strings.Count(string(data), "\n") != 2 {
+		t.Fatalf("JSON log kept: %q %v", data, err)
+	}
 }

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Maven 4: a MavenLoggerFactory subclass, found through Maven's own ServiceLoader lookup. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.buildyard</groupId>
+    <artifactId>buildyard-maven-log</artifactId>
+    <version>1</version>
+  </parent>
+  <artifactId>buildyard-maven-log-maven4</artifactId>
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>2.0.17</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-logging</artifactId>
+      <version>4.0.0-rc-7</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+  <build>
+    <finalName>maven-log-maven4</finalName>
+  </build>
+</project>

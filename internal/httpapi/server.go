@@ -34,6 +34,9 @@ type Server struct {
 	DataDir string
 	Config  *config.Live // daemon settings from config.toml; nil in tests that don't need them
 	ExtJar  string       // installed Maven extension; "" disables it
+	// MavenLogDir holds the generated Maven conf folders and mvnd stand-ins that load
+	// Buildyard's JSON logger; "" (or no ExtJar) disables JSON logs.
+	MavenLogDir string
 	// Telemetry is the OpenTelemetry export; nil in tests that don't need it.
 	Telemetry *telemetry.Exporter
 	UI        fs.FS               // static files; index.html at the root
@@ -71,6 +74,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/jobs/{id}/kill", s.controlJob("kill"))
 	mux.HandleFunc("POST /api/jobs/{id}/rerun", s.rerunJob)
 	mux.HandleFunc("GET /api/jobs/{id}/log", s.jobLog)
+	mux.HandleFunc("GET /api/jobs/{id}/log.txt", s.jobLogFile(false))
+	mux.HandleFunc("GET /api/jobs/{id}/log.jsonl", s.jobLogFile(true))
 	mux.HandleFunc("GET /api/jobs/{id}/modules", s.jobModules)
 	mux.HandleFunc("GET /api/jobs/{id}/problems", s.jobProblems)
 	mux.HandleFunc("GET /api/jobs/{id}/stream", s.jobStream)

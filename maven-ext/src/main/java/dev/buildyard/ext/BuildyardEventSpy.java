@@ -20,6 +20,7 @@ import org.apache.maven.execution.MavenSession;
 import org.apache.maven.execution.ProjectDependencyGraph;
 import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.project.MavenProject;
+import org.slf4j.MDC;
 
 /**
  * Writes Maven build events as JSON Lines to the file named by -Dbuildyard.events.
@@ -65,6 +66,9 @@ public class BuildyardEventSpy extends AbstractEventSpy {
 
     @Override
     public void onEvent(Object event) throws Exception {
+        if (event instanceof ExecutionEvent) {
+            mdc((ExecutionEvent) event);
+        }
         if (out == null) {
             return;
         }
@@ -126,6 +130,55 @@ public class BuildyardEventSpy extends AbstractEventSpy {
             out.close();
             out = null;
         }
+    }
+
+    /**
+     * Puts the module and goal the builder thread works on in the SLF4J MDC, so Buildyard's
+     * JSON logger can tag every log line with them (threads a plugin starts inherit it).
+     */
+    private static void mdc(ExecutionEvent e) {
+        try {
+            switch (e.getType()) {
+                case ProjectStarted:
+                    MDC.put("buildyard.module", key(e.getProject()));
+                    MDC.remove("buildyard.goal");
+                    break;
+                case MojoStarted:
+                    MojoExecution m = e.getMojoExecution();
+                    if (m != null && e.getProject() != null) {
+                        MDC.put("buildyard.module", key(e.getProject()));
+                        MDC.put("buildyard.goal", goal(m));
+                    }
+                    break;
+                case MojoSucceeded:
+                case MojoFailed:
+                case MojoSkipped:
+                    MDC.remove("buildyard.goal");
+                    break;
+                case ProjectSucceeded:
+                case ProjectFailed:
+                case ProjectSkipped:
+                    MDC.remove("buildyard.module");
+                    MDC.remove("buildyard.goal");
+                    break;
+                default:
+                    break;
+            }
+        } catch (RuntimeException | LinkageError ignore) {
+            // no MDC: log lines just carry no module
+        }
+    }
+
+    /** "compiler:compile (default-compile)", as Maven's "--- compiler:3.13.0:compile (default-compile) @ a ---" names it. */
+    private static String goal(MojoExecution m) {
+        String prefix = null;
+        if (m.getMojoDescriptor() != null && m.getMojoDescriptor().getPluginDescriptor() != null) {
+            prefix = m.getMojoDescriptor().getPluginDescriptor().getGoalPrefix();
+        }
+        if (prefix == null || prefix.isEmpty()) {
+            prefix = m.getArtifactId();
+        }
+        return prefix + ":" + m.getGoal() + " (" + m.getExecutionId() + ")";
     }
 
     /** The reactor: each project's folder, aggregating parent, and direct in-reactor dependencies. */

@@ -640,6 +640,10 @@
               <code x-show="!traceLink(job)" x-text="job.traceId"></code></span>
             <span x-show="job.exitCode !== null && job.exitCode !== undefined" x-text="'· exit code ' + job.exitCode"></span>
             <span x-text="'· ' + logCount + ' lines'"></span>
+            <span>· <a :href="'/api/jobs/' + job.id + '/log.txt'" target="_blank" rel="noopener" title="The whole log as plain text">log file</a></span>
+            <span x-show="job.jsonLog">· <a :href="'/api/jobs/' + job.id + '/log.jsonl'" target="_blank" rel="noopener"
+              title="Every log call as one JSON line: level, logger, thread, module and goal, stack trace">JSON log</a></span>
+            <span x-show="logsLink(job)">· <a :href="logsLink(job)" target="_blank" rel="noopener" title="The job's log records in Grafana (Loki)">logs in Grafana</a></span>
           </div>
           <div class="card modprog" x-show="jobMods.length">
             <div class="row spread">

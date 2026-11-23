@@ -7,11 +7,11 @@ Buildyard can send every build to an OpenTelemetry stack you run yourself, such 
 | Signal | Backend | Content |
 |---|---|---|
 | Timeline (traces) | Tempo | One trace per run: `startup` (JVM, POMs, extensions), a span per module, and under it a span per goal and per download |
-| Build output (logs) | Loki | The run's output, linked to its trace |
+| Build log (logs) | Loki | The run's log records, linked to its trace |
 
 Spans and log records carry `host.name` and the project, task and tool (`mvn`, `mvnd`, `mvnw`). The root span also carries the exit code, the git commit and download totals (count, bytes, time). Download spans carry the repository, the size and whether the artifact was found. This works with mvn, mvnd and `./mvnw` through Buildyard's Maven extension.
 
-Each output line is sent as it is, one log record per line, with the run's context: the trace, `buildyard.log.line` and, when modules build one at a time, `maven.module` and `maven.goal`. Buildyard doesn't parse the output: levels and stack traces are the observability stack's job, see [Parse Maven output](#parse-maven-output).
+On [supported Maven versions](#structured-logs) each log call is sent as one record with its level, module, goal and stack trace, ready to filter in Loki with no extra parsing. On other versions each output line is sent as it is, one record per line, with the trace, `buildyard.log.line` and, when modules build one at a time, `maven.module` and `maven.goal`.
 
 ## Start a stack
 
@@ -58,108 +58,39 @@ Export never slows a build down. When the collector is down, records are dropped
 ## Find builds in Grafana
 
 - Traces: Explore → Tempo, `{resource.service.name="buildyard" && span.buildyard.project="my-app"}`
-- Logs: Explore → Loki, `{service_name="buildyard"} | buildyard_project="my-app"`, or **Related logs** on a trace
+- Logs: Explore → Loki, `{service_name="buildyard"} | buildyard_project="my-app"`, or **Related logs** on a trace. A run's page links to its records (**logs in Grafana**; it assumes the Loki data source uid `loki`, as in otel-lgtm).
 
-## Parse Maven output
+## Structured logs
 
-Put [Grafana Alloy](https://grafana.com/docs/alloy/) between Buildyard and the stack. It reads the level from each line (`[ERROR] msg`, `[main] [ERROR] msg` or `[my-module] [INFO] msg`) and stores it, with the run's context, as structured metadata in Loki. The line itself is kept as it is, minus colors. Each line is parsed on its own: lines are not merged into multi-line entries, because modules built in parallel interleave their output. A stack trace therefore stays one entry per line, and its frames have no level. Traces pass through unchanged. Save this as `config.alloy`:
+On the versions below, Buildyard runs Maven with its own logger wrapped around Maven's. The console output and the log file stay exactly the same. In addition, every log call is written as one JSON line to the run's **JSON log** (linked on the run's page), and that is what goes to Loki. Nothing to install or configure: no Alloy, no change to the project or the Maven installation.
 
-```alloy
-otelcol.receiver.otlp "buildyard" {
-  http {
-    endpoint = "0.0.0.0:4318"
-  }
+| Runtime | Tested versions |
+|---|---|
+| Maven 3 (`mvn`, `./mvnw`, a custom path) | 3.9.6, 3.9.9, 3.9.10, 3.9.11 |
+| Maven 4 | 4.0.0-rc-7 |
+| mvnd | 1.0.2, 1.0.6 |
 
-  output {
-    traces = [otelcol.exporter.otlphttp.lgtm.input]
-    logs   = [otelcol.exporter.loki.buildyard.input]
-  }
-}
+Other versions run exactly as before, with raw lines. `./mvnw` gets it once its Maven is downloaded (from its second run on).
 
-otelcol.exporter.otlphttp "lgtm" {
-  client {
-    endpoint = "http://lgtm:4318"
+How it gets in: Maven's launchers load `${maven.conf}/logging` before their own jars. Buildyard makes a copy of the installation's `conf` folder under `~/.buildyard/ext/logging`, with links to the original files and the logger's classes in `logging/`, and passes `-Dmaven.conf=<copy>` in `MAVEN_OPTS`. mvnd ignores that setting, so for mvnd Buildyard runs the client from a stand-in installation in the same folder (links to the real one, a generated `mvn/conf`). Its daemons are separate from the ones your own `mvnd` uses.
 
-    tls {
-      insecure = true
-    }
-  }
-}
+Each record carries:
 
-otelcol.exporter.loki "buildyard" {
-  forward_to = [loki.process.maven.receiver]
-}
+| Attribute (Loki name) | Content |
+|---|---|
+| severity (`severity_text`, `detected_level`) | `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `maven.module` (`maven_module`) | `group:artifact` of the module the log call was made for, also with `-T` and mvnd |
+| `maven.goal` (`maven_goal`) | `compiler:compile (default-compile)` |
+| `logger.name`, `thread.name` | The logger, or `stdout`/`stderr` for what plugins print directly (such as test output) |
+| `exception.type`, `exception.message`, `exception.stacktrace` | When the call logged an exception: the whole stack trace stays in one record |
 
-loki.process "maven" {
-  stage.json {
-    expressions = {
-      body               = "body",
-      trace_id           = "traceid",
-      span_id            = "spanid",
-      buildyard_project  = `attributes."buildyard.project"`,
-      buildyard_task     = `attributes."buildyard.task"`,
-      buildyard_job_id   = `attributes."buildyard.job.id"`,
-      buildyard_log_line = `attributes."buildyard.log.line"`,
-      maven_module       = `attributes."maven.module"`,
-      maven_goal         = `attributes."maven.goal"`,
-    }
-  }
+A message that spans several lines, such as a failed test with its stack trace, is one record.
 
-  stage.output {
-    source = "body"
-  }
+Examples:
 
-  stage.decolorize {}
-
-  // Parse each line independently; never merge parallel module output.
-  stage.regex {
-    expression = `^(?:\[(?P<maven_module_artifact>[^\]]+)\]\s+)?\[(?P<level>TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\](?:\s+(?P<message>.*))?$`
-  }
-
-  stage.structured_metadata {
-    values = {
-      level                 = "",
-      trace_id              = "",
-      span_id               = "",
-      buildyard_project     = "",
-      buildyard_task        = "",
-      buildyard_job_id      = "",
-      buildyard_log_line    = "",
-      maven_module          = "",
-      maven_module_artifact = "",
-      maven_goal            = "",
-    }
-  }
-
-  forward_to = [loki.write.lgtm.receiver]
-}
-
-loki.write "lgtm" {
-  endpoint {
-    url = "http://lgtm:3100/loki/api/v1/push"
-  }
-}
+```logql
+{service_name="buildyard"} | detected_level="error"
+{service_name="buildyard"} | buildyard_project="my-app" | maven_module="com.example:core"
+{service_name="buildyard"} | maven_goal=~"surefire:test.*" | detected_level="error"
+{service_name="buildyard"} | exception_type!=""
 ```
-
-The regex must stay on one line: a line break inside it is matched literally, and then no line matches.
-
-And run it in front of otel-lgtm (`compose.yaml` next to it). Buildyard keeps sending to `http://localhost:4318`, which is Alloy now:
-
-```yaml
-services:
-  lgtm:
-    image: grafana/otel-lgtm
-    ports: ["3000:3000"]                 # Grafana
-    volumes: ["lgtm-data:/data"]
-  alloy:
-    image: grafana/alloy
-    command: ["run", "/etc/alloy/config.alloy"]
-    volumes: ["./config.alloy:/etc/alloy/config.alloy:ro"]
-    ports: ["4318:4318"]                 # OTLP/HTTP from Buildyard
-volumes:
-  lgtm-data:
-```
-
-Then filter by level: `{service_name="buildyard"} | level="ERROR"`, or by module prefix: `| maven_module_artifact="my-module"`.
-
-Without Alloy, parse at query time instead: `{service_name="buildyard"} | regexp "^\\[(?P<level>[A-Z]+)\\]" | level="ERROR"`.

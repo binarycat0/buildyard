@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Maven 3.9: shadows Maven's SLF4J 1.7 binding and wraps its MavenSimpleLoggerFactory. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>dev.buildyard</groupId>
+    <artifactId>buildyard-maven-log</artifactId>
+    <version>1</version>
+  </parent>
+  <artifactId>buildyard-maven-log-maven3</artifactId>
+  <properties>
+    <maven.compiler.release>8</maven.compiler.release>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.7.36</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-slf4j-provider</artifactId>
+      <version>3.9.11</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+  <build>
+    <finalName>maven-log-maven3</finalName>
+  </build>
+</project>

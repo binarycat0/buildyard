@@ -31,6 +31,8 @@ run: build
 ext:
 	cd maven-ext && mvn -B -q -ntp clean package
 	cp maven-ext/target/buildyard-maven-ext.jar internal/ext/
+	cd maven-log && mvn -B -q -ntp clean package
+	cp maven-log/maven3/target/maven-log-maven3.jar maven-log/maven4/target/maven-log-maven4.jar maven-log/mvnd1/target/maven-log-mvnd1.jar internal/ext/
 
 # Replaces the binary atomically (copy, then rename over the old one): on
 # Apple Silicon, overwriting a binary in place can get it killed by the

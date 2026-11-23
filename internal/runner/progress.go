@@ -159,11 +159,13 @@ func (rn *run) syncLogModulesLocked() {
 	}
 }
 
-// eventTail follows a JSON Lines events file the build tool appends to.
+// eventTail follows a JSON Lines file the build tool appends to: its events, or its JSON log.
 type eventTail struct {
 	path    string
 	f       *os.File
 	partial []byte
+	// apply takes each complete line, with rn.mu held; nil means rn.applyLocked (events).
+	apply func(rn *run, line []byte)
 }
 
 const tailEvery = 250 * time.Millisecond
@@ -209,9 +211,13 @@ func (t *eventTail) read(rn *run) {
 	t.partial = append([]byte(nil), data[last+1:]...)
 	rn.mu.Lock()
 	defer rn.mu.Unlock()
+	apply := t.apply
+	if apply == nil {
+		apply = (*run).applyLocked
+	}
 	for _, line := range bytes.Split(data[:last], []byte{'\n'}) {
 		if len(bytes.TrimSpace(line)) > 0 {
-			rn.applyLocked(line)
+			apply(rn, line)
 		}
 	}
 }

@@ -206,3 +206,46 @@ func TestLogLinesAreSentRaw(t *testing.T) {
 		t.Error("records point at the job's trace")
 	}
 }
+
+// JSON records from Buildyard's Maven logger go out with their severity, module, goal
+// and exception; output lines are then not sent.
+func TestStructuredRecords(t *testing.T) {
+	col := &collector{}
+	srv := httptest.NewServer(col)
+	defer srv.Close()
+	cfg := config.DefaultTelemetry()
+	cfg.Enabled, cfg.Endpoint, cfg.Traces = true, srv.URL, false
+	e := New(cfg, "test", nil)
+	j := e.StartJob(store.Job{ID: 1}, Labels{Project: "p", StructuredLogs: true}, nil)
+	j.Event([]byte(`{"t":"session","ts":1,"projects":[{"key":"demo:a","name":"A"}]}`))
+	j.Line(1, "[ERROR] boom") // the console copy of a record: not sent
+	for _, rec := range []string{
+		`{"ts":1000,"level":"ERROR","logger":"org.x.Mojo","thread":"main","msg":"boom","mdc":{"buildyard.module":"demo:a","buildyard.goal":"compiler:compile (default-compile)"},"exception":{"type":"java.lang.IllegalStateException","message":"bad","stacktrace":"java.lang.IllegalStateException: bad\n\tat x.Y.z(Y.java:1)\n"}}`,
+		`{"ts":1000,"level":"WARN","logger":"x","thread":"t","msg":"m4","mdc":{"maven.project.id":"a","maven.mojo.id":"surefire:test@default-test"}}`,
+		`{"ts":1001,"level":"INFO","logger":"stderr","thread":"main","msg":"SLF4J: Actual binding is of type [dev.buildyard.log.TeeLoggerFactory]"}`,
+		`not json`,
+	} {
+		j.Record([]byte(rec))
+	}
+	j.End(store.JobFailed, nil)
+	e.flush(context.Background())
+	if len(col.logs) != 2 {
+		t.Fatalf("got %d records, want 2: %v", len(col.logs), col.logs)
+	}
+	r := col.logs[0]
+	if body(r) != "boom" || r["severityNumber"] != float64(17) || r["severityText"] != "ERROR" {
+		t.Errorf("record: %v", r)
+	}
+	if attr(r, "maven.module") != "demo:a" || attr(r, "maven.goal") != "compiler:compile (default-compile)" ||
+		attr(r, "exception.type") != "java.lang.IllegalStateException" || attr(r, "exception.message") != "bad" ||
+		attr(r, "logger.name") != "org.x.Mojo" || attr(r, "thread.name") != "main" {
+		t.Errorf("attributes: %v", r["attributes"])
+	}
+	r = col.logs[1]
+	if attr(r, "maven.module") != "demo:a" || attr(r, "maven.goal") != "surefire:test (default-test)" || r["severityText"] != "WARN" {
+		t.Errorf("Maven 4 context: %v", r)
+	}
+	if col.logs[0]["timeUnixNano"] == col.logs[1]["timeUnixNano"] {
+		t.Error("records in the same millisecond keep their order")
+	}
+}
