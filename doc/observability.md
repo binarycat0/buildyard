@@ -62,11 +62,14 @@ Export never slows a build down. When the collector is down, records are dropped
 
 ## Parse Maven output
 
-Put [Grafana Alloy](https://grafana.com/docs/alloy/) between Buildyard and the stack. It turns `[ERROR] msg` into level `ERROR` with the line `msg`, and joins a stack trace into one entry. Traces pass through unchanged. Save this as `config.alloy`:
+Put [Grafana Alloy](https://grafana.com/docs/alloy/) between Buildyard and the stack. It reads the level from each line (`[ERROR] msg`, `[main] [ERROR] msg` or `[my-module] [INFO] msg`) and stores it, with the run's context, as structured metadata in Loki. The line itself is kept as it is, minus colors. Each line is parsed on its own: lines are not merged into multi-line entries, because modules built in parallel interleave their output. A stack trace therefore stays one entry per line, and its frames have no level. Traces pass through unchanged. Save this as `config.alloy`:
 
 ```alloy
 otelcol.receiver.otlp "buildyard" {
-  http { endpoint = "0.0.0.0:4318" }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
   output {
     traces = [otelcol.exporter.otlphttp.lgtm.input]
     logs   = [otelcol.exporter.loki.buildyard.input]
@@ -76,7 +79,10 @@ otelcol.receiver.otlp "buildyard" {
 otelcol.exporter.otlphttp "lgtm" {
   client {
     endpoint = "http://lgtm:4318"
-    tls { insecure = true }
+
+    tls {
+      insecure = true
+    }
   }
 }
 
@@ -85,45 +91,57 @@ otelcol.exporter.loki "buildyard" {
 }
 
 loki.process "maven" {
-  // Each entry arrives as JSON: the line is in body, the run's context around it.
   stage.json {
     expressions = {
-      body              = "body",
-      trace_id          = "traceid",
-      span_id           = "spanid",
-      buildyard_project = `attributes."buildyard.project"`,
-      buildyard_task    = `attributes."buildyard.task"`,
-      buildyard_job_id  = `attributes."buildyard.job.id"`,
-      maven_module      = `attributes."maven.module"`,
-      maven_goal        = `attributes."maven.goal"`,
+      body               = "body",
+      trace_id           = "traceid",
+      span_id            = "spanid",
+      buildyard_project  = `attributes."buildyard.project"`,
+      buildyard_task     = `attributes."buildyard.task"`,
+      buildyard_job_id   = `attributes."buildyard.job.id"`,
+      buildyard_log_line = `attributes."buildyard.log.line"`,
+      maven_module       = `attributes."maven.module"`,
+      maven_goal         = `attributes."maven.goal"`,
     }
   }
-  stage.output { source = "body" }
 
-  // An entry starts at a [LEVEL] line. Other lines (stack frames, "Caused by:",
-  // unprefixed tool output) join the entry before them.
-  stage.multiline { firstline = `^\[[A-Z]+\]` }
+  stage.output {
+    source = "body"
+  }
 
-  // "[ERROR] msg" -> level ERROR, line "msg".
-  stage.regex { expression = `^\[(?P<level>[A-Z]+)\] ` }
-  stage.replace {
-    expression = `^(\[[A-Z]+\] )`
-    replace    = ""
+  stage.decolorize {}
+
+  // Parse each line independently; never merge parallel module output.
+  stage.regex {
+    expression = `^(?:\[(?P<maven_module_artifact>[^\]]+)\]\s+)?\[(?P<level>TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\](?:\s+(?P<message>.*))?$`
   }
 
   stage.structured_metadata {
     values = {
-      level = "", trace_id = "", span_id = "", maven_module = "", maven_goal = "",
-      buildyard_project = "", buildyard_task = "", buildyard_job_id = "",
+      level                 = "",
+      trace_id              = "",
+      span_id               = "",
+      buildyard_project     = "",
+      buildyard_task        = "",
+      buildyard_job_id      = "",
+      buildyard_log_line    = "",
+      maven_module          = "",
+      maven_module_artifact = "",
+      maven_goal            = "",
     }
   }
+
   forward_to = [loki.write.lgtm.receiver]
 }
 
 loki.write "lgtm" {
-  endpoint { url = "http://lgtm:3100/loki/api/v1/push" }
+  endpoint {
+    url = "http://lgtm:3100/loki/api/v1/push"
+  }
 }
 ```
+
+The regex must stay on one line: a line break inside it is matched literally, and then no line matches.
 
 And run it in front of otel-lgtm (`compose.yaml` next to it). Buildyard keeps sending to `http://localhost:4318`, which is Alloy now:
 
@@ -142,6 +160,6 @@ volumes:
   lgtm-data:
 ```
 
-Then filter by level: `{service_name="buildyard"} | level="ERROR"`.
+Then filter by level: `{service_name="buildyard"} | level="ERROR"`, or by module prefix: `| maven_module_artifact="my-module"`.
 
 Without Alloy, parse at query time instead: `{service_name="buildyard"} | regexp "^\\[(?P<level>[A-Z]+)\\]" | level="ERROR"`.
