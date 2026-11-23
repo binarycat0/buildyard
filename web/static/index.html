@@ -130,7 +130,7 @@
               <tbody>
                 <template x-for="j in activeJobs()" :key="j.id">
                   <tr>
-                    <td class="nowrap"><a :href="'#/jobs/' + j.id" class="status-link"><span class="status" :class="j.status" x-text="j.status"></span></a></td>
+                    <td class="nowrap"><a :href="'#/jobs/' + j.id" class="status-link"><span class="status" :class="j.status" x-text="j.status"></span></a> <span class="awake" x-show="j.keptAwake && j.status === 'running'" title="caffeinate keeps the Mac awake until this build ends">☕</span></td>
                     <td class="nowrap"><a :href="'#/jobs/' + j.id" x-text="'#' + j.id"></a></td>
                     <td class="grow-cell"><a :href="'#/jobs/' + j.id" class="plain" x-text="jobTaskName(j)"></a></td>
                     <td class="nowrap muted small" x-text="j.startedAt ? 'started ' + when(j.startedAt) : 'queued ' + when(j.queuedAt)"></td>
@@ -458,7 +458,7 @@
                   <tr class="clickable" @click="location.hash = '#/jobs/' + j.id">
                     <td @click.stop><input type="checkbox" :checked="pick.includes(j.id)" @change="togglePick(j.id)" title="Pick to compare"></td>
                     <td><a :href="'#/jobs/' + j.id" x-text="j.id"></a></td>
-                    <td><span class="status" :class="j.status" x-text="j.status"></span></td>
+                    <td><span class="status" :class="j.status" x-text="j.status"></span> <span class="awake" x-show="j.keptAwake && j.status === 'running'" title="caffeinate keeps the Mac awake until this build ends">☕</span></td>
                     <td><code x-text="specText(j)"></code></td>
                     <td class="small" x-text="when(j.startedAt || j.queuedAt)"></td>
                     <td class="small" x-text="duration(j)"></td>
@@ -605,6 +605,7 @@
                 <span class="muted" x-text="'· job ' + job.id"></span>
               </h1>
               <span class="status big" :class="job.status" x-text="job.status"></span>
+              <span class="awake" x-show="job.keptAwake && job.status === 'running'" title="caffeinate keeps the Mac awake until this build ends">☕</span>
               <span class="muted" x-text="duration(job)"></span>
               <template x-if="failReason()">
                 <button type="button" class="link fail-reason" @click="failReason().line && goToLine(failReason().line)"
@@ -878,6 +879,9 @@
               <input class="short" type="number" min="0" required x-model.number="cform.jobsPerProject" title="Older finished runs and their logs are deleted; 0 keeps all">
             </label>
           </div>
+          <label class="radio" x-show="cform.keepAwakeAvailable" title="Runs caffeinate -i -w &lt;pid&gt; next to each build, so idle sleep can't interrupt it. Closing the lid still sleeps.">
+            <input type="checkbox" x-model="cform.keepAwake"> Keep the Mac awake while builds run
+          </label>
           <p class="muted small">Port <span x-text="cform.port"></span>: set <code>port</code> in config.toml; it needs a restart.</p>
           <div class="row">
             <button class="primary" type="submit" :disabled="busy">Save</button>

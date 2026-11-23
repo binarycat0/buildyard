@@ -212,6 +212,7 @@ func serve(args []string) error {
 	}
 	// Limits edited in the UI, or in config.toml followed by SIGHUP, apply without a restart.
 	live := config.NewLive(e.paths.Config, e.cfg)
+	jobs.KeepAwake = func() bool { return live.Get().KeepAwake }
 	live.OnChange(func(c config.Config) {
 		jobs.SetLimits(c.MaxConcurrentJobs, c.Retention.JobsPerProject)
 		otel.Configure(c.Telemetry)

@@ -43,13 +43,14 @@ func (l *Live) OnChange(f func(Config)) {
 
 // Limits are the settings the web UI edits.
 type Limits struct {
-	MaxConcurrentJobs int `json:"maxConcurrentJobs"`
-	JobsPerProject    int `json:"jobsPerProject"` // finished jobs kept per project; 0 = all
+	MaxConcurrentJobs int  `json:"maxConcurrentJobs"`
+	JobsPerProject    int  `json:"jobsPerProject"` // finished jobs kept per project; 0 = all
+	KeepAwake         bool `json:"keepAwake"`      // macOS: keep the Mac awake while builds run
 }
 
 func (l *Live) Limits() Limits {
 	c := l.Get()
-	return Limits{MaxConcurrentJobs: c.MaxConcurrentJobs, JobsPerProject: c.Retention.JobsPerProject}
+	return Limits{MaxConcurrentJobs: c.MaxConcurrentJobs, JobsPerProject: c.Retention.JobsPerProject, KeepAwake: c.KeepAwake}
 }
 
 // SetLimits validates the limits, writes them to config.toml and applies them.
@@ -61,6 +62,7 @@ func (l *Live) SetLimits(v Limits) error {
 	next := l.cfg
 	next.MaxConcurrentJobs = v.MaxConcurrentJobs
 	next.Retention.JobsPerProject = v.JobsPerProject
+	next.KeepAwake = v.KeepAwake
 	if err := next.Validate(); err != nil {
 		l.mu.Unlock()
 		return err
@@ -68,6 +70,7 @@ func (l *Live) SetLimits(v Limits) error {
 	err := updateFile(l.path, func(raw map[string]any) {
 		raw["maxConcurrentJobs"] = v.MaxConcurrentJobs
 		section(raw, "retention")["jobsPerProject"] = v.JobsPerProject
+		raw["keepAwake"] = v.KeepAwake
 	})
 	if err != nil {
 		l.mu.Unlock()
