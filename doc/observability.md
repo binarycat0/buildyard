@@ -62,7 +62,7 @@ Export never slows a build down. When the collector is down, records are dropped
 
 ## Parse Maven output
 
-Put [Grafana Alloy](https://grafana.com/docs/alloy/) between Buildyard and the stack. It reads the level from each line (`[ERROR] msg`, `[main] [ERROR] msg` or `[my-module] [INFO] msg`) and stores it, with the run's context, as structured metadata in Loki. The line itself is kept as it is, minus colors. Each line is parsed on its own: lines are not merged into multi-line entries, because modules built in parallel interleave their output. Traces pass through unchanged. Save this as `config.alloy`:
+Put [Grafana Alloy](https://grafana.com/docs/alloy/) between Buildyard and the stack. It reads the level from each line (`[ERROR] msg`, `[main] [ERROR] msg` or `[my-module] [INFO] msg`) and stores it, with the run's context, as structured metadata in Loki. The line itself is kept as it is, minus colors. Each line is parsed on its own: lines are not merged into multi-line entries, because modules built in parallel interleave their output. A stack trace therefore stays one entry per line, and its frames have no level. Traces pass through unchanged. Save this as `config.alloy`:
 
 ```alloy
 otelcol.receiver.otlp "buildyard" {
