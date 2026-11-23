@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/binarycat0/buildyard/internal/config"
+	"github.com/binarycat0/buildyard/internal/runner"
 )
 
 // configView is the daemon part of config.toml as the Settings page shows it.
@@ -11,10 +12,13 @@ type configView struct {
 	config.Limits
 	Port int    `json:"port"` // read-only here: changing it needs a restart
 	Path string `json:"path"` // config.toml
+	// KeepAwakeAvailable: this machine can keep itself awake (macOS caffeinate).
+	KeepAwakeAvailable bool `json:"keepAwakeAvailable"`
 }
 
 func (s *Server) configView() configView {
-	return configView{Limits: s.Config.Limits(), Port: s.Config.Get().Port, Path: s.Config.Path()}
+	return configView{Limits: s.Config.Limits(), Port: s.Config.Get().Port, Path: s.Config.Path(),
+		KeepAwakeAvailable: runner.KeepAwakeAvailable()}
 }
 
 func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {

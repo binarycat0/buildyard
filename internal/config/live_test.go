@@ -18,7 +18,7 @@ func TestLiveSetLimitsKeepsOtherKeys(t *testing.T) {
 	var seen []Config
 	l.OnChange(func(c Config) { seen = append(seen, c) })
 
-	if err := l.SetLimits(Limits{MaxConcurrentJobs: 3, JobsPerProject: 50}); err != nil {
+	if err := l.SetLimits(Limits{MaxConcurrentJobs: 3, JobsPerProject: 50, KeepAwake: true}); err != nil {
 		t.Fatal(err)
 	}
 	if len(seen) != 1 || seen[0].MaxConcurrentJobs != 3 || seen[0].Retention.JobsPerProject != 50 {
@@ -28,7 +28,7 @@ func TestLiveSetLimitsKeepsOtherKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again.Port != 7790 || again.MaxConcurrentJobs != 3 || again.Retention.JobsPerProject != 50 || again.Retention.MaxLogBytes != "1GB" {
+	if again.Port != 7790 || again.MaxConcurrentJobs != 3 || again.Retention.JobsPerProject != 50 || again.Retention.MaxLogBytes != "1GB" || !again.KeepAwake {
 		t.Fatalf("file after save: %+v", again)
 	}
 	b, _ := os.ReadFile(p)

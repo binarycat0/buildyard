@@ -28,7 +28,7 @@ The install script checks the release's SHA-256, installs the binary to `~/.buil
 
 The service runs `buildyard serve --service` with the `PATH`, `JAVA_HOME` and `BUILDYARD_HOME` of the shell that ran `service install`, so it finds mvn, mvnd and java the way that shell does; run `service install` again after changing them. `buildyard service stop|restart|status|uninstall` manage it; stopping it interrupts running builds.
 
-Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db` and `daemon.log` (the service's output). Settings → General edits `maxConcurrentJobs` and `retention.jobsPerProject` in `config.toml` and applies them at once (saving drops comments in the file); after editing the file by hand, `kill -HUP <pid>` reloads it. The port needs a restart.
+Data lives in `~/.buildyard` (`BUILDYARD_HOME` overrides it): `config.toml`, `buildyard.db` and `daemon.log` (the service's output). Settings → General edits `maxConcurrentJobs`, `retention.jobsPerProject` and, on macOS, `keepAwake` (runs `caffeinate -i -w <pid>` next to each build so idle sleep can't interrupt it) in `config.toml` and applies them at once (saving drops comments in the file); after editing the file by hand, `kill -HUP <pid>` reloads it. The port needs a restart.
 
 To uninstall: `buildyard service uninstall`, then delete `~/.local/bin/buildyard` and `~/.buildyard`.
 

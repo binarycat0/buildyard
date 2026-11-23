@@ -878,6 +878,9 @@
               <input class="short" type="number" min="0" required x-model.number="cform.jobsPerProject" title="Older finished runs and their logs are deleted; 0 keeps all">
             </label>
           </div>
+          <label class="radio" x-show="cform.keepAwakeAvailable" title="Runs caffeinate -i -w &lt;pid&gt; next to each build, so idle sleep can't interrupt it. Closing the lid still sleeps.">
+            <input type="checkbox" x-model="cform.keepAwake"> Keep the Mac awake while builds run
+          </label>
           <p class="muted small">Port <span x-text="cform.port"></span>: set <code>port</code> in config.toml; it needs a restart.</p>
           <div class="row">
             <button class="primary" type="submit" :disabled="busy">Save</button>

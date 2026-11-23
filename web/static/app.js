@@ -2119,8 +2119,8 @@ document.addEventListener('alpine:init', () => {
       this.busy = true;
       this.cfgSaved = false;
       try {
-        const { maxConcurrentJobs, jobsPerProject } = this.cform;
-        this.cform = await api('PUT', '/config', { maxConcurrentJobs, jobsPerProject });
+        const { maxConcurrentJobs, jobsPerProject, keepAwake } = this.cform;
+        this.cform = await api('PUT', '/config', { maxConcurrentJobs, jobsPerProject, keepAwake });
         this.cfgSaved = true;
       } catch (e) {
         this.error = e.message;

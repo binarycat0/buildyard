@@ -19,6 +19,7 @@ const DefaultPort = 7777
 type Config struct {
 	Port              int       `toml:"port"`
 	MaxConcurrentJobs int       `toml:"maxConcurrentJobs"`
+	KeepAwake         bool      `toml:"keepAwake"` // macOS: run caffeinate while a build runs
 	Retention         Retention `toml:"retention"`
 	Defaults          Defaults  `toml:"defaults"`
 	Telemetry         Telemetry `toml:"telemetry"`
@@ -156,6 +157,9 @@ func Load(path string) (Config, error) {
 	}
 	if md.IsDefined("maxConcurrentJobs") {
 		cfg.MaxConcurrentJobs = file.MaxConcurrentJobs
+	}
+	if md.IsDefined("keepAwake") {
+		cfg.KeepAwake = file.KeepAwake
 	}
 	if md.IsDefined("retention", "jobsPerProject") {
 		cfg.Retention.JobsPerProject = file.Retention.JobsPerProject

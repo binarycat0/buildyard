@@ -77,6 +77,8 @@ type Runner struct {
 	KillGrace time.Duration
 	// Tracer, when set, exports each job as it runs.
 	Tracer Tracer
+	// KeepAwake, when set and true, keeps macOS awake while each build runs.
+	KeepAwake func() bool
 
 	mu      sync.Mutex
 	queue   []*run
@@ -418,6 +420,7 @@ func (r *Runner) runProcess(ctx context.Context, rn *run) (status string, exit *
 		rn.writeLine("[buildyard] cannot start " + rn.cmd.Argv[0] + ": " + err.Error())
 		return store.JobFailed, nil
 	}
+	r.keepAwake(rn, cmd.Process.Pid)
 
 	if tail != nil {
 		stopTail := make(chan struct{})
