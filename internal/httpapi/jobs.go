@@ -25,6 +25,7 @@ type jobView struct {
 	store.Job
 	LiveLines       int        `json:"liveLines"`       // lines so far while running; logLines once finished
 	StopRequestedAt *time.Time `json:"stopRequestedAt"` // set while a running job is being stopped
+	KeptAwake       bool       `json:"keptAwake"`       // caffeinate keeps the Mac awake while it runs
 }
 
 func (s *Server) view(j store.Job) jobView {
@@ -36,6 +37,7 @@ func (s *Server) view(j store.Job) jobView {
 		if t := s.Runner.StopRequested(j.ID); !t.IsZero() {
 			v.StopRequestedAt = &t
 		}
+		v.KeptAwake = s.Runner.KeptAwake(j.ID)
 	}
 	return v
 }

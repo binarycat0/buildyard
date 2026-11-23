@@ -29,5 +29,23 @@ func (r *Runner) keepAwake(rn *run, pid int) {
 		rn.writeLine("[buildyard] keep awake: " + err.Error())
 		return
 	}
+	rn.mu.Lock()
+	rn.keptAwake = true
+	rn.mu.Unlock()
+	rn.writeLine("[buildyard] keeping the Mac awake: caffeinate -i -w " + strconv.Itoa(pid))
+	r.log.Info("keeping the Mac awake", "job", rn.job.ID, "build pid", pid, "caffeinate pid", c.Process.Pid)
 	go c.Wait() // exits on its own when pid does
+}
+
+// KeptAwake reports whether caffeinate is keeping the Mac awake for an active job.
+func (r *Runner) KeptAwake(id int64) bool {
+	r.mu.Lock()
+	rn, ok := r.runs[id]
+	r.mu.Unlock()
+	if !ok {
+		return false
+	}
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+	return rn.keptAwake
 }

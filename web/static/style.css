@@ -105,6 +105,7 @@ pre.cmd { margin: 0; padding: 8px 10px; background: var(--bg); border: 1px solid
   .status.cancelled, .status.interrupted { background: #3d321a; color: #e2c98a; }
 }
 .status-link { text-decoration: none; margin-right: 6px; }
+.awake { cursor: help; font-size: 0.9em; }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: var(--bg); }
 .logwrap { position: relative; }

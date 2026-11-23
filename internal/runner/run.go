@@ -61,6 +61,7 @@ type run struct {
 	interrupted bool
 	ended       bool
 	stopAt      time.Time // when a stop was first requested
+	keptAwake   bool      // caffeinate is holding the Mac awake for this build
 	reaper      bool
 	done        chan struct{}
 	prog        progress
