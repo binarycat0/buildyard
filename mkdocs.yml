@@ -45,4 +45,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Observability: observability.md
+  - Features:
+      - Web UI: ui.md
+      - Observability: observability.md
+      - Keep the Mac awake: keep-awake.md
