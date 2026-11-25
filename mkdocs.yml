@@ -49,3 +49,4 @@ nav:
       - Web UI: ui.md
       - Observability: observability.md
       - Keep the Mac awake: keep-awake.md
+      - MCP for agents: mcp.md
