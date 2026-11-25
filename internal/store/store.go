@@ -63,6 +63,7 @@ func migrate(ctx context.Context, db *sql.DB) error {
 // that was never merged): goose then skips the real one.
 var columns = []struct{ table, column, ddl string }{
 	{"job", "trace_id", "ALTER TABLE job ADD COLUMN trace_id TEXT"},
+	{"job", "dir", "ALTER TABLE job ADD COLUMN dir TEXT"},
 }
 
 func ensureColumns(ctx context.Context, db *sql.DB) error {

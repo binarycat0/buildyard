@@ -382,6 +382,8 @@ document.addEventListener('alpine:init', () => {
     ],
     pview: 'run',
     pjobs: [],
+    worktrees: [], // the project's git worktrees; more than one shows a picker for runs
+    worktree: '', // the picked worktree's dir; '' = the project root
     commonGoals: ['clean', 'compile', 'test', 'package', 'verify', 'install'],
     rform: emptyForm(),
     modules: [],
@@ -606,6 +608,7 @@ document.addEventListener('alpine:init', () => {
       this.openState = {};
       this.modScroll = 0;
       this.refreshPreview();
+      this.loadWorktrees();
       // First visit: list the modules in the background.
       if (!this.modules.length && !this.discoverTask) this.discover();
       this.resetProjectForm();
@@ -1262,10 +1265,35 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
+    async loadWorktrees() {
+      const id = this.proj.id;
+      this.worktrees = [];
+      this.worktree = '';
+      const list = await api('GET', `/projects/${id}/worktrees`).catch(() => []);
+      if (this.proj?.id !== id) return;
+      this.worktrees = list;
+      const saved = loadPref('worktree.' + id, '');
+      this.worktree = list.some((w) => !w.main && w.dir === saved) ? saved : '';
+    },
+
+    pickWorktree(dir) {
+      this.worktree = dir;
+      savePref('worktree.' + this.proj.id, dir);
+    },
+
+    worktreeLabel(w) {
+      return (w.branch || 'detached ' + (w.head || '').slice(0, 7)) + (w.main ? ' (project dir)' : ' · ' + w.dir.split('/').pop());
+    },
+
+    // The worktree a job ran in, when it was not the project dir.
+    jobWorktree(j, p) {
+      return j?.dir && p && j.dir !== p.rootPath ? j.dir : '';
+    },
+
     async runTask(t) {
       this.busy = true;
       try {
-        const j = await api('POST', `/projects/${this.proj.id}/jobs`, { profileId: t.id });
+        const j = await api('POST', `/projects/${this.proj.id}/jobs`, { profileId: t.id, worktree: this.worktree });
         location.hash = `#/jobs/${j.id}`;
       } catch (e) {
         this.runError = `${t.name}: ${e.message}`;

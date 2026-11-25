@@ -25,6 +25,7 @@ type Job struct {
 	ProfileID  *int64          `json:"profileId"`
 	Spec       json.RawMessage `json:"spec"` // RunSpec snapshot
 	Argv       []string        `json:"argv"` // final command
+	Dir        string          `json:"dir"`  // where it ran: the project root or one of its git worktrees
 	Status     string          `json:"status"`
 	ExitCode   *int            `json:"exitCode"`
 	QueuedAt   time.Time       `json:"queuedAt"`
@@ -46,7 +47,7 @@ func (j Job) Finished() bool {
 }
 
 const jobCols = `id, project_id, profile_id, spec_json, argv_json, status, exit_code,
-	queued_at, started_at, finished_at, git_head, log_path, log_lines, trace_id`
+	queued_at, started_at, finished_at, git_head, log_path, log_lines, trace_id, dir`
 
 // nowNano uses fixed-width fractions so job times sort correctly as text.
 func nowNano() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000000000Z07:00") }
@@ -62,8 +63,8 @@ func (s *Store) CreateJob(ctx context.Context, j Job, logPathFor func(id int64) 
 		return Job{}, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `INSERT INTO job (project_id, profile_id, spec_json, argv_json, status, queued_at, log_path)
-		VALUES (?, ?, ?, ?, ?, ?, '')`, j.ProjectID, j.ProfileID, string(j.Spec), string(argv), JobQueued, nowNano())
+	res, err := tx.ExecContext(ctx, `INSERT INTO job (project_id, profile_id, spec_json, argv_json, status, queued_at, log_path, dir)
+		VALUES (?, ?, ?, ?, ?, ?, '', ?)`, j.ProjectID, j.ProfileID, string(j.Spec), string(argv), JobQueued, nowNano(), nullIfEmpty(j.Dir))
 	if err != nil {
 		return Job{}, err
 	}
@@ -170,14 +171,15 @@ func scanJob(r scanner) (Job, error) {
 		j                          Job
 		spec, argv, queued         string
 		started, finished, gitHead sql.NullString
-		traceID                    sql.NullString
+		traceID, dir               sql.NullString
 		exit                       sql.NullInt64
 	)
 	if err := r.Scan(&j.ID, &j.ProjectID, &j.ProfileID, &spec, &argv, &j.Status, &exit,
-		&queued, &started, &finished, &gitHead, &j.LogPath, &j.LogLines, &traceID); err != nil {
+		&queued, &started, &finished, &gitHead, &j.LogPath, &j.LogLines, &traceID, &dir); err != nil {
 		return Job{}, err
 	}
 	j.Spec = json.RawMessage(spec)
+	j.Dir = dir.String
 	_ = json.Unmarshal([]byte(argv), &j.Argv)
 	if exit.Valid {
 		c := int(exit.Int64)

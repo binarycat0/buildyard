@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/binarycat0/buildyard/internal/buildtool/maven"
+	"github.com/binarycat0/buildyard/internal/project"
 	"github.com/binarycat0/buildyard/internal/runner"
 	"github.com/binarycat0/buildyard/internal/store"
 )
@@ -174,6 +175,27 @@ func buildEnv(base []string, project map[string]string, javaHome string) []strin
 type runRequest struct {
 	Spec      *maven.RunSpec `json:"spec"`
 	ProfileID int64          `json:"profileId"` // run a saved task instead of spec
+	Worktree  string         `json:"worktree"`  // run in this git worktree of the project; "" = the project root
+}
+
+// inWorktree points p at dir when dir is one of the project's git worktrees.
+func inWorktree(ctx context.Context, p *store.Project, dir string) bool {
+	if dir == "" || dir == p.RootPath {
+		return true
+	}
+	for _, wt := range project.Worktrees(ctx, p.RootPath) {
+		if wt.Dir == dir {
+			p.RootPath = dir
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) listWorktrees(w http.ResponseWriter, r *http.Request) {
+	if p, ok := s.projectFor(w, r); ok {
+		writeJSON(w, http.StatusOK, nonNil(project.Worktrees(r.Context(), p.RootPath)))
+	}
 }
 
 func (s *Server) projectFor(w http.ResponseWriter, r *http.Request) (store.Project, bool) {
@@ -239,6 +261,10 @@ func (s *Server) createJob(w http.ResponseWriter, r *http.Request) {
 		spec = *req.Spec
 	default:
 		writeError(w, http.StatusBadRequest, "bad_request", "give spec or profileId")
+		return
+	}
+	if !inWorktree(r.Context(), &p, req.Worktree) {
+		writeError(w, http.StatusBadRequest, "bad_request", "not a git worktree of this project: "+req.Worktree)
 		return
 	}
 	s.start(w, r, p, spec, profileID)
@@ -361,6 +387,7 @@ func (s *Server) rerunJob(w http.ResponseWriter, r *http.Request) {
 		}
 		spec = spec.Without(refs)
 	}
+	inWorktree(r.Context(), &p, j.Dir) // the same worktree, while it still is one
 	s.start(w, r, p, spec, j.ProfileID)
 }
 
