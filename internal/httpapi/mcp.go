@@ -1,14 +1,17 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +24,7 @@ import (
 
 // MCP: the Model Context Protocol over streamable HTTP at /mcp, so coding agents can
 // run saved tasks and read results. Every request gets a plain JSON reply (no SSE
-// stream, no sessions). Settings are read-only here.
+// stream, no sessions). Agents can add projects and tasks; settings and existing tasks are read-only.
 
 const mcpProtocol = "2025-06-18"
 
@@ -81,7 +84,8 @@ func (s *Server) mcpDispatch(ctx context.Context, req rpcRequest) (any, *rpcErro
 			"capabilities":    map[string]any{"tools": map[string]any{}},
 			"serverInfo":      map[string]any{"name": "buildyard", "version": Version},
 			"instructions": "Buildyard runs saved build tasks (Maven) of local projects. Call list_projects, " +
-				"then run_task and get_job with wait_seconds to follow it. Settings are read-only.",
+				"then run_task and get_job with wait_seconds to follow it. New projects: discover, create_project, create_task. " +
+				"Existing tasks and settings are read-only.",
 		}, nil
 	case "ping":
 		return map[string]any{}, nil
@@ -127,8 +131,8 @@ func prop(typ, desc string) map[string]any { return map[string]any{"type": typ, 
 var mcpTools = []mcpTool{
 	{Name: "list_projects", Description: "Projects with their directory, git branch, git worktrees and saved tasks (id, name, command, last job).",
 		InputSchema: schema(nil, map[string]any{}), run: (*Server).mcpListProjects},
-	{Name: "run_task", Description: "Queue a saved task of a project and return the job. Optional overrides narrow it, e.g. " +
-		"modules [\":core\"] with properties {\"test\": \"FooTest\"} to run one test class.",
+	{Name: "run_task", Description: "Queue a saved task of a project and return the job. Optional overrides change this run only, e.g. " +
+		"modules [\":core\"] with properties {\"test\": \"FooTest\"} and dont_skip [\"tests\"] to run one test class.",
 		InputSchema: schema([]string{"project", "task"}, map[string]any{
 			"project":    prop("string", "project id or name"),
 			"task":       prop("string", "task id or name"),
@@ -137,6 +141,8 @@ var mcpTools = []mcpTool{
 			"also_make":  prop("boolean", "with modules: also build what they depend on (-am)"),
 			"properties": map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}, "description": "extra -Dkey=value, e.g. {\"test\": \"FooTest#bar\"}"},
 			"extra_args": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "arguments appended as is"},
+			"skip":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "skip preset ids to turn on, e.g. [\"tests\", \"checkstyle\"]; get_settings with project lists them"},
+			"dont_skip":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "skip preset ids the task has on to turn off for this run, e.g. [\"tests\"] to run tests"},
 		}), run: (*Server).mcpRunTask},
 	{Name: "get_job", Description: "A job's status, exit code, command, failed modules, problems found in the log and the end of the log. " +
 		"With wait_seconds it waits for the job to finish first.",
@@ -146,6 +152,45 @@ var mcpTools = []mcpTool{
 			"log_lines":    prop("integer", "how many log lines to return (default 60, max 1000)"),
 			"log_from":     prop("integer", "return the log from this line instead of its end, e.g. a problem's logLine minus a few"),
 		}), run: (*Server).mcpGetJob},
+	{Name: "list_modules", Description: "A project's Maven modules as found by the last discovery, with the ref to pass to run_task modules. " +
+		"Use filter to search large projects.",
+		InputSchema: schema([]string{"project"}, map[string]any{
+			"project": prop("string", "project id or name"),
+			"filter":  prop("string", "only modules whose ref, name or path contains this text"),
+			"refresh": prop("boolean", "start a new discovery in the background (takes a while); call again later"),
+		}), run: (*Server).mcpListModules},
+	{Name: "list_jobs", Description: "A project's recent jobs, newest first: id, task, status, exit code, directory and times.",
+		InputSchema: schema([]string{"project"}, map[string]any{
+			"project": prop("string", "project id or name"),
+			"limit":   prop("integer", "how many (default 10, max 50)"),
+		}), run: (*Server).mcpListJobs},
+	{Name: "rerun_job", Description: "Run a job again with the same settings and worktree. With without_failed it leaves out " +
+		"the modules that failed and everything depending on them.",
+		InputSchema: schema([]string{"job"}, map[string]any{
+			"job":            prop("integer", "job id"),
+			"without_failed": prop("boolean", "skip the failed modules and their dependents"),
+		}), run: (*Server).mcpRerunJob},
+	{Name: "discover", Description: "Inspect a directory before adding it: build tool, Maven wrapper, git branch and worktrees, " +
+		"which mvn/mvnd would run it, and whether it is already a project.",
+		InputSchema: schema([]string{"path"}, map[string]any{"path": prop("string", "absolute path of the project root (the folder with pom.xml)")}),
+		run:         (*Server).mcpDiscover},
+	{Name: "create_project", Description: "Add a project and start module discovery in the background. It has no tasks yet: add one with create_task.",
+		InputSchema: schema([]string{"path"}, map[string]any{
+			"path": prop("string", "absolute path of the project root"),
+			"name": prop("string", "display name; default the folder name"),
+		}), run: (*Server).mcpCreateProject},
+	{Name: "create_task", Description: "Save a new task (a named build) in a project. Existing tasks are not changed.",
+		InputSchema: schema([]string{"project", "name", "goals"}, map[string]any{
+			"project":    prop("string", "project id or name"),
+			"name":       prop("string", "task name, unique in the project"),
+			"goals":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "e.g. [\"clean\", \"install\"]"},
+			"modules":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "build only these modules (-pl); refs from list_modules"},
+			"also_make":  prop("boolean", "with modules: also build what they depend on (-am)"),
+			"profiles":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Maven profiles (-P); \"!id\" turns one off"},
+			"skip":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "skip preset ids, e.g. [\"tests\"]"},
+			"properties": map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}, "description": "-Dkey=value"},
+			"extra_args": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "arguments appended as is"},
+		}), run: (*Server).mcpCreateTask},
 	{Name: "cancel_job", Description: "Cancel a queued or running job (stop, then kill after a grace period).",
 		InputSchema: schema([]string{"job"}, map[string]any{"job": prop("integer", "job id")}), run: (*Server).mcpCancelJob},
 	{Name: "get_settings", Description: "Read-only settings for diagnosing builds: build tools found, JDKs, global defaults and the " +
@@ -194,6 +239,7 @@ func (s *Server) findProject(ctx context.Context, r ref) (store.Project, error) 
 type mcpTask struct {
 	ID      int64             `json:"id"`
 	Name    string            `json:"name"`
+	Skips   []string          `json:"skips"` // skip preset ids the task has on
 	Command string            `json:"command"`
 	LastJob *store.JobSummary `json:"lastJob"`
 }
@@ -236,7 +282,7 @@ func (s *Server) mcpListProjects(ctx context.Context, _ json.RawMessage) (any, e
 			var spec maven.RunSpec
 			_ = json.Unmarshal(prof.Spec, &spec)
 			argv := spec.Normalize().WithDefaults(resourcesFor(p)).Argv(exe, presetsFor(p))
-			it.Tasks = append(it.Tasks, mcpTask{ID: prof.ID, Name: prof.Name, Command: strings.Join(argv, " "), LastJob: prof.LastJob})
+			it.Tasks = append(it.Tasks, mcpTask{ID: prof.ID, Name: prof.Name, Skips: nonNil(spec.Skips), Command: strings.Join(argv, " "), LastJob: prof.LastJob})
 		}
 		out = append(out, it)
 	}
@@ -252,6 +298,8 @@ func (s *Server) mcpRunTask(ctx context.Context, raw json.RawMessage) (any, erro
 		AlsoMake   bool              `json:"also_make"`
 		Properties map[string]string `json:"properties"`
 		ExtraArgs  []string          `json:"extra_args"`
+		Skip       []string          `json:"skip"`
+		DontSkip   []string          `json:"dont_skip"`
 	}
 	if err := args(raw, &a); err != nil {
 		return nil, err
@@ -288,19 +336,16 @@ func (s *Server) mcpRunTask(ctx context.Context, raw json.RawMessage) (any, erro
 		spec.Properties[k] = v
 	}
 	spec.ExtraArgs = append(spec.ExtraArgs, a.ExtraArgs...)
+	if err := applySkips(&spec, presetsFor(p), a.Skip, a.DontSkip); err != nil {
+		return nil, err
+	}
 	if !inWorktree(ctx, &p, a.Worktree) {
 		return nil, errors.New("not a git worktree of this project: " + a.Worktree)
 	}
 	// Reuse the HTTP path that starts jobs, so runs from agents and the UI behave the same.
-	rec := httptest.NewRecorder()
-	s.start(rec, httptest.NewRequestWithContext(ctx, http.MethodPost, "/mcp", nil), p, spec, &task.ID)
-	if rec.Code >= 300 {
-		var e apiError
-		_ = json.Unmarshal(rec.Body.Bytes(), &e)
-		return nil, errors.New(e.Message)
-	}
 	var job jobView
-	if err := json.Unmarshal(rec.Body.Bytes(), &job); err != nil {
+	start := func(w http.ResponseWriter, r *http.Request) { s.start(w, r, p, spec, &task.ID) }
+	if err := callAPI(ctx, start, http.MethodPost, "/mcp", "", nil, &job); err != nil {
 		return nil, err
 	}
 	return map[string]any{"job": job.ID, "status": job.Status, "dir": p.RootPath, "command": strings.Join(job.Argv, " ")}, nil
@@ -469,4 +514,273 @@ func (s *Server) mcpReadConfig(ctx context.Context, raw json.RawMessage) (any, e
 	c.Content = secretRe.ReplaceAllString(c.Content, "${1}${4}***${3}")
 	c.Template = ""
 	return c, nil
+}
+
+func (s *Server) mcpListModules(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Project ref    `json:"project"`
+		Filter  string `json:"filter"`
+		Refresh bool   `json:"refresh"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	p, err := s.findProject(ctx, a.Project)
+	if err != nil {
+		return nil, err
+	}
+	if a.Refresh {
+		if _, err := s.SubmitModuleDiscovery(p, maven.RunSpec{}); err != nil {
+			return nil, err
+		}
+		return map[string]any{"discovery": "started; call list_modules again in a minute"}, nil
+	}
+	mods, err := s.Store.ListModules(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	perArtifact := map[string]int{}
+	for _, m := range mods {
+		perArtifact[m.ArtifactID]++
+	}
+	type module struct {
+		Ref       string `json:"ref"` // what -pl takes
+		Name      string `json:"name"`
+		Path      string `json:"path"`
+		Packaging string `json:"packaging"`
+	}
+	out := []module{}
+	filter := strings.ToLower(a.Filter)
+	for _, m := range mods {
+		r := ":" + m.ArtifactID
+		if perArtifact[m.ArtifactID] > 1 {
+			r = m.Key
+		}
+		it := module{r, m.Name, m.RelPath, m.Packaging}
+		if filter == "" || strings.Contains(strings.ToLower(r+" "+m.Name+" "+m.RelPath), filter) {
+			out = append(out, it)
+		}
+	}
+	res := map[string]any{"total": len(mods), "modules": out}
+	if len(mods) == 0 {
+		res["hint"] = "no modules discovered yet; call list_modules with refresh true"
+	} else {
+		res["discoveredAt"] = mods[0].DiscoveredAt
+	}
+	return res, nil
+}
+
+func (s *Server) mcpListJobs(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Project ref `json:"project"`
+		Limit   int `json:"limit"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	p, err := s.findProject(ctx, a.Project)
+	if err != nil {
+		return nil, err
+	}
+	if a.Limit <= 0 {
+		a.Limit = 10
+	}
+	jobs, err := s.Store.ListJobs(ctx, p.ID, min(a.Limit, 50))
+	if err != nil {
+		return nil, err
+	}
+	profiles, err := s.Store.ListProfiles(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	names := map[int64]string{}
+	for _, prof := range profiles {
+		names[prof.ID] = prof.Name
+	}
+	type job struct {
+		ID         int64      `json:"id"`
+		Task       string     `json:"task"` // "" for a run that was not a saved task
+		Status     string     `json:"status"`
+		ExitCode   *int       `json:"exitCode"`
+		Dir        string     `json:"dir"`
+		QueuedAt   time.Time  `json:"queuedAt"`
+		FinishedAt *time.Time `json:"finishedAt"`
+	}
+	out := []job{}
+	for _, j := range jobs {
+		it := job{ID: j.ID, Status: j.Status, ExitCode: j.ExitCode, Dir: j.Dir, QueuedAt: j.QueuedAt, FinishedAt: j.FinishedAt}
+		if j.ProfileID != nil {
+			it.Task = names[*j.ProfileID]
+		}
+		out = append(out, it)
+	}
+	return out, nil
+}
+
+func (s *Server) mcpRerunJob(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Job           int64 `json:"job"`
+		WithoutFailed bool  `json:"without_failed"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	target := "/api/jobs/" + strconv.FormatInt(a.Job, 10) + "/rerun"
+	if a.WithoutFailed {
+		target += "?without=failed"
+	}
+	// The UI's rerun handler, so both pick the same worktree and modules.
+	var job jobView
+	if err := callAPI(ctx, s.rerunJob, http.MethodPost, target, strconv.FormatInt(a.Job, 10), nil, &job); err != nil {
+		return nil, err
+	}
+	return map[string]any{"job": job.ID, "status": job.Status, "dir": job.Dir, "command": strings.Join(job.Argv, " ")}, nil
+}
+
+// applySkips turns skip presets on and off for one run; unknown ids are an error that lists the known ones.
+func applySkips(spec *maven.RunSpec, presets []maven.SkipPreset, on, off []string) error {
+	known := map[string]bool{}
+	var ids []string
+	for _, p := range presets {
+		known[p.ID] = true
+		ids = append(ids, p.ID)
+	}
+	for _, id := range append(append([]string{}, on...), off...) {
+		if !known[id] {
+			return fmt.Errorf("no skip preset %q; this project has: %s", id, strings.Join(ids, ", "))
+		}
+	}
+	drop := map[string]bool{}
+	for _, id := range off {
+		drop[id] = true
+	}
+	var out []string
+	for _, id := range append(spec.Skips, on...) {
+		if !drop[id] && !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	spec.Skips = out
+	return nil
+}
+
+// callAPI runs one of the HTTP handlers in process and decodes its JSON reply into out;
+// an error reply becomes its message. pathID fills {id}.
+func callAPI(ctx context.Context, h http.HandlerFunc, method, target, pathID string, body, out any) error {
+	var rd io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = bytes.NewReader(b)
+	}
+	r := httptest.NewRequestWithContext(ctx, method, target, rd)
+	if pathID != "" {
+		r.SetPathValue("id", pathID)
+	}
+	rec := httptest.NewRecorder()
+	h(rec, r)
+	if rec.Code >= 300 {
+		var e apiError
+		_ = json.Unmarshal(rec.Body.Bytes(), &e)
+		return errors.New(e.Message)
+	}
+	if out == nil {
+		return nil
+	}
+	return json.Unmarshal(rec.Body.Bytes(), out)
+}
+
+func (s *Server) mcpDiscover(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Path string `json:"path"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	root, err := project.Inspect(strings.TrimSpace(a.Path))
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{"dir": root.Path, "buildTool": root.BuildTool, "git": project.GitInfo(ctx, root.Path)}
+	if wts := project.Worktrees(ctx, root.Path); len(wts) > 1 {
+		out["worktrees"] = wts
+	}
+	// What a run would use with the global defaults, as if it were already added.
+	info, err := s.runtimeFor(ctx, store.Project{RootPath: root.Path, BuildTool: root.BuildTool})
+	if err != nil {
+		return nil, err
+	}
+	out["wrapper"], out["executable"], out["jdk"] = info.Wrapper, info.Executable, info.JDK
+	if info.ExecutableError != "" {
+		out["executableError"] = info.ExecutableError
+	}
+	list, err := s.Store.ListProjects(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range list {
+		if p.RootPath == root.Path {
+			out["project"] = map[string]any{"id": p.ID, "name": p.Name}
+		}
+	}
+	return out, nil
+}
+
+func (s *Server) mcpCreateProject(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Path string `json:"path"`
+		Name string `json:"name"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	var p store.Project
+	if err := callAPI(ctx, s.createProject, http.MethodPost, "/api/projects", "", createProjectReq{Name: a.Name, RootPath: a.Path}, &p); err != nil {
+		return nil, err
+	}
+	out := map[string]any{"id": p.ID, "name": p.Name, "dir": p.RootPath, "buildTool": p.BuildTool}
+	if _, err := s.SubmitModuleDiscovery(p, maven.RunSpec{}); err == nil {
+		out["discovery"] = "started; list_modules shows the modules when it is done"
+	}
+	return out, nil
+}
+
+func (s *Server) mcpCreateTask(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Project    ref               `json:"project"`
+		Name       string            `json:"name"`
+		Goals      []string          `json:"goals"`
+		Modules    []string          `json:"modules"`
+		AlsoMake   bool              `json:"also_make"`
+		Profiles   []string          `json:"profiles"`
+		Skip       []string          `json:"skip"`
+		Properties map[string]string `json:"properties"`
+		ExtraArgs  []string          `json:"extra_args"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	p, err := s.findProject(ctx, a.Project)
+	if err != nil {
+		return nil, err
+	}
+	spec := maven.RunSpec{Goals: a.Goals, Profiles: a.Profiles, Properties: a.Properties, ExtraArgs: a.ExtraArgs}
+	if len(a.Modules) > 0 {
+		spec.Modules = maven.Modules{Mode: "selected", List: a.Modules, AlsoMake: a.AlsoMake}
+	}
+	if err := applySkips(&spec, presetsFor(p), a.Skip, nil); err != nil {
+		return nil, err
+	}
+	specJSON, _ := json.Marshal(spec)
+	id := strconv.FormatInt(p.ID, 10)
+	var prof store.RunProfile
+	if err := callAPI(ctx, s.createProfile, http.MethodPost, "/api/projects/"+id+"/profiles", id,
+		profileRequest{Name: a.Name, Spec: specJSON}, &prof); err != nil {
+		return nil, err
+	}
+	exe := "mvn"
+	if info, err := s.runtimeFor(ctx, p); err == nil && info.Executable != nil {
+		exe = filepath.Base(info.Executable.Path)
+	}
+	argv := spec.Normalize().WithDefaults(resourcesFor(p)).Argv(exe, presetsFor(p))
+	return mcpTask{ID: prof.ID, Name: prof.Name, Skips: nonNil(spec.Skips), Command: strings.Join(argv, " ")}, nil
 }

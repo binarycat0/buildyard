@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -59,10 +60,28 @@ func TestMCP(t *testing.T) {
 	}
 
 	root := mavenProject(t)
+	var found map[string]any
+	tool("discover", `{"path":"`+root+`"}`, &found)
+	if found["buildTool"] != "maven" || found["wrapper"] == nil || found["project"] != nil {
+		t.Fatalf("discover: %v", found)
+	}
 	var p store.Project
-	decodeInto(do(t, h, req{method: "POST", path: "/api/projects", body: `{"name":"app","rootPath":"` + root + `"}`}), &p)
+	tool("create_project", `{"path":"`+root+`","name":"app"}`, &p)
 	pid := strconv.FormatInt(p.ID, 10)
-	do(t, h, req{method: "POST", path: "/api/projects/" + pid + "/profiles", body: `{"name":"Quick","spec":{"goals":["install"]}}`})
+	if text, isErr := tool("create_project", `{"path":"`+root+`"}`, nil); !isErr || !strings.Contains(text, "already exists") {
+		t.Fatalf("duplicate project: %s", text)
+	}
+	if tool("discover", `{"path":"`+root+`"}`, &found); found["project"] == nil {
+		t.Fatalf("discover after create: %v", found)
+	}
+	var created mcpTask
+	tool("create_task", `{"project":"app","name":"Quick","goals":["install"]}`, &created)
+	if created.ID == 0 || !strings.HasSuffix(created.Command, "mvnw -B install") {
+		t.Fatalf("create_task: %+v", created)
+	}
+	if text, isErr := tool("create_task", `{"project":"app","name":"Bad","goals":["install"],"skip":["nope"]}`, nil); !isErr || !strings.Contains(text, "no skip preset") {
+		t.Fatalf("create_task bad skip: %s", text)
+	}
 
 	var projects []struct {
 		Name  string    `json:"name"`
@@ -101,6 +120,46 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("cancel finished: %s", text)
 	}
 
+	var skipped struct {
+		Command string `json:"command"`
+	}
+	tool("run_task", `{"project":"app","task":"Quick","skip":["tests","checkstyle"],"dont_skip":["checkstyle"]}`, &skipped)
+	if !strings.HasSuffix(skipped.Command, "mvnw -B -DskipTests install") {
+		t.Fatalf("run_task with skips: %+v", skipped)
+	}
+	if text, isErr := tool("run_task", `{"project":"app","task":"Quick","skip":["nope"]}`, nil); !isErr || !strings.Contains(text, "tests, testCompile") {
+		t.Fatalf("unknown skip: %s", text)
+	}
+	if text, _ := tool("list_projects", `{}`, nil); !strings.Contains(text, `"skips": []`) {
+		t.Fatalf("list_projects skips: %s", text)
+	}
+
+	var jobs []struct {
+		ID   int64  `json:"id"`
+		Task string `json:"task"`
+	}
+	tool("list_jobs", `{"project":"app"}`, &jobs)
+	if len(jobs) != 2 || jobs[1].ID != run.Job || jobs[1].Task != "Quick" {
+		t.Fatalf("list_jobs: %+v", jobs)
+	}
+	var rerun struct {
+		Job     int64  `json:"job"`
+		Command string `json:"command"`
+	}
+	tool("rerun_job", `{"job":`+strconv.FormatInt(run.Job, 10)+`}`, &rerun)
+	if rerun.Job == run.Job || rerun.Command != run.Command {
+		t.Fatalf("rerun_job: %+v", rerun)
+	}
+	if text, isErr := tool("rerun_job", `{"job":`+strconv.FormatInt(run.Job, 10)+`,"without_failed":true}`, nil); !isErr || !strings.Contains(text, "no failed modules") {
+		t.Fatalf("rerun without failed: %s", text)
+	}
+	waitJob(t, h, rerun.Job)
+	var mods map[string]any
+	tool("list_modules", `{"project":"app"}`, &mods)
+	if mods["hint"] == nil {
+		t.Fatalf("list_modules: %v", mods)
+	}
+
 	// Settings are readable, with secrets masked.
 	os.MkdirAll(filepath.Join(home, ".m2"), 0o755)
 	os.WriteFile(filepath.Join(home, ".m2", "settings.xml"), []byte("<settings><servers><server><id>x</id><password>hunter2</password></server></servers></settings>"), 0o644)
@@ -120,5 +179,31 @@ func TestMCP(t *testing.T) {
 	text, _ := tool("read_config_file", `{"id":"maven.settings"}`, nil)
 	if strings.Contains(text, "hunter2") || !strings.Contains(text, "<password>***</password>") {
 		t.Fatalf("read_config_file: %s", text)
+	}
+}
+
+func TestMCPListModules(t *testing.T) {
+	s, _ := newTestServer(t, t.TempDir())
+	ctx := context.Background()
+	p, err := s.Store.CreateProject(ctx, store.Project{Name: "app", RootPath: t.TempDir(), BuildTool: "maven"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Store.ReplaceModules(ctx, p.ID, []store.Module{
+		{Key: "g:core", GroupID: "g", ArtifactID: "core", Name: "Core", RelPath: "core"},
+		{Key: "a:util", GroupID: "a", ArtifactID: "util", RelPath: "a/util"},
+		{Key: "b:util", GroupID: "b", ArtifactID: "util", RelPath: "b/util"},
+	}, "test")
+	out, err := s.mcpListModules(ctx, json.RawMessage(`{"project":"app","filter":"UTIL"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(out)
+	if !strings.Contains(string(b), `"ref":"a:util"`) || !strings.Contains(string(b), `"ref":"b:util"`) || strings.Contains(string(b), "core") {
+		t.Fatalf("list_modules: %s", b)
+	}
+	out, _ = s.mcpListModules(ctx, json.RawMessage(`{"project":"app","filter":"core"}`))
+	if b, _ := json.Marshal(out); !strings.Contains(string(b), `"ref":":core"`) {
+		t.Fatalf("list_modules: %s", b)
 	}
 }

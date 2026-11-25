@@ -7,13 +7,19 @@ The running daemon serves an [MCP](https://modelcontextprotocol.io) endpoint at 
 | Tool | What it does |
 | --- | --- |
 | `list_projects` | Projects with their directory, git branch, worktrees and saved tasks (command and last job). |
-| `run_task` | Queues a saved task. Optional `worktree`, `modules` (`-pl`), `also_make` (`-am`), `properties` (`-D`) and `extra_args` narrow the run, e.g. one test class with `properties: {"test": "FooTest"}`. |
+| `run_task` | Queues a saved task. Optional `worktree`, `modules` (`-pl`), `also_make` (`-am`), `properties` (`-D`), `extra_args`, and `skip` / `dont_skip` (skip preset ids) change this run only, e.g. one test class with `properties: {"test": "FooTest"}, dont_skip: ["tests"]`. |
 | `get_job` | Status, exit code, failed modules, problems found in the log and the end of the log. `wait_seconds` waits for the job to finish; `log_from` reads around a problem. |
+| `list_modules` | The project's Maven modules from the last discovery, with the ref `run_task` takes; `filter` searches, `refresh` starts a new discovery. |
+| `list_jobs` | A project's recent jobs: task, status, exit code, worktree, times. |
+| `rerun_job` | Runs a job again with the same settings; `without_failed` leaves out the failed modules and their dependents. |
+| `discover` | Inspects a directory before adding it: build tool, Maven wrapper, git branch and worktrees, which mvn/mvnd and JDK would run it, and whether it is already a project. |
+| `create_project` | Adds a project and starts module discovery. |
+| `create_task` | Saves a new task: goals, modules, profiles, skip presets, `-D` properties and extra arguments. |
 | `cancel_job` | Cancels a queued or running job. |
 | `get_settings` | Read-only: build tools, JDKs, global defaults and the tool config files; with `project`, the executable, JDK, env and resources its runs use. |
 | `read_config_file` | Read-only: one of those config files (e.g. `maven.settings`), with passwords masked. |
 
-Agents cannot create projects or tasks, or change any settings.
+Agents can add projects and tasks, but cannot change or delete existing tasks, projects or settings.
 
 ## Setup
 
