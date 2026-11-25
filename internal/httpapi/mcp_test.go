@@ -60,10 +60,28 @@ func TestMCP(t *testing.T) {
 	}
 
 	root := mavenProject(t)
+	var found map[string]any
+	tool("discover", `{"path":"`+root+`"}`, &found)
+	if found["buildTool"] != "maven" || found["wrapper"] == nil || found["project"] != nil {
+		t.Fatalf("discover: %v", found)
+	}
 	var p store.Project
-	decodeInto(do(t, h, req{method: "POST", path: "/api/projects", body: `{"name":"app","rootPath":"` + root + `"}`}), &p)
+	tool("create_project", `{"path":"`+root+`","name":"app"}`, &p)
 	pid := strconv.FormatInt(p.ID, 10)
-	do(t, h, req{method: "POST", path: "/api/projects/" + pid + "/profiles", body: `{"name":"Quick","spec":{"goals":["install"]}}`})
+	if text, isErr := tool("create_project", `{"path":"`+root+`"}`, nil); !isErr || !strings.Contains(text, "already exists") {
+		t.Fatalf("duplicate project: %s", text)
+	}
+	if tool("discover", `{"path":"`+root+`"}`, &found); found["project"] == nil {
+		t.Fatalf("discover after create: %v", found)
+	}
+	var created mcpTask
+	tool("create_task", `{"project":"app","name":"Quick","goals":["install"]}`, &created)
+	if created.ID == 0 || !strings.HasSuffix(created.Command, "mvnw -B install") {
+		t.Fatalf("create_task: %+v", created)
+	}
+	if text, isErr := tool("create_task", `{"project":"app","name":"Bad","goals":["install"],"skip":["nope"]}`, nil); !isErr || !strings.Contains(text, "no skip preset") {
+		t.Fatalf("create_task bad skip: %s", text)
+	}
 
 	var projects []struct {
 		Name  string    `json:"name"`
