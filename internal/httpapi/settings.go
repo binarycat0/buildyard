@@ -9,6 +9,7 @@ import (
 
 	"github.com/binarycat0/buildyard/internal/buildtool/maven"
 	"github.com/binarycat0/buildyard/internal/jdk"
+	"github.com/binarycat0/buildyard/internal/project"
 	"github.com/binarycat0/buildyard/internal/store"
 	"github.com/binarycat0/buildyard/internal/tasks"
 	"github.com/binarycat0/buildyard/internal/toolconfig"
@@ -313,6 +314,7 @@ type runtimeInfo struct {
 	ProjectJDK      *store.JDK      `json:"projectJdk"`     // the project JDK, if set
 	Wrapper         *maven.Wrapper  `json:"wrapper"`
 	Tools           maven.Tools     `json:"tools"`
+	Git             *project.Git    `json:"git"` // nil = not a git checkout
 }
 
 func (s *Server) projectRuntime(w http.ResponseWriter, r *http.Request) {
@@ -339,7 +341,7 @@ func (s *Server) runtimeFor(ctx context.Context, p store.Project) (runtimeInfo, 
 	if err != nil {
 		return runtimeInfo{}, err
 	}
-	info := runtimeInfo{Tools: maven.FindTools(s.Home), Wrapper: maven.FindWrapper(p.RootPath)}
+	info := runtimeInfo{Tools: maven.FindTools(s.Home), Wrapper: maven.FindWrapper(p.RootPath), Git: project.GitInfo(ctx, p.RootPath)}
 
 	tool := settings.Tool(p.BuildTool)
 	mode := tool.Executable

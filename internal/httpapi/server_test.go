@@ -139,6 +139,16 @@ func TestProjectsAPI(t *testing.T) {
 	if w.Code != 200 || p.Name != "Renamed" || *p.Executable != "wrapper" || p.Env["MAVEN_OPTS"] != "-Xmx8g" {
 		t.Fatalf("patch: %d %s", w.Code, w.Body)
 	}
+	moved := t.TempDir()
+	os.WriteFile(filepath.Join(moved, "pom.xml"), []byte("<project/>"), 0o644)
+	w = call("PATCH", id, `{"rootPath":"`+moved+`"}`)
+	mustJSON(w, &p)
+	if want, _ := filepath.EvalSymlinks(moved); w.Code != 200 || p.RootPath != want {
+		t.Fatalf("move: %d %s", w.Code, w.Body)
+	}
+	if w := call("PATCH", id, `{"rootPath":"`+noPom+`"}`); w.Code != 400 {
+		t.Fatalf("move to dir without pom: %d", w.Code)
+	}
 	if w := call("PATCH", id, `{"name":"  "}`); w.Code != 400 {
 		t.Fatalf("empty name: %d", w.Code)
 	}

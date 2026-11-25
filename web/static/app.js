@@ -618,6 +618,7 @@ document.addEventListener('alpine:init', () => {
       const known = ['', 'auto', 'wrapper', 'mvnd', 'mvn'].includes(exe);
       this.pform = {
         name: p.name,
+        rootPath: p.rootPath,
         execChoice: known ? exe : 'custom',
         customPath: known ? '' : exe,
         buildTool: p.buildTool,
@@ -648,7 +649,7 @@ document.addEventListener('alpine:init', () => {
         const executable = f.execChoice === 'custom' ? f.customPath.trim() : f.execChoice;
         if (f.execChoice === 'custom' && !executable.startsWith('/')) throw new Error('Enter an absolute path to the executable');
         const p = await api('PATCH', `/projects/${this.proj.id}`, {
-          name: f.name, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: 0,
+          name: f.name, rootPath: f.rootPath, executable, jdkId: Number(f.jdkId) || 0, toolJdkId: 0,
           env: textToEnv(f.envText), skipPresets: this.presetDiff(f.presets),
           resources: {
             threads: joinChoice('cpu', f.cpu, f.cpuCustom),
