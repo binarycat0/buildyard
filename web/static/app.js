@@ -1276,7 +1276,10 @@ document.addEventListener('alpine:init', () => {
       this.worktree = list.some((w) => !w.main && w.dir === saved) ? saved : '';
     },
 
+    // Options carry each worktree's dir (an empty value would read as the label text);
+    // the project's own one is stored as ''.
     pickWorktree(dir) {
+      if (this.worktrees.some((w) => w.main && w.dir === dir)) dir = '';
       this.worktree = dir;
       savePref('worktree.' + this.proj.id, dir);
     },
