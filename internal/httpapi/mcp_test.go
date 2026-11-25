@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -101,6 +102,32 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("cancel finished: %s", text)
 	}
 
+	var jobs []struct {
+		ID   int64  `json:"id"`
+		Task string `json:"task"`
+	}
+	tool("list_jobs", `{"project":"app"}`, &jobs)
+	if len(jobs) != 1 || jobs[0].ID != run.Job || jobs[0].Task != "Quick" {
+		t.Fatalf("list_jobs: %+v", jobs)
+	}
+	var rerun struct {
+		Job     int64  `json:"job"`
+		Command string `json:"command"`
+	}
+	tool("rerun_job", `{"job":`+strconv.FormatInt(run.Job, 10)+`}`, &rerun)
+	if rerun.Job == run.Job || rerun.Command != run.Command {
+		t.Fatalf("rerun_job: %+v", rerun)
+	}
+	if text, isErr := tool("rerun_job", `{"job":`+strconv.FormatInt(run.Job, 10)+`,"without_failed":true}`, nil); !isErr || !strings.Contains(text, "no failed modules") {
+		t.Fatalf("rerun without failed: %s", text)
+	}
+	waitJob(t, h, rerun.Job)
+	var mods map[string]any
+	tool("list_modules", `{"project":"app"}`, &mods)
+	if mods["hint"] == nil {
+		t.Fatalf("list_modules: %v", mods)
+	}
+
 	// Settings are readable, with secrets masked.
 	os.MkdirAll(filepath.Join(home, ".m2"), 0o755)
 	os.WriteFile(filepath.Join(home, ".m2", "settings.xml"), []byte("<settings><servers><server><id>x</id><password>hunter2</password></server></servers></settings>"), 0o644)
@@ -120,5 +147,31 @@ func TestMCP(t *testing.T) {
 	text, _ := tool("read_config_file", `{"id":"maven.settings"}`, nil)
 	if strings.Contains(text, "hunter2") || !strings.Contains(text, "<password>***</password>") {
 		t.Fatalf("read_config_file: %s", text)
+	}
+}
+
+func TestMCPListModules(t *testing.T) {
+	s, _ := newTestServer(t, t.TempDir())
+	ctx := context.Background()
+	p, err := s.Store.CreateProject(ctx, store.Project{Name: "app", RootPath: t.TempDir(), BuildTool: "maven"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Store.ReplaceModules(ctx, p.ID, []store.Module{
+		{Key: "g:core", GroupID: "g", ArtifactID: "core", Name: "Core", RelPath: "core"},
+		{Key: "a:util", GroupID: "a", ArtifactID: "util", RelPath: "a/util"},
+		{Key: "b:util", GroupID: "b", ArtifactID: "util", RelPath: "b/util"},
+	}, "test")
+	out, err := s.mcpListModules(ctx, json.RawMessage(`{"project":"app","filter":"UTIL"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(out)
+	if !strings.Contains(string(b), `"ref":"a:util"`) || !strings.Contains(string(b), `"ref":"b:util"`) || strings.Contains(string(b), "core") {
+		t.Fatalf("list_modules: %s", b)
+	}
+	out, _ = s.mcpListModules(ctx, json.RawMessage(`{"project":"app","filter":"core"}`))
+	if b, _ := json.Marshal(out); !strings.Contains(string(b), `"ref":":core"`) {
+		t.Fatalf("list_modules: %s", b)
 	}
 }

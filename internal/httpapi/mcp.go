@@ -146,6 +146,24 @@ var mcpTools = []mcpTool{
 			"log_lines":    prop("integer", "how many log lines to return (default 60, max 1000)"),
 			"log_from":     prop("integer", "return the log from this line instead of its end, e.g. a problem's logLine minus a few"),
 		}), run: (*Server).mcpGetJob},
+	{Name: "list_modules", Description: "A project's Maven modules as found by the last discovery, with the ref to pass to run_task modules. " +
+		"Use filter to search large projects.",
+		InputSchema: schema([]string{"project"}, map[string]any{
+			"project": prop("string", "project id or name"),
+			"filter":  prop("string", "only modules whose ref, name or path contains this text"),
+			"refresh": prop("boolean", "start a new discovery in the background (takes a while); call again later"),
+		}), run: (*Server).mcpListModules},
+	{Name: "list_jobs", Description: "A project's recent jobs, newest first: id, task, status, exit code, directory and times.",
+		InputSchema: schema([]string{"project"}, map[string]any{
+			"project": prop("string", "project id or name"),
+			"limit":   prop("integer", "how many (default 10, max 50)"),
+		}), run: (*Server).mcpListJobs},
+	{Name: "rerun_job", Description: "Run a job again with the same settings and worktree. With without_failed it leaves out " +
+		"the modules that failed and everything depending on them.",
+		InputSchema: schema([]string{"job"}, map[string]any{
+			"job":            prop("integer", "job id"),
+			"without_failed": prop("boolean", "skip the failed modules and their dependents"),
+		}), run: (*Server).mcpRerunJob},
 	{Name: "cancel_job", Description: "Cancel a queued or running job (stop, then kill after a grace period).",
 		InputSchema: schema([]string{"job"}, map[string]any{"job": prop("integer", "job id")}), run: (*Server).mcpCancelJob},
 	{Name: "get_settings", Description: "Read-only settings for diagnosing builds: build tools found, JDKs, global defaults and the " +
@@ -469,4 +487,134 @@ func (s *Server) mcpReadConfig(ctx context.Context, raw json.RawMessage) (any, e
 	c.Content = secretRe.ReplaceAllString(c.Content, "${1}${4}***${3}")
 	c.Template = ""
 	return c, nil
+}
+
+func (s *Server) mcpListModules(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Project ref    `json:"project"`
+		Filter  string `json:"filter"`
+		Refresh bool   `json:"refresh"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	p, err := s.findProject(ctx, a.Project)
+	if err != nil {
+		return nil, err
+	}
+	if a.Refresh {
+		if _, err := s.SubmitModuleDiscovery(p, maven.RunSpec{}); err != nil {
+			return nil, err
+		}
+		return map[string]any{"discovery": "started; call list_modules again in a minute"}, nil
+	}
+	mods, err := s.Store.ListModules(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	perArtifact := map[string]int{}
+	for _, m := range mods {
+		perArtifact[m.ArtifactID]++
+	}
+	type module struct {
+		Ref       string `json:"ref"` // what -pl takes
+		Name      string `json:"name"`
+		Path      string `json:"path"`
+		Packaging string `json:"packaging"`
+	}
+	out := []module{}
+	filter := strings.ToLower(a.Filter)
+	for _, m := range mods {
+		r := ":" + m.ArtifactID
+		if perArtifact[m.ArtifactID] > 1 {
+			r = m.Key
+		}
+		it := module{r, m.Name, m.RelPath, m.Packaging}
+		if filter == "" || strings.Contains(strings.ToLower(r+" "+m.Name+" "+m.RelPath), filter) {
+			out = append(out, it)
+		}
+	}
+	res := map[string]any{"total": len(mods), "modules": out}
+	if len(mods) == 0 {
+		res["hint"] = "no modules discovered yet; call list_modules with refresh true"
+	} else {
+		res["discoveredAt"] = mods[0].DiscoveredAt
+	}
+	return res, nil
+}
+
+func (s *Server) mcpListJobs(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Project ref `json:"project"`
+		Limit   int `json:"limit"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	p, err := s.findProject(ctx, a.Project)
+	if err != nil {
+		return nil, err
+	}
+	if a.Limit <= 0 {
+		a.Limit = 10
+	}
+	jobs, err := s.Store.ListJobs(ctx, p.ID, min(a.Limit, 50))
+	if err != nil {
+		return nil, err
+	}
+	profiles, err := s.Store.ListProfiles(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	names := map[int64]string{}
+	for _, prof := range profiles {
+		names[prof.ID] = prof.Name
+	}
+	type job struct {
+		ID         int64      `json:"id"`
+		Task       string     `json:"task"` // "" for a run that was not a saved task
+		Status     string     `json:"status"`
+		ExitCode   *int       `json:"exitCode"`
+		Dir        string     `json:"dir"`
+		QueuedAt   time.Time  `json:"queuedAt"`
+		FinishedAt *time.Time `json:"finishedAt"`
+	}
+	out := []job{}
+	for _, j := range jobs {
+		it := job{ID: j.ID, Status: j.Status, ExitCode: j.ExitCode, Dir: j.Dir, QueuedAt: j.QueuedAt, FinishedAt: j.FinishedAt}
+		if j.ProfileID != nil {
+			it.Task = names[*j.ProfileID]
+		}
+		out = append(out, it)
+	}
+	return out, nil
+}
+
+func (s *Server) mcpRerunJob(ctx context.Context, raw json.RawMessage) (any, error) {
+	var a struct {
+		Job           int64 `json:"job"`
+		WithoutFailed bool  `json:"without_failed"`
+	}
+	if err := args(raw, &a); err != nil {
+		return nil, err
+	}
+	target := "/api/jobs/" + strconv.FormatInt(a.Job, 10) + "/rerun"
+	if a.WithoutFailed {
+		target += "?without=failed"
+	}
+	// The UI's rerun handler, so both pick the same worktree and modules.
+	r := httptest.NewRequestWithContext(ctx, http.MethodPost, target, nil)
+	r.SetPathValue("id", strconv.FormatInt(a.Job, 10))
+	rec := httptest.NewRecorder()
+	s.rerunJob(rec, r)
+	if rec.Code >= 300 {
+		var e apiError
+		_ = json.Unmarshal(rec.Body.Bytes(), &e)
+		return nil, errors.New(e.Message)
+	}
+	var job jobView
+	if err := json.Unmarshal(rec.Body.Bytes(), &job); err != nil {
+		return nil, err
+	}
+	return map[string]any{"job": job.ID, "status": job.Status, "dir": job.Dir, "command": strings.Join(job.Argv, " ")}, nil
 }
