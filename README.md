@@ -42,6 +42,10 @@ Projects, saved build tasks, live logs with a module tree and problems, run hist
 
 Builds can also be sent to an OpenTelemetry stack you run yourself (Grafana, Loki, Tempo): a trace per run with startup, modules, goals and downloads, and the build output as logs. See [Observability](doc/observability.md) for setup with Docker.
 
+### MCP for agents
+
+The daemon serves an MCP endpoint at `http://localhost:7777/mcp`, so coding agents (Claude Code, opencode and others) can run saved tasks, follow jobs and read settings to diagnose failures. See [MCP for agents](doc/mcp.md).
+
 ### Keep the Mac awake (macOS)
 
 An option in Settings → General runs `caffeinate` next to each build, so idle sleep can't interrupt it. See [Keep the Mac awake](doc/keep-awake.md).

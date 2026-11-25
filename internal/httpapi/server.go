@@ -99,6 +99,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/jdks/{id}", s.deleteJDK)
 	mux.HandleFunc("GET /api/tasks", s.listTasks)
 	mux.HandleFunc("GET /api/tasks/{id}", s.getTask)
+	mux.HandleFunc("POST /mcp", s.mcp)
+	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+		// No server-initiated stream and no sessions: only POST is served.
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "POST JSON-RPC requests to /mcp")
+	})
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "no such endpoint")
 	})
