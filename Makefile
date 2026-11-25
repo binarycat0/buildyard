@@ -58,26 +58,41 @@ uninstall:
 	@echo "kept $(BUILDYARD_HOME) (config, database, logs); delete it yourself if you want"
 
 clean:
-	rm -rf bin maven-ext/target site
+	rm -rf bin maven-ext/target site .venv-docs
 
-# Docs site (MkDocs Material in a container, see utils/mkdocs), published to
+# Docs site (MkDocs Material, see utils/mkdocs), published to
 # https://tools.binaryc.at/buildyard/ by .github/workflows/docs.yml.
-DOCKER ?= docker
+# Runs in docker or podman when one is installed (DOCKER=podman picks one),
+# otherwise in a Python venv in .venv-docs.
+DOCKER ?= $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null)
 DOCS_IMAGE ?= buildyard-docs
+MKDOCS_VERSION = $(shell sed -n 's/^FROM .*mkdocs-material:\(.*\)/\1/p' utils/mkdocs/Dockerfile)
+ifeq ($(DOCKER),)
+DOCS_VENV = .venv-docs
+DOCS_RUN = PATH="$(CURDIR)/$(DOCS_VENV)/bin:$$PATH" sh utils/mkdocs/entrypoint.sh
+DOCS_SERVE = $(DOCS_RUN) serve
+docs-image: $(DOCS_VENV)/bin/mkdocs
+$(DOCS_VENV)/bin/mkdocs: utils/mkdocs/Dockerfile
+	python3 -m venv $(DOCS_VENV)
+	$(DOCS_VENV)/bin/pip install -q mkdocs-material==$(MKDOCS_VERSION)
+	touch $@
+else
 ifeq ($(notdir $(DOCKER)),podman)
 # Rootless podman: run as your own user so site/ stays yours; :z for SELinux.
-DOCS_RUN = $(DOCKER) run --rm --userns=keep-id -v "$(CURDIR)":/docs:z
+DOCS_CTR = $(DOCKER) run --rm --userns=keep-id -v "$(CURDIR)":/docs:z
 else
-DOCS_RUN = $(DOCKER) run --rm --user $(shell id -u):$(shell id -g) -v "$(CURDIR)":/docs
+DOCS_CTR = $(DOCKER) run --rm --user $(shell id -u):$(shell id -g) -v "$(CURDIR)":/docs
 endif
-
+DOCS_RUN = $(DOCS_CTR) $(DOCS_IMAGE)
+DOCS_SERVE = $(DOCS_CTR) -it -p 8000:8000 $(DOCS_IMAGE) serve -a 0.0.0.0:8000
 docs-image:
 	$(DOCKER) build -q -t $(DOCS_IMAGE) utils/mkdocs >/dev/null
+endif
 
 # Builds site/.
 docs: docs-image
-	$(DOCS_RUN) $(DOCS_IMAGE) build --strict
+	$(DOCS_RUN) build --strict
 
 # http://127.0.0.1:8000; restart to pick up README.md changes.
 docs-serve: docs-image
-	$(DOCS_RUN) -it -p 8000:8000 $(DOCS_IMAGE) serve -a 0.0.0.0:8000
+	$(DOCS_SERVE)

@@ -71,7 +71,7 @@ buildyard cancel 42
 
 - Go 1.26+
 - Maven, only for `make ext` (the extension jar is committed)
-- Docker or Podman, only for the docs site
+- For the docs site: Docker or Podman, or else Python 3 (a venv in `.venv-docs`)
 
 ### Build and run
 
