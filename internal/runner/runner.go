@@ -130,7 +130,7 @@ func (r *Runner) Enqueue(ctx context.Context, j store.Job, cmd Command) (store.J
 	if closing {
 		return store.Job{}, ErrClosed
 	}
-	j.Argv = cmd.Argv
+	j.Argv, j.Dir = cmd.Argv, cmd.Dir
 	job, err := r.store.CreateJob(ctx, j, func(id int64) string {
 		return filepath.Join(r.logsDir, strconv.FormatInt(id, 10)+".log")
 	})

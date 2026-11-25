@@ -132,7 +132,7 @@
                   <tr>
                     <td class="nowrap"><a :href="'#/jobs/' + j.id" class="status-link"><span class="status" :class="j.status" x-text="j.status"></span></a> <span class="awake" x-show="j.keptAwake && j.status === 'running'" title="caffeinate keeps the Mac awake until this build ends">☕</span></td>
                     <td class="nowrap"><a :href="'#/jobs/' + j.id" x-text="'#' + j.id"></a></td>
-                    <td class="grow-cell"><a :href="'#/jobs/' + j.id" class="plain" x-text="jobTaskName(j)"></a></td>
+                    <td class="grow-cell"><a :href="'#/jobs/' + j.id" class="plain" x-text="jobTaskName(j)"></a> <span class="tag" x-show="jobWorktree(j, proj)" :title="'Worktree ' + jobWorktree(j, proj)" x-text="'⎇ ' + jobWorktree(j, proj).split('/').pop()"></span></td>
                     <td class="nowrap muted small" x-text="j.startedAt ? 'started ' + when(j.startedAt) : 'queued ' + when(j.queuedAt)"></td>
                     <td class="nowrap small" x-text="duration(j)"></td>
                     <td class="actions nowrap">
@@ -155,6 +155,12 @@
           <div class="stack" x-show="pview === 'run'">
             <div class="row">
               <button type="button" class="primary" @click="openNewTask()">New task</button>
+              <label class="small worktree-pick" x-show="worktrees.length > 1" title="Git worktree the Run buttons build in">Run in
+                <select :value="worktree" @change="pickWorktree($event.target.value)">
+                  <template x-for="w in worktrees" :key="w.dir">
+                    <option :value="w.main ? '' : w.dir" :selected="(w.main ? '' : w.dir) === worktree" :title="w.dir" x-text="worktreeLabel(w)"></option>
+                  </template>
+                </select></label>
               <span class="error small" x-show="runError && !$refs.taskDialog?.open" x-text="runError"></span>
               <span class="muted small" x-show="copied && !$refs.taskDialog?.open" x-cloak>Command copied</span>
             </div>
@@ -459,7 +465,7 @@
                     <td @click.stop><input type="checkbox" :checked="pick.includes(j.id)" @change="togglePick(j.id)" title="Pick to compare"></td>
                     <td><a :href="'#/jobs/' + j.id" x-text="j.id"></a></td>
                     <td><span class="status" :class="j.status" x-text="j.status"></span> <span class="awake" x-show="j.keptAwake && j.status === 'running'" title="caffeinate keeps the Mac awake until this build ends">☕</span></td>
-                    <td><code x-text="specText(j)"></code></td>
+                    <td><span class="tag" x-show="jobWorktree(j, proj)" :title="'Worktree ' + jobWorktree(j, proj)" x-text="'⎇ ' + jobWorktree(j, proj).split('/').pop()"></span> <code x-text="specText(j)"></code></td>
                     <td class="small" x-text="when(j.startedAt || j.queuedAt)"></td>
                     <td class="small" x-text="duration(j)"></td>
                     <td class="nowrap">
@@ -636,6 +642,7 @@
           <div class="muted small">
             <span x-text="'Queued ' + when(job.queuedAt)"></span>
             <span x-show="job.gitHead" x-text="'· commit ' + (job.gitHead || '').slice(0, 10)"></span>
+            <span x-show="jobWorktree(job, jobProject)">· worktree <code x-text="jobWorktree(job, jobProject)"></code></span>
             <span x-show="job.traceId">· trace
               <a x-show="traceLink(job)" :href="traceLink(job)" target="_blank" rel="noopener" title="Open the trace in Grafana" x-text="(job.traceId || '').slice(0, 12)"></a>
               <code x-show="!traceLink(job)" x-text="job.traceId"></code></span>
