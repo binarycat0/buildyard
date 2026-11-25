@@ -44,7 +44,7 @@ Builds can also be sent to an OpenTelemetry stack you run yourself (Grafana, Lok
 
 ### MCP for agents
 
-The daemon serves an MCP endpoint at `http://localhost:7777/mcp`, so coding agents (Claude Code, opencode and others) can run saved tasks, follow jobs and read settings to diagnose failures. See [MCP for agents](doc/mcp.md).
+Coding agents connect to `http://localhost:7777/mcp` to add projects and tasks, run builds and read results. See [MCP for agents](doc/mcp.md).
 
 ### Keep the Mac awake (macOS)
 
@@ -71,7 +71,7 @@ buildyard cancel 42
 
 - Go 1.26+
 - Maven, only for `make ext` (the extension jar is committed)
-- Docker or Podman, only for the docs site
+- For the docs site: Docker or Podman, or else Python 3 (a venv in `.venv-docs`)
 
 ### Build and run
 

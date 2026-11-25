@@ -16,5 +16,6 @@ mkdocs "$@"
 
 # The home page is generated; point its edit button at README.md.
 if [ "${1:-}" = build ] && [ -f site/index.html ]; then
-  sed -i 's#/edit/main/doc/index\.md#/edit/main/README.md#g' site/index.html
+  sed 's#/edit/main/doc/index\.md#/edit/main/README.md#g' site/index.html > site/index.html.tmp
+  mv site/index.html.tmp site/index.html
 fi
