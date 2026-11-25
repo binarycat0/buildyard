@@ -1,25 +1,6 @@
 # MCP for agents
 
-The running daemon serves an [MCP](https://modelcontextprotocol.io) endpoint at `http://localhost:7777/mcp` (the UI's port; change it if `config.toml` sets another). Coding agents use it to run saved tasks and read the results, without knowing how the project is built. There is nothing to install or start.
-
-## Tools
-
-| Tool | What it does |
-| --- | --- |
-| `list_projects` | Projects with their directory, git branch, worktrees and saved tasks (command and last job). |
-| `run_task` | Queues a saved task. Optional `worktree`, `modules` (`-pl`), `also_make` (`-am`), `properties` (`-D`), `extra_args`, and `skip` / `dont_skip` (skip preset ids) change this run only, e.g. one test class with `properties: {"test": "FooTest"}, dont_skip: ["tests"]`. |
-| `get_job` | Status, exit code, failed modules, problems found in the log and the end of the log. `wait_seconds` waits for the job to finish; `log_from` reads around a problem. |
-| `list_modules` | The project's Maven modules from the last discovery, with the ref `run_task` takes; `filter` searches, `refresh` starts a new discovery. |
-| `list_jobs` | A project's recent jobs: task, status, exit code, worktree, times. |
-| `rerun_job` | Runs a job again with the same settings; `without_failed` leaves out the failed modules and their dependents. |
-| `discover` | Inspects a directory before adding it: build tool, Maven wrapper, git branch and worktrees, which mvn/mvnd and JDK would run it, and whether it is already a project. |
-| `create_project` | Adds a project and starts module discovery. |
-| `create_task` | Saves a new task: goals, modules, profiles, skip presets, `-D` properties and extra arguments. |
-| `cancel_job` | Cancels a queued or running job. |
-| `get_settings` | Read-only: build tools, JDKs, global defaults and the tool config files; with `project`, the executable, JDK, env and resources its runs use. |
-| `read_config_file` | Read-only: one of those config files (e.g. `maven.settings`), with passwords masked. |
-
-Agents can add projects and tasks, but cannot change or delete existing tasks, projects or settings.
+The daemon serves an [MCP](https://modelcontextprotocol.io) endpoint (streamable HTTP) at `http://localhost:7777/mcp`, on the UI's port.
 
 ## Setup
 
@@ -29,14 +10,29 @@ Claude Code:
 claude mcp add --transport http buildyard http://localhost:7777/mcp
 ```
 
-opencode, in `opencode.json`:
+opencode (`opencode.json`):
 
 ```json
-{
-  "mcp": {
-    "buildyard": { "type": "remote", "url": "http://localhost:7777/mcp", "enabled": true }
-  }
-}
+{ "mcp": { "buildyard": { "type": "remote", "url": "http://localhost:7777/mcp" } } }
 ```
 
-Other agents that support remote (streamable HTTP) MCP servers take the same URL.
+## Tools
+
+| Tool | Does |
+| --- | --- |
+| `discover` | Inspects a folder: build tool, wrapper, git, executable and JDK it would use. |
+| `create_project` | Adds a project and starts module discovery. |
+| `create_task` | Saves a task: goals, modules, profiles, skips, `-D`, extra args. |
+| `list_projects` | Projects with git branch, worktrees and tasks. |
+| `list_modules` | Modules with the ref for `-pl`; `filter`, `refresh`. |
+| `run_task` | Runs a task. Per-run overrides: `worktree`, `modules`, `also_make`, `properties`, `skip`, `dont_skip`, `extra_args`. |
+| `get_job` | Status, failed modules, problems, log tail; `wait_seconds`, `log_from`. |
+| `list_jobs` | Recent jobs of a project. |
+| `rerun_job` | Runs a job again; `without_failed`. |
+| `cancel_job` | Cancels a job. |
+| `get_settings` | Tools, JDKs, defaults, config files; with `project`, what its runs use. |
+| `read_config_file` | One config file, passwords masked. |
+
+Agents can add projects and tasks but cannot edit or delete them, or change settings.
+
+Example, one test class: `run_task {project: "app", task: "Quick", modules: [":core"], properties: {test: "FooTest"}, dont_skip: ["tests"]}`, then `get_job {job: 42, wait_seconds: 300}`.
