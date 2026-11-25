@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -127,8 +128,8 @@ func prop(typ, desc string) map[string]any { return map[string]any{"type": typ, 
 var mcpTools = []mcpTool{
 	{Name: "list_projects", Description: "Projects with their directory, git branch, git worktrees and saved tasks (id, name, command, last job).",
 		InputSchema: schema(nil, map[string]any{}), run: (*Server).mcpListProjects},
-	{Name: "run_task", Description: "Queue a saved task of a project and return the job. Optional overrides narrow it, e.g. " +
-		"modules [\":core\"] with properties {\"test\": \"FooTest\"} to run one test class.",
+	{Name: "run_task", Description: "Queue a saved task of a project and return the job. Optional overrides change this run only, e.g. " +
+		"modules [\":core\"] with properties {\"test\": \"FooTest\"} and dont_skip [\"tests\"] to run one test class.",
 		InputSchema: schema([]string{"project", "task"}, map[string]any{
 			"project":    prop("string", "project id or name"),
 			"task":       prop("string", "task id or name"),
@@ -137,6 +138,8 @@ var mcpTools = []mcpTool{
 			"also_make":  prop("boolean", "with modules: also build what they depend on (-am)"),
 			"properties": map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}, "description": "extra -Dkey=value, e.g. {\"test\": \"FooTest#bar\"}"},
 			"extra_args": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "arguments appended as is"},
+			"skip":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "skip preset ids to turn on, e.g. [\"tests\", \"checkstyle\"]; get_settings with project lists them"},
+			"dont_skip":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "skip preset ids the task has on to turn off for this run, e.g. [\"tests\"] to run tests"},
 		}), run: (*Server).mcpRunTask},
 	{Name: "get_job", Description: "A job's status, exit code, command, failed modules, problems found in the log and the end of the log. " +
 		"With wait_seconds it waits for the job to finish first.",
@@ -212,6 +215,7 @@ func (s *Server) findProject(ctx context.Context, r ref) (store.Project, error) 
 type mcpTask struct {
 	ID      int64             `json:"id"`
 	Name    string            `json:"name"`
+	Skips   []string          `json:"skips"` // skip preset ids the task has on
 	Command string            `json:"command"`
 	LastJob *store.JobSummary `json:"lastJob"`
 }
@@ -254,7 +258,7 @@ func (s *Server) mcpListProjects(ctx context.Context, _ json.RawMessage) (any, e
 			var spec maven.RunSpec
 			_ = json.Unmarshal(prof.Spec, &spec)
 			argv := spec.Normalize().WithDefaults(resourcesFor(p)).Argv(exe, presetsFor(p))
-			it.Tasks = append(it.Tasks, mcpTask{ID: prof.ID, Name: prof.Name, Command: strings.Join(argv, " "), LastJob: prof.LastJob})
+			it.Tasks = append(it.Tasks, mcpTask{ID: prof.ID, Name: prof.Name, Skips: nonNil(spec.Skips), Command: strings.Join(argv, " "), LastJob: prof.LastJob})
 		}
 		out = append(out, it)
 	}
@@ -270,6 +274,8 @@ func (s *Server) mcpRunTask(ctx context.Context, raw json.RawMessage) (any, erro
 		AlsoMake   bool              `json:"also_make"`
 		Properties map[string]string `json:"properties"`
 		ExtraArgs  []string          `json:"extra_args"`
+		Skip       []string          `json:"skip"`
+		DontSkip   []string          `json:"dont_skip"`
 	}
 	if err := args(raw, &a); err != nil {
 		return nil, err
@@ -306,6 +312,9 @@ func (s *Server) mcpRunTask(ctx context.Context, raw json.RawMessage) (any, erro
 		spec.Properties[k] = v
 	}
 	spec.ExtraArgs = append(spec.ExtraArgs, a.ExtraArgs...)
+	if err := applySkips(&spec, presetsFor(p), a.Skip, a.DontSkip); err != nil {
+		return nil, err
+	}
 	if !inWorktree(ctx, &p, a.Worktree) {
 		return nil, errors.New("not a git worktree of this project: " + a.Worktree)
 	}
@@ -617,4 +626,31 @@ func (s *Server) mcpRerunJob(ctx context.Context, raw json.RawMessage) (any, err
 		return nil, err
 	}
 	return map[string]any{"job": job.ID, "status": job.Status, "dir": job.Dir, "command": strings.Join(job.Argv, " ")}, nil
+}
+
+// applySkips turns skip presets on and off for one run; unknown ids are an error that lists the known ones.
+func applySkips(spec *maven.RunSpec, presets []maven.SkipPreset, on, off []string) error {
+	known := map[string]bool{}
+	var ids []string
+	for _, p := range presets {
+		known[p.ID] = true
+		ids = append(ids, p.ID)
+	}
+	for _, id := range append(append([]string{}, on...), off...) {
+		if !known[id] {
+			return fmt.Errorf("no skip preset %q; this project has: %s", id, strings.Join(ids, ", "))
+		}
+	}
+	drop := map[string]bool{}
+	for _, id := range off {
+		drop[id] = true
+	}
+	var out []string
+	for _, id := range append(spec.Skips, on...) {
+		if !drop[id] && !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	spec.Skips = out
+	return nil
 }

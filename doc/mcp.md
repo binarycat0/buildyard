@@ -7,7 +7,7 @@ The running daemon serves an [MCP](https://modelcontextprotocol.io) endpoint at 
 | Tool | What it does |
 | --- | --- |
 | `list_projects` | Projects with their directory, git branch, worktrees and saved tasks (command and last job). |
-| `run_task` | Queues a saved task. Optional `worktree`, `modules` (`-pl`), `also_make` (`-am`), `properties` (`-D`) and `extra_args` narrow the run, e.g. one test class with `properties: {"test": "FooTest"}`. |
+| `run_task` | Queues a saved task. Optional `worktree`, `modules` (`-pl`), `also_make` (`-am`), `properties` (`-D`), `extra_args`, and `skip` / `dont_skip` (skip preset ids) change this run only, e.g. one test class with `properties: {"test": "FooTest"}, dont_skip: ["tests"]`. |
 | `get_job` | Status, exit code, failed modules, problems found in the log and the end of the log. `wait_seconds` waits for the job to finish; `log_from` reads around a problem. |
 | `list_modules` | The project's Maven modules from the last discovery, with the ref `run_task` takes; `filter` searches, `refresh` starts a new discovery. |
 | `list_jobs` | A project's recent jobs: task, status, exit code, worktree, times. |

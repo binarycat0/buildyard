@@ -102,12 +102,26 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("cancel finished: %s", text)
 	}
 
+	var skipped struct {
+		Command string `json:"command"`
+	}
+	tool("run_task", `{"project":"app","task":"Quick","skip":["tests","checkstyle"],"dont_skip":["checkstyle"]}`, &skipped)
+	if !strings.HasSuffix(skipped.Command, "mvnw -B -DskipTests install") {
+		t.Fatalf("run_task with skips: %+v", skipped)
+	}
+	if text, isErr := tool("run_task", `{"project":"app","task":"Quick","skip":["nope"]}`, nil); !isErr || !strings.Contains(text, "tests, testCompile") {
+		t.Fatalf("unknown skip: %s", text)
+	}
+	if text, _ := tool("list_projects", `{}`, nil); !strings.Contains(text, `"skips": []`) {
+		t.Fatalf("list_projects skips: %s", text)
+	}
+
 	var jobs []struct {
 		ID   int64  `json:"id"`
 		Task string `json:"task"`
 	}
 	tool("list_jobs", `{"project":"app"}`, &jobs)
-	if len(jobs) != 1 || jobs[0].ID != run.Job || jobs[0].Task != "Quick" {
+	if len(jobs) != 2 || jobs[1].ID != run.Job || jobs[1].Task != "Quick" {
 		t.Fatalf("list_jobs: %+v", jobs)
 	}
 	var rerun struct {
