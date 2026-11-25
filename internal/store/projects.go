@@ -37,6 +37,7 @@ type JobSummary struct {
 // ProjectPatch holds the fields PATCH /api/projects/{id} may change. Nil means "leave as is".
 type ProjectPatch struct {
 	Name        *string            `json:"name"`
+	RootPath    *string            `json:"rootPath"`
 	Executable  *string            `json:"executable"` // "" resets to the global default
 	JdkID       *int64             `json:"jdkId"`      // 0 clears the project JDK
 	ToolJdkID   *int64             `json:"toolJdkId"`  // 0 resets to "use the project JDK"
@@ -106,6 +107,9 @@ func (s *Store) UpdateProject(ctx context.Context, id int64, patch ProjectPatch)
 	var args []any
 	if patch.Name != nil {
 		sets, args = append(sets, "name = ?"), append(args, *patch.Name)
+	}
+	if patch.RootPath != nil {
+		sets, args = append(sets, "root_path = ?"), append(args, *patch.RootPath)
 	}
 	if patch.Executable != nil {
 		sets, args = append(sets, "executable = ?"), append(args, nullIfEmpty(*patch.Executable))

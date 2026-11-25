@@ -94,6 +94,9 @@
             </div>
             <div class="facts small">
               <code class="path" :title="proj.rootPath" x-text="proj.rootPath"></code>
+              <span class="fact" x-show="runtime" :title="runtime?.git ? 'Git commit ' + (runtime.git.commit || 'none yet') : 'Not a git repository'">git
+                <strong x-show="runtime?.git" x-text="runtime?.git?.branch || ('detached ' + (runtime?.git?.commit || ''))"></strong>
+                <span class="muted" x-show="runtime && !runtime.git">none</span></span>
               <span class="fact" title="Build tool"><span class="badge" x-text="proj.buildTool"></span>
                 <strong x-show="runtime?.executable" x-text="runtime?.executable?.kind === 'wrapper' ? './mvnw' : runtime?.executable?.kind"></strong>
                 <span class="error" x-show="runtime?.executableError" x-text="runtime?.executableError"></span>
@@ -487,6 +490,8 @@
 
             <div class="stack" x-show="ptab === 'general'">
               <label>Name <input x-model="pform.name" required></label>
+              <label><span>Directory <span class="muted">(absolute path with a pom.xml)</span></span>
+                <input x-model="pform.rootPath" required></label>
               <label>JDK
                 <select x-model.number="pform.jdkId">
                   <option value="0" x-text="'Global default (' + jdkText(maven().jdkId, 'daemon JAVA_HOME') + ')'"></option>

@@ -33,15 +33,8 @@ func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON: "+err.Error())
 		return
 	}
-	root, err := project.Inspect(strings.TrimSpace(req.RootPath))
-	if err != nil {
-		code := "bad_path"
-		if errors.Is(err, project.ErrUnsupported) {
-			code = "unsupported_build_tool"
-		} else if errors.Is(err, project.ErrNoBuildFile) {
-			code = "no_build_file"
-		}
-		writeError(w, http.StatusBadRequest, code, err.Error())
+	root, ok := inspectRoot(w, req.RootPath)
+	if !ok {
 		return
 	}
 	name := strings.TrimSpace(req.Name)
@@ -84,6 +77,13 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "name must not be empty")
 		return
 	}
+	if patch.RootPath != nil {
+		root, ok := inspectRoot(w, *patch.RootPath)
+		if !ok {
+			return
+		}
+		patch.RootPath = &root.Path
+	}
 	if patch.SkipPresets != nil {
 		var arr []maven.SkipPreset
 		if json.Unmarshal(*patch.SkipPresets, &arr) != nil {
@@ -122,6 +122,22 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 	s.respondProject(w, p, err)
 }
 
+// inspectRoot validates a project directory and writes a 400 when it is not usable.
+func inspectRoot(w http.ResponseWriter, path string) (project.Root, bool) {
+	root, err := project.Inspect(strings.TrimSpace(path))
+	if err != nil {
+		code := "bad_path"
+		if errors.Is(err, project.ErrUnsupported) {
+			code = "unsupported_build_tool"
+		} else if errors.Is(err, project.ErrNoBuildFile) {
+			code = "no_build_file"
+		}
+		writeError(w, http.StatusBadRequest, code, err.Error())
+		return root, false
+	}
+	return root, true
+}
+
 func (s *Server) deleteProject(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -144,7 +160,7 @@ func (s *Server) respondProject(w http.ResponseWriter, p store.Project, err erro
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "project not found")
 	case errors.Is(err, store.ErrConflict):
-		writeError(w, http.StatusConflict, "conflict", err.Error())
+		writeError(w, http.StatusConflict, "duplicate_root", "a project with this root path already exists")
 	case err != nil:
 		s.internal(w, err)
 	default:
